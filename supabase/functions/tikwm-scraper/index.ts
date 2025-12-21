@@ -14,6 +14,7 @@ interface TikWMUserInfo {
   followerCount: number;
   followingCount: number;
   videoCount: number;
+  secUid: string;
 }
 
 interface TikWMVideo {
@@ -35,7 +36,10 @@ async function fetchUserInfo(username: string): Promise<TikWMUserInfo | null> {
   try {
     const response = await fetch('https://www.tikwm.com/api/user/info', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      headers: { 
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      },
       body: `unique_id=${encodeURIComponent(username)}`,
     });
     
@@ -43,7 +47,19 @@ async function fetchUserInfo(username: string): Promise<TikWMUserInfo | null> {
     console.log('TikWM user info response:', JSON.stringify(data));
     
     if (data.code === 0 && data.data) {
-      return data.data;
+      const user = data.data.user;
+      const stats = data.data.stats;
+      return {
+        id: user.id,
+        uniqueId: user.uniqueId,
+        nickname: user.nickname,
+        avatarLarger: user.avatarLarger,
+        signature: user.signature,
+        followerCount: stats.followerCount,
+        followingCount: stats.followingCount,
+        videoCount: stats.videoCount,
+        secUid: user.secUid,
+      };
     }
     return null;
   } catch (error) {
@@ -52,22 +68,35 @@ async function fetchUserInfo(username: string): Promise<TikWMUserInfo | null> {
   }
 }
 
-async function fetchAllVideos(username: string): Promise<TikWMVideo[]> {
+async function fetchAllVideos(secUid: string, username: string): Promise<TikWMVideo[]> {
   const allVideos: TikWMVideo[] = [];
   let cursor = '0';
   let hasMore = true;
   
   while (hasMore) {
     try {
-      console.log(`Fetching videos for ${username}, cursor: ${cursor}`);
+      console.log(`Fetching videos for ${username} (secUid: ${secUid.substring(0, 20)}...), cursor: ${cursor}`);
       
       const response = await fetch('https://www.tikwm.com/api/user/posts', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `unique_id=${encodeURIComponent(username)}&count=35&cursor=${cursor}`,
+        headers: { 
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        body: `secUid=${encodeURIComponent(secUid)}&count=35&cursor=${cursor}`,
       });
       
-      const data = await response.json();
+      // Check if response is HTML (error page) instead of JSON
+      const contentType = response.headers.get('content-type') || '';
+      const responseText = await response.text();
+      
+      if (!contentType.includes('application/json') || responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<')) {
+        console.error('TikWM returned HTML instead of JSON. Response:', responseText.substring(0, 200));
+        hasMore = false;
+        continue;
+      }
+      
+      const data = JSON.parse(responseText);
       console.log(`TikWM posts response - videos: ${data.data?.videos?.length || 0}, hasMore: ${data.data?.hasMore}`);
       
       if (data.code === 0 && data.data?.videos) {
@@ -86,6 +115,7 @@ async function fetchAllVideos(username: string): Promise<TikWMVideo[]> {
           await new Promise(resolve => setTimeout(resolve, 500));
         }
       } else {
+        console.log('TikWM API returned error or no videos:', JSON.stringify(data));
         hasMore = false;
       }
     } catch (error) {
@@ -209,8 +239,8 @@ Deno.serve(async (req) => {
 
     console.log(`Account saved: ${account.id}`);
 
-    // Fetch all videos
-    const videos = await fetchAllVideos(cleanUsername);
+    // Fetch all videos using secUid
+    const videos = await fetchAllVideos(userInfo.secUid, cleanUsername);
     console.log(`Fetched ${videos.length} videos`);
 
     // Get existing video IDs to avoid duplicates
