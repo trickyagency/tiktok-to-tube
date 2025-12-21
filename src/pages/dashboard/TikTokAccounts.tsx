@@ -8,6 +8,7 @@ import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
+import { ManualVideoImport } from '@/components/tiktok/ManualVideoImport';
 
 const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
@@ -68,7 +69,10 @@ const TikTokAccounts = () => {
         {/* Header with Add Button */}
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
-          <AddTikTokAccountDialog />
+          <div className="flex gap-2">
+            <ManualVideoImport />
+            <AddTikTokAccountDialog />
+          </div>
         </div>
 
         {/* Account List */}
