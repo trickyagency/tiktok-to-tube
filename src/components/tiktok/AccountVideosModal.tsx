@@ -1,7 +1,16 @@
+import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination';
 import { Eye, Heart, MessageCircle, Share2, ExternalLink } from 'lucide-react';
 import { useScrapedVideos, ScrapedVideo } from '@/hooks/useScrapedVideos';
 import { TikTokAccount } from '@/hooks/useTikTokAccounts';
@@ -30,8 +39,10 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
         {video.thumbnail_url ? (
           <img
             src={video.thumbnail_url}
-            alt={video.title || 'Video thumbnail'}
+            alt={video.title ? `TikTok video thumbnail: ${video.title}` : 'TikTok video thumbnail'}
             className="w-full h-full object-cover"
+            loading="lazy"
+            decoding="async"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-muted-foreground">
@@ -47,9 +58,7 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium line-clamp-2">
-            {video.title || 'Untitled video'}
-          </p>
+          <p className="text-sm font-medium line-clamp-2">{video.title || 'Untitled video'}</p>
           <ExternalLink className="h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
         </div>
 
@@ -98,15 +107,30 @@ function VideoSkeleton() {
 export function AccountVideosModal({ account, open, onOpenChange }: AccountVideosModalProps) {
   const { data: videos, isLoading } = useScrapedVideos(account?.id || null);
 
+  const PAGE_SIZE = 20;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    if (open) setPage(1);
+  }, [open, account?.id]);
+
+  const total = videos?.length ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const pageVideos = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return videos?.slice(start, start + PAGE_SIZE) ?? [];
+  }, [page, videos]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
           <DialogTitle>
             Videos from @{account?.username}
-            {videos && (
+            {typeof total === 'number' && (
               <Badge variant="secondary" className="ml-2">
-                {videos.length} videos
+                {total} videos
               </Badge>
             )}
           </DialogTitle>
@@ -119,9 +143,9 @@ export function AccountVideosModal({ account, open, onOpenChange }: AccountVideo
                 <VideoSkeleton key={i} />
               ))}
             </div>
-          ) : videos && videos.length > 0 ? (
+          ) : total > 0 ? (
             <div className="space-y-1">
-              {videos.map((video) => (
+              {pageVideos.map((video) => (
                 <VideoCard key={video.id} video={video} />
               ))}
             </div>
@@ -131,6 +155,58 @@ export function AccountVideosModal({ account, open, onOpenChange }: AccountVideo
             </div>
           )}
         </ScrollArea>
+
+        {!isLoading && total > PAGE_SIZE && (
+          <div className="pt-2">
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.max(1, p - 1));
+                    }}
+                    className={page <= 1 ? 'pointer-events-none opacity-50' : undefined}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: Math.min(5, totalPages) }).map((_, idx) => {
+                  const p = idx + 1;
+                  return (
+                    <PaginationItem key={p}>
+                      <PaginationLink
+                        href="#"
+                        isActive={p === page}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPage(p);
+                        }}
+                      >
+                        {p}
+                      </PaginationLink>
+                    </PaginationItem>
+                  );
+                })}
+
+                <PaginationItem>
+                  <PaginationNext
+                    href="#"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage((p) => Math.min(totalPages, p + 1));
+                    }}
+                    className={page >= totalPages ? 'pointer-events-none opacity-50' : undefined}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+
+            <p className="mt-2 text-xs text-muted-foreground text-center">
+              Page {page} of {totalPages}
+            </p>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

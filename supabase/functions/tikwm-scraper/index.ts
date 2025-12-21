@@ -72,58 +72,110 @@ async function fetchAllVideos(secUid: string, username: string): Promise<TikWMVi
   const allVideos: TikWMVideo[] = [];
   let cursor = '0';
   let hasMore = true;
-  
+
+  const baseUrls = ['https://www.tikwm.com', 'https://tikwm.com'];
+
+  const browserHeaders: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'User-Agent':
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Accept': 'application/json, text/plain, */*',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Origin': 'https://www.tikwm.com',
+    'Referer': 'https://www.tikwm.com/',
+  };
+
+  const looksLikeJson = (text: string) => {
+    const t = text.trimStart();
+    return t.startsWith('{') || t.startsWith('[');
+  };
+
+  const isCloudflareChallenge = (text: string) => {
+    return (
+      text.includes('Just a moment...') ||
+      text.includes('cf-chl') ||
+      text.trimStart().startsWith('<!DOCTYPE') ||
+      text.trimStart().startsWith('<html')
+    );
+  };
+
   while (hasMore) {
-    try {
-      console.log(`Fetching videos for ${username} (secUid: ${secUid.substring(0, 20)}...), cursor: ${cursor}`);
-      
-      const response = await fetch('https://www.tikwm.com/api/user/posts', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-        body: `secUid=${encodeURIComponent(secUid)}&count=35&cursor=${cursor}`,
-      });
-      
-      // Check if response is HTML (error page) instead of JSON
-      const contentType = response.headers.get('content-type') || '';
-      const responseText = await response.text();
-      
-      if (!contentType.includes('application/json') || responseText.startsWith('<!DOCTYPE') || responseText.startsWith('<')) {
-        console.error('TikWM returned HTML instead of JSON. Response:', responseText.substring(0, 200));
-        hasMore = false;
-        continue;
-      }
-      
-      const data = JSON.parse(responseText);
-      console.log(`TikWM posts response - videos: ${data.data?.videos?.length || 0}, hasMore: ${data.data?.hasMore}`);
-      
-      if (data.code === 0 && data.data?.videos) {
-        allVideos.push(...data.data.videos);
-        hasMore = data.data.hasMore === true;
-        cursor = data.data.cursor || '0';
-        
-        // Safety limit to prevent infinite loops
-        if (allVideos.length > 1000) {
-          console.log('Reached 1000 video limit, stopping pagination');
+    console.log(`Fetching videos for ${username}, cursor: ${cursor}`);
+
+    let pageData: any | null = null;
+    let blocked = false;
+
+    for (const baseUrl of baseUrls) {
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const response = await fetch(`${baseUrl}/api/user/posts`, {
+            method: 'POST',
+            headers: browserHeaders,
+            body: `secUid=${encodeURIComponent(secUid)}&count=35&cursor=${cursor}`,
+          });
+
+          const responseText = await response.text();
+          console.log(
+            `TikWM posts (${baseUrl}) status=${response.status} attempt=${attempt} firstChars=${JSON.stringify(responseText.substring(0, 60))}`,
+          );
+
+          if (!looksLikeJson(responseText)) {
+            if (isCloudflareChallenge(responseText)) {
+              blocked = true;
+              const delayMs = 1000 * attempt;
+              console.error(`TikWM blocked by Cloudflare (attempt ${attempt}). Waiting ${delayMs}ms...`);
+              await new Promise((r) => setTimeout(r, delayMs));
+              continue;
+            }
+
+            console.error('TikWM returned non-JSON response:', responseText.substring(0, 200));
+            continue;
+          }
+
+          pageData = JSON.parse(responseText);
+          blocked = false;
           break;
+        } catch (error) {
+          console.error(`Error fetching videos from ${baseUrl} attempt ${attempt}:`, error);
+          await new Promise((r) => setTimeout(r, 500 * attempt));
         }
-        
-        // Small delay between requests to avoid rate limiting
-        if (hasMore) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
-      } else {
-        console.log('TikWM API returned error or no videos:', JSON.stringify(data));
-        hasMore = false;
       }
-    } catch (error) {
-      console.error('Error fetching videos:', error);
+
+      if (pageData) break;
+    }
+
+    if (!pageData) {
+      if (blocked) {
+        console.error('TikWM posts endpoint is blocked (Cloudflare). Cannot scrape videos from this environment.');
+      }
+      break;
+    }
+
+    console.log(
+      `TikWM posts response - code: ${pageData.code}, videos: ${pageData.data?.videos?.length || 0}, hasMore: ${pageData.data?.hasMore}`,
+    );
+
+    if (pageData.code === 0 && pageData.data?.videos) {
+      allVideos.push(...pageData.data.videos);
+      hasMore = pageData.data.hasMore === true;
+      cursor = pageData.data.cursor || '0';
+
+      // Safety limit to prevent infinite loops
+      if (allVideos.length > 1000) {
+        console.log('Reached 1000 video limit, stopping pagination');
+        break;
+      }
+
+      // Small delay between requests to avoid rate limiting
+      if (hasMore) {
+        await new Promise((resolve) => setTimeout(resolve, 750));
+      }
+    } else {
+      console.log('TikWM API returned error or no videos:', JSON.stringify(pageData));
       hasMore = false;
     }
   }
-  
+
   return allVideos;
 }
 
