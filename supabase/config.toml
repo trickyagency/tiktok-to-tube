@@ -1,1 +1,4 @@
 project_id = "qpufyeeqosvgipslwday"
+
+[functions.tikwm-scraper]
+verify_jwt = false
