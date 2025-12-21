@@ -17,14 +17,12 @@ interface TikWMUserInfo {
   secUid: string;
 }
 
-interface TikWMVideo {
+interface TikTokVideo {
   id: string;
   title: string;
   duration: number;
   cover: string;
   play: string;
-  wmplay: string;
-  music: string;
   play_count: number;
   digg_count: number;
   comment_count: number;
@@ -32,6 +30,7 @@ interface TikWMVideo {
   create_time: number;
 }
 
+// Fetch user info from TikWM (still works)
 async function fetchUserInfo(username: string): Promise<TikWMUserInfo | null> {
   try {
     const response = await fetch('https://www.tikwm.com/api/user/info', {
@@ -68,115 +67,183 @@ async function fetchUserInfo(username: string): Promise<TikWMUserInfo | null> {
   }
 }
 
-async function fetchAllVideos(secUid: string, username: string): Promise<TikWMVideo[]> {
-  const allVideos: TikWMVideo[] = [];
-  let cursor = '0';
+// Fetch videos using TikTok's native item_list API
+async function fetchVideosFromTikTok(secUid: string, username: string): Promise<TikTokVideo[]> {
+  const allVideos: TikTokVideo[] = [];
+  let cursor = 0;
   let hasMore = true;
 
-  const baseUrls = ['https://www.tikwm.com', 'https://tikwm.com'];
-
-  const browserHeaders: Record<string, string> = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'User-Agent':
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    'Accept': 'application/json, text/plain, */*',
-    'Accept-Language': 'en-US,en;q=0.9',
-    'Origin': 'https://www.tikwm.com',
-    'Referer': 'https://www.tikwm.com/',
-  };
-
-  const looksLikeJson = (text: string) => {
-    const t = text.trimStart();
-    return t.startsWith('{') || t.startsWith('[');
-  };
-
-  const isCloudflareChallenge = (text: string) => {
-    return (
-      text.includes('Just a moment...') ||
-      text.includes('cf-chl') ||
-      text.trimStart().startsWith('<!DOCTYPE') ||
-      text.trimStart().startsWith('<html')
-    );
-  };
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+  ];
 
   while (hasMore) {
-    console.log(`Fetching videos for ${username}, cursor: ${cursor}`);
+    console.log(`Fetching videos for ${username} using TikTok API, cursor: ${cursor}`);
 
-    let pageData: any | null = null;
-    let blocked = false;
+    let pageData: any = null;
+    
+    // Try TikTok's native item_list API
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const userAgent = userAgents[attempt - 1] || userAgents[0];
+        const params = new URLSearchParams({
+          aid: '1988',
+          count: '35',
+          cursor: cursor.toString(),
+          secUid: secUid,
+          device_platform: 'web_pc',
+          WebIdLastTime: Date.now().toString(),
+        });
 
-    for (const baseUrl of baseUrls) {
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          const response = await fetch(`${baseUrl}/api/user/posts`, {
-            method: 'POST',
-            headers: browserHeaders,
-            body: `secUid=${encodeURIComponent(secUid)}&count=35&cursor=${cursor}`,
-          });
+        const url = `https://www.tiktok.com/api/post/item_list/?${params.toString()}`;
+        console.log(`TikTok API attempt ${attempt}: ${url.substring(0, 100)}...`);
 
-          const responseText = await response.text();
-          console.log(
-            `TikWM posts (${baseUrl}) status=${response.status} attempt=${attempt} firstChars=${JSON.stringify(responseText.substring(0, 60))}`,
-          );
+        const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+            'User-Agent': userAgent,
+            'Accept': 'application/json, text/plain, */*',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': `https://www.tiktok.com/@${username}`,
+            'Origin': 'https://www.tiktok.com',
+          },
+        });
 
-          if (!looksLikeJson(responseText)) {
-            if (isCloudflareChallenge(responseText)) {
-              blocked = true;
-              const delayMs = 1000 * attempt;
-              console.error(`TikWM blocked by Cloudflare (attempt ${attempt}). Waiting ${delayMs}ms...`);
-              await new Promise((r) => setTimeout(r, delayMs));
-              continue;
-            }
+        const responseText = await response.text();
+        console.log(`TikTok API response status=${response.status}, length=${responseText.length}, firstChars=${JSON.stringify(responseText.substring(0, 100))}`);
 
-            console.error('TikWM returned non-JSON response:', responseText.substring(0, 200));
-            continue;
-          }
-
+        if (response.status === 200 && responseText.startsWith('{')) {
           pageData = JSON.parse(responseText);
-          blocked = false;
-          break;
-        } catch (error) {
-          console.error(`Error fetching videos from ${baseUrl} attempt ${attempt}:`, error);
-          await new Promise((r) => setTimeout(r, 500 * attempt));
+          if (pageData.itemList || pageData.statusCode === 0) {
+            console.log(`TikTok API success: ${pageData.itemList?.length || 0} videos`);
+            break;
+          }
         }
-      }
 
-      if (pageData) break;
+        // If TikTok API failed, try SSSTik approach
+        console.log(`TikTok API attempt ${attempt} failed, trying alternative...`);
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+        
+      } catch (error) {
+        console.error(`TikTok API attempt ${attempt} error:`, error);
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      }
     }
 
-    if (!pageData) {
-      if (blocked) {
-        console.error('TikWM posts endpoint is blocked (Cloudflare). Cannot scrape videos from this environment.');
-      }
+    // If TikTok native API failed, try alternative scraping method
+    if (!pageData?.itemList) {
+      console.log('TikTok native API failed, trying SSSTik-style approach...');
+      pageData = await fetchVideosAlternative(secUid, username, cursor);
+    }
+
+    if (!pageData?.itemList && !pageData?.videos) {
+      console.log('All video fetching methods failed');
+      hasMore = false;
       break;
     }
 
-    console.log(
-      `TikWM posts response - code: ${pageData.code}, videos: ${pageData.data?.videos?.length || 0}, hasMore: ${pageData.data?.hasMore}`,
-    );
+    // Parse videos from whichever source worked
+    const videoList = pageData.itemList || pageData.videos || [];
+    
+    for (const item of videoList) {
+      const video: TikTokVideo = {
+        id: item.id || item.video_id,
+        title: item.desc || item.title || '',
+        duration: item.video?.duration || item.duration || 0,
+        cover: item.video?.cover || item.cover || '',
+        play: item.video?.playAddr || item.play || item.video?.downloadAddr || '',
+        play_count: item.stats?.playCount || item.play_count || 0,
+        digg_count: item.stats?.diggCount || item.digg_count || 0,
+        comment_count: item.stats?.commentCount || item.comment_count || 0,
+        share_count: item.stats?.shareCount || item.share_count || 0,
+        create_time: item.createTime || item.create_time || 0,
+      };
+      allVideos.push(video);
+    }
 
-    if (pageData.code === 0 && pageData.data?.videos) {
-      allVideos.push(...pageData.data.videos);
-      hasMore = pageData.data.hasMore === true;
-      cursor = pageData.data.cursor || '0';
+    hasMore = pageData.hasMore === true || pageData.has_more === true;
+    cursor = pageData.cursor || (cursor + 35);
 
-      // Safety limit to prevent infinite loops
-      if (allVideos.length > 1000) {
-        console.log('Reached 1000 video limit, stopping pagination');
-        break;
-      }
+    console.log(`Fetched ${videoList.length} videos, total: ${allVideos.length}, hasMore: ${hasMore}`);
 
-      // Small delay between requests to avoid rate limiting
-      if (hasMore) {
-        await new Promise((resolve) => setTimeout(resolve, 750));
-      }
-    } else {
-      console.log('TikWM API returned error or no videos:', JSON.stringify(pageData));
-      hasMore = false;
+    // Safety limit
+    if (allVideos.length >= 500) {
+      console.log('Reached 500 video limit');
+      break;
+    }
+
+    if (hasMore) {
+      await new Promise(r => setTimeout(r, 1000));
     }
   }
 
   return allVideos;
+}
+
+// Alternative method using a public TikTok data endpoint
+async function fetchVideosAlternative(secUid: string, username: string, cursor: number): Promise<any> {
+  try {
+    // Try the TikTok web embed data approach
+    const profileUrl = `https://www.tiktok.com/@${username}`;
+    console.log(`Fetching profile page: ${profileUrl}`);
+
+    const response = await fetch(profileUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+    });
+
+    const html = await response.text();
+    console.log(`Profile page response: status=${response.status}, length=${html.length}`);
+
+    // Try to extract SIGI_STATE data which contains video info
+    const sigiMatch = html.match(/<script id="SIGI_STATE" type="application\/json">(.+?)<\/script>/s);
+    if (sigiMatch) {
+      const sigiData = JSON.parse(sigiMatch[1]);
+      console.log('Found SIGI_STATE data');
+      
+      if (sigiData.ItemModule) {
+        const videos = Object.values(sigiData.ItemModule).map((item: any) => ({
+          id: item.id,
+          desc: item.desc,
+          video: {
+            duration: item.video?.duration,
+            cover: item.video?.cover,
+            playAddr: item.video?.playAddr,
+          },
+          stats: item.stats,
+          createTime: item.createTime,
+        }));
+        
+        return { itemList: videos, hasMore: false };
+      }
+    }
+
+    // Try __UNIVERSAL_DATA_FOR_REHYDRATION__
+    const universalMatch = html.match(/<script id="__UNIVERSAL_DATA_FOR_REHYDRATION__" type="application\/json">(.+?)<\/script>/s);
+    if (universalMatch) {
+      const universalData = JSON.parse(universalMatch[1]);
+      console.log('Found __UNIVERSAL_DATA_FOR_REHYDRATION__ data');
+      
+      const defaultScope = universalData?.__DEFAULT_SCOPE__;
+      const itemList = defaultScope?.['webapp.user-detail']?.userInfo?.user?.itemList ||
+                       defaultScope?.['webapp.user-detail']?.itemList;
+      
+      if (itemList) {
+        return { itemList, hasMore: false };
+      }
+    }
+
+    console.log('Could not extract video data from profile page');
+    return null;
+  } catch (error) {
+    console.error('Alternative fetch error:', error);
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -227,7 +294,7 @@ Deno.serve(async (req) => {
     // Clean username (remove @ if present)
     const cleanUsername = username.replace(/^@/, '').trim();
 
-    // Fetch user info
+    // Fetch user info from TikWM (still works)
     const userInfo = await fetchUserInfo(cleanUsername);
     
     if (!userInfo) {
@@ -291,9 +358,9 @@ Deno.serve(async (req) => {
 
     console.log(`Account saved: ${account.id}`);
 
-    // Fetch all videos using secUid
-    const videos = await fetchAllVideos(userInfo.secUid, cleanUsername);
-    console.log(`Fetched ${videos.length} videos`);
+    // Fetch videos using TikTok's native API
+    const videos = await fetchVideosFromTikTok(userInfo.secUid, cleanUsername);
+    console.log(`Fetched ${videos.length} videos total`);
 
     // Get existing video IDs to avoid duplicates
     const { data: existingVideos } = await supabase
@@ -339,13 +406,12 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Update account status and video count
+    // Update account status
     const { error: updateError } = await supabase
       .from('tiktok_accounts')
       .update({
-        scrape_status: 'completed',
+        scrape_status: videos.length > 0 ? 'completed' : 'partial',
         last_scraped_at: new Date().toISOString(),
-        video_count: videos.length,
       })
       .eq('id', account.id);
 
