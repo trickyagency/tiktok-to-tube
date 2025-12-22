@@ -14,6 +14,7 @@ import UploadHistory from "./pages/dashboard/UploadHistory";
 import Settings from "./pages/dashboard/Settings";
 import CronMonitor from "./pages/dashboard/CronMonitor";
 import UserManagement from "./pages/dashboard/UserManagement";
+import Analytics from "./pages/dashboard/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -89,6 +90,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <UserManagement />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/analytics"
+              element={
+                <ProtectedRoute>
+                  <Analytics />
                 </ProtectedRoute>
               }
             />

@@ -9,6 +9,8 @@ export interface UserWithRole {
   full_name: string | null;
   created_at: string;
   role: 'owner' | 'admin' | 'user';
+  email_confirmed_at: string | null;
+  last_sign_in_at: string | null;
 }
 
 export interface PendingInvitation {
@@ -19,6 +21,13 @@ export interface PendingInvitation {
   invited_at: string;
   status: string;
   expires_at: string;
+}
+
+interface AuthMetadata {
+  user_id: string;
+  email_confirmed_at: string | null;
+  last_sign_in_at: string | null;
+  auth_created_at: string | null;
 }
 
 export function useAllUsers() {
@@ -40,6 +49,18 @@ export function useAllUsers() {
 
       if (rolesError) throw rolesError;
 
+      // Fetch auth metadata using the secure function
+      const { data: authMetadata, error: authError } = await supabase
+        .rpc('get_user_auth_metadata');
+
+      // Map auth metadata by user_id
+      const authMap = new Map<string, AuthMetadata>();
+      if (!authError && authMetadata) {
+        (authMetadata as AuthMetadata[]).forEach(meta => {
+          authMap.set(meta.user_id, meta);
+        });
+      }
+
       // Map roles to users
       const roleMap = new Map<string, 'owner' | 'admin' | 'user'>();
       roles?.forEach(r => {
@@ -54,14 +75,19 @@ export function useAllUsers() {
         }
       });
 
-      const usersWithRoles: UserWithRole[] = profiles?.map(profile => ({
-        id: profile.id,
-        user_id: profile.user_id,
-        email: profile.email,
-        full_name: profile.full_name,
-        created_at: profile.created_at,
-        role: roleMap.get(profile.user_id) || 'user',
-      })) || [];
+      const usersWithRoles: UserWithRole[] = profiles?.map(profile => {
+        const auth = authMap.get(profile.user_id);
+        return {
+          id: profile.id,
+          user_id: profile.user_id,
+          email: profile.email,
+          full_name: profile.full_name,
+          created_at: profile.created_at,
+          role: roleMap.get(profile.user_id) || 'user',
+          email_confirmed_at: auth?.email_confirmed_at || null,
+          last_sign_in_at: auth?.last_sign_in_at || null,
+        };
+      }) || [];
 
       return usersWithRoles;
     },
