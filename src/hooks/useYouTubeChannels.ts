@@ -126,12 +126,7 @@ export function useYouTubeChannels() {
 
   const startOAuth = async (channelId: string) => {
     try {
-      const response = await supabase.functions.invoke('youtube-oauth', {
-        body: null,
-        headers: {},
-      });
-
-      // Build the URL manually since we need query params
+      // Build the URL with query params for the OAuth flow
       const oauthUrl = `https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=start-auth&channel_id=${channelId}`;
       
       const res = await fetch(oauthUrl);
