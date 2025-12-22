@@ -1,5 +1,27 @@
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import DashboardSidebar from './DashboardSidebar';
+import { Bell, Plus, LogOut, Settings, User, ChevronDown, Home } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -7,23 +29,164 @@ interface DashboardLayoutProps {
   description?: string;
 }
 
+const routeLabels: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/dashboard/youtube': 'YouTube Channels',
+  '/dashboard/tiktok': 'TikTok Accounts',
+  '/dashboard/queue': 'Video Queue',
+  '/dashboard/history': 'Upload History',
+  '/dashboard/cron': 'Cron Monitor',
+  '/dashboard/users': 'Users',
+  '/dashboard/analytics': 'Analytics',
+  '/dashboard/settings': 'Settings',
+};
+
 const DashboardLayout = ({ children, title, description }: DashboardLayoutProps) => {
+  const location = useLocation();
+  const { user, signOut } = useAuth();
+  const [notificationCount] = useState(0);
+
+  const getBreadcrumbs = () => {
+    const path = location.pathname;
+    if (path === '/dashboard') {
+      return null;
+    }
+    return routeLabels[path] || title;
+  };
+
+  const getUserInitials = () => {
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
+  const currentBreadcrumb = getBreadcrumbs();
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar />
         <main className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b border-border px-6 py-4">
-            <div className="flex items-center gap-4">
-              <SidebarTrigger className="-ml-1" />
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-                {description && (
-                  <p className="text-sm text-muted-foreground">{description}</p>
-                )}
+          {/* Enhanced Header */}
+          <header className="sticky top-0 z-10 glass border-b border-border">
+            <div className="flex items-center justify-between h-16 px-6">
+              {/* Left: Trigger + Breadcrumbs */}
+              <div className="flex items-center gap-4">
+                <SidebarTrigger className="-ml-1 h-9 w-9" />
+                
+                <Breadcrumb>
+                  <BreadcrumbList>
+                    <BreadcrumbItem>
+                      {location.pathname === '/dashboard' ? (
+                        <BreadcrumbPage className="flex items-center gap-2">
+                          <Home className="h-4 w-4" />
+                          Dashboard
+                        </BreadcrumbPage>
+                      ) : (
+                        <BreadcrumbLink asChild>
+                          <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
+                            <Home className="h-4 w-4" />
+                            Dashboard
+                          </Link>
+                        </BreadcrumbLink>
+                      )}
+                    </BreadcrumbItem>
+                    {currentBreadcrumb && (
+                      <>
+                        <BreadcrumbSeparator />
+                        <BreadcrumbItem>
+                          <BreadcrumbPage>{currentBreadcrumb}</BreadcrumbPage>
+                        </BreadcrumbItem>
+                      </>
+                    )}
+                  </BreadcrumbList>
+                </Breadcrumb>
+              </div>
+
+              {/* Right: Quick Actions + Notifications + User Menu */}
+              <div className="flex items-center gap-3">
+                {/* Quick Add Button */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm" className="gradient-primary text-white border-0 shadow-glow gap-2">
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden sm:inline">Add New</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard/youtube">Add YouTube Channel</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard/tiktok">Add TikTok Account</Link>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                {/* Notifications */}
+                <Button variant="ghost" size="icon" className="relative h-9 w-9">
+                  <Bell className="h-4 w-4" />
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-medium flex items-center justify-center">
+                      {notificationCount}
+                    </span>
+                  )}
+                </Button>
+
+                {/* User Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="h-9 gap-2 px-2">
+                      <Avatar className="h-7 w-7 border border-border">
+                        <AvatarImage src="" alt={user?.email || 'User'} />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                          {getUserInitials()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuLabel className="font-normal">
+                      <div className="flex flex-col space-y-1">
+                        <p className="text-sm font-medium">{user?.email?.split('@')[0]}</p>
+                        <p className="text-xs text-muted-foreground">{user?.email}</p>
+                      </div>
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard/settings" className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Profile
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/dashboard/settings" className="flex items-center gap-2">
+                        <Settings className="h-4 w-4" />
+                        Settings
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={signOut} className="text-destructive focus:text-destructive">
+                      <LogOut className="h-4 w-4 mr-2" />
+                      Sign Out
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
+
+            {/* Page Title */}
+            <div className="px-6 pb-4">
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              {description && (
+                <p className="text-sm text-muted-foreground mt-0.5">{description}</p>
+              )}
+            </div>
           </header>
+
           <div className="flex-1 p-6">
             {children}
           </div>
