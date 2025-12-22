@@ -90,6 +90,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
             Connected
           </Badge>
         );
+      case 'no_channel':
+        return (
+          <Badge variant="default" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            No YouTube Channel
+          </Badge>
+        );
       case 'authorizing':
         return (
           <Badge variant="secondary">
@@ -150,6 +157,21 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                   <Video className="h-3.5 w-3.5" />
                   {channel.video_count} videos
                 </span>
+              </div>
+            )}
+
+            {channel.auth_status === 'no_channel' && (
+              <div className="text-sm text-amber-600 mb-2">
+                <p className="mb-1">Your Google account doesn't have a YouTube channel yet.</p>
+                <a 
+                  href="https://www.youtube.com/create_channel" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Create YouTube Channel
+                </a>
               </div>
             )}
 

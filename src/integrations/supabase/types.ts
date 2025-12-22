@@ -530,7 +530,7 @@ export type Database = {
         Row: {
           access_token: string | null
           auth_status: string | null
-          channel_id: string
+          channel_id: string | null
           channel_thumbnail: string | null
           channel_title: string | null
           created_at: string
@@ -551,7 +551,7 @@ export type Database = {
         Insert: {
           access_token?: string | null
           auth_status?: string | null
-          channel_id: string
+          channel_id?: string | null
           channel_thumbnail?: string | null
           channel_title?: string | null
           created_at?: string
@@ -572,7 +572,7 @@ export type Database = {
         Update: {
           access_token?: string | null
           auth_status?: string | null
-          channel_id?: string
+          channel_id?: string | null
           channel_thumbnail?: string | null
           channel_title?: string | null
           created_at?: string

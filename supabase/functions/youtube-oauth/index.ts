@@ -255,7 +255,8 @@ serve(async (req) => {
       let channelThumbnail = null;
       let subscriberCount = 0;
       let videoCount = 0;
-      let youtubeChannelId = null;
+      let youtubeChannelId: string | null = null;
+      let authStatus = 'connected';
 
       if (channelInfo.items && channelInfo.items.length > 0) {
         const ytChannel = channelInfo.items[0];
@@ -264,6 +265,11 @@ serve(async (req) => {
         channelThumbnail = ytChannel.snippet?.thumbnails?.default?.url || null;
         subscriberCount = parseInt(ytChannel.statistics?.subscriberCount || '0', 10);
         videoCount = parseInt(ytChannel.statistics?.videoCount || '0', 10);
+      } else {
+        // No YouTube channel found - user hasn't created one yet
+        console.warn('No YouTube channel found for this Google account');
+        channelTitle = 'No YouTube Channel';
+        authStatus = 'no_channel';
       }
 
       // Calculate token expiration time
@@ -281,8 +287,8 @@ serve(async (req) => {
           access_token: tokenData.access_token,
           refresh_token: tokenData.refresh_token,
           token_expires_at: tokenExpiresAt,
-          auth_status: 'connected',
-          is_connected: true,
+          auth_status: authStatus,
+          is_connected: authStatus === 'connected',
         })
         .eq('id', stateObj.channel_id);
 
