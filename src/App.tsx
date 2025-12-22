@@ -13,6 +13,7 @@ import VideoQueue from "./pages/dashboard/VideoQueue";
 import UploadHistory from "./pages/dashboard/UploadHistory";
 import Settings from "./pages/dashboard/Settings";
 import CronMonitor from "./pages/dashboard/CronMonitor";
+import UserManagement from "./pages/dashboard/UserManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -80,6 +81,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <CronMonitor />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/users"
+              element={
+                <ProtectedRoute>
+                  <UserManagement />
                 </ProtectedRoute>
               }
             />
