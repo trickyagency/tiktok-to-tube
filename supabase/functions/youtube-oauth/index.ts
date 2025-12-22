@@ -1,0 +1,429 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+
+// YouTube OAuth scopes
+const YOUTUBE_SCOPES = [
+  'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/youtube.upload'
+].join(' ');
+
+// Base64url encode/decode helpers
+function base64urlEncode(obj: object): string {
+  const json = JSON.stringify(obj);
+  const base64 = btoa(json);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function base64urlDecode(str: string): object {
+  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  while (base64.length % 4) base64 += '=';
+  const json = atob(base64);
+  return JSON.parse(json);
+}
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const url = new URL(req.url);
+  const action = url.searchParams.get('action');
+
+  try {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // ============================================
+    // ACTION: start-auth
+    // Initiates OAuth flow for a specific channel
+    // ============================================
+    if (action === 'start-auth') {
+      const channelId = url.searchParams.get('channel_id');
+      const redirectUrl = url.searchParams.get('redirect_url'); // Where to redirect after success
+
+      if (!channelId) {
+        return new Response(JSON.stringify({ error: 'channel_id is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`Starting OAuth for channel: ${channelId}`);
+
+      // Fetch channel's Google credentials from database
+      const { data: channel, error: channelError } = await supabase
+        .from('youtube_channels')
+        .select('id, user_id, google_client_id, google_redirect_uri')
+        .eq('id', channelId)
+        .single();
+
+      if (channelError || !channel) {
+        console.error('Channel not found:', channelError);
+        return new Response(JSON.stringify({ error: 'Channel not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!channel.google_client_id) {
+        return new Response(JSON.stringify({ error: 'Channel missing Google Client ID' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Use channel's custom redirect URI or default callback URL
+      const callbackUrl = channel.google_redirect_uri || 
+        `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
+
+      // Create state object with channel info (encoded as base64url)
+      const stateObj = {
+        channel_id: channel.id,
+        user_id: channel.user_id,
+        redirect_url: redirectUrl || '',
+        ts: Date.now()
+      };
+      const state = base64urlEncode(stateObj);
+
+      // Build Google OAuth URL using THIS channel's client_id
+      const oauthUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+      oauthUrl.searchParams.set('client_id', channel.google_client_id);
+      oauthUrl.searchParams.set('redirect_uri', callbackUrl);
+      oauthUrl.searchParams.set('response_type', 'code');
+      oauthUrl.searchParams.set('scope', YOUTUBE_SCOPES);
+      oauthUrl.searchParams.set('access_type', 'offline');
+      oauthUrl.searchParams.set('prompt', 'consent');
+      oauthUrl.searchParams.set('state', state);
+
+      console.log(`OAuth URL generated for channel ${channelId}`);
+
+      // Update channel status to 'authorizing'
+      await supabase
+        .from('youtube_channels')
+        .update({ auth_status: 'authorizing' })
+        .eq('id', channelId);
+
+      // Return the OAuth URL (frontend will redirect user)
+      return new Response(JSON.stringify({ oauth_url: oauthUrl.toString() }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ============================================
+    // ACTION: callback
+    // Handles OAuth callback from Google
+    // ============================================
+    if (action === 'callback') {
+      const code = url.searchParams.get('code');
+      const state = url.searchParams.get('state');
+      const error = url.searchParams.get('error');
+
+      console.log('OAuth callback received');
+
+      if (error) {
+        console.error('OAuth error from Google:', error);
+        return new Response(`
+          <html>
+            <body>
+              <script>
+                window.opener?.postMessage({ type: 'youtube-oauth-error', error: '${error}' }, '*');
+                window.close();
+              </script>
+              <p>Authorization failed: ${error}. You can close this window.</p>
+            </body>
+          </html>
+        `, {
+          headers: { 'Content-Type': 'text/html' },
+        });
+      }
+
+      if (!code || !state) {
+        return new Response('Missing code or state parameter', {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+
+      // Decode state to get channel info
+      let stateObj: { channel_id: string; user_id: string; redirect_url: string };
+      try {
+        stateObj = base64urlDecode(state) as typeof stateObj;
+      } catch (e) {
+        console.error('Failed to decode state:', e);
+        return new Response('Invalid state parameter', {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+
+      console.log(`Processing callback for channel: ${stateObj.channel_id}`);
+
+      // Fetch THIS channel's credentials from database
+      const { data: channel, error: channelError } = await supabase
+        .from('youtube_channels')
+        .select('id, google_client_id, google_client_secret, google_redirect_uri')
+        .eq('id', stateObj.channel_id)
+        .single();
+
+      if (channelError || !channel) {
+        console.error('Channel not found in callback:', channelError);
+        return new Response('Channel not found', {
+          status: 404,
+          headers: corsHeaders,
+        });
+      }
+
+      if (!channel.google_client_id || !channel.google_client_secret) {
+        console.error('Channel missing OAuth credentials');
+        return new Response('Channel missing OAuth credentials', {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+
+      const callbackUrl = channel.google_redirect_uri || 
+        `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
+
+      // Exchange authorization code for tokens using THIS channel's credentials
+      console.log('Exchanging code for tokens...');
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: channel.google_client_id,
+          client_secret: channel.google_client_secret,
+          code: code,
+          grant_type: 'authorization_code',
+          redirect_uri: callbackUrl,
+        }),
+      });
+
+      const tokenData = await tokenResponse.json();
+
+      if (tokenData.error) {
+        console.error('Token exchange error:', tokenData);
+        
+        // Update channel status to failed
+        await supabase
+          .from('youtube_channels')
+          .update({ auth_status: 'failed' })
+          .eq('id', stateObj.channel_id);
+
+        return new Response(`
+          <html>
+            <body>
+              <script>
+                window.opener?.postMessage({ type: 'youtube-oauth-error', error: '${tokenData.error_description || tokenData.error}' }, '*');
+                window.close();
+              </script>
+              <p>Token exchange failed: ${tokenData.error_description || tokenData.error}. You can close this window.</p>
+            </body>
+          </html>
+        `, {
+          headers: { 'Content-Type': 'text/html' },
+        });
+      }
+
+      console.log('Tokens received successfully');
+
+      // Fetch YouTube channel info using the access token
+      console.log('Fetching YouTube channel info...');
+      const channelInfoResponse = await fetch(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true',
+        {
+          headers: {
+            'Authorization': `Bearer ${tokenData.access_token}`,
+          },
+        }
+      );
+
+      const channelInfo = await channelInfoResponse.json();
+      console.log('Channel info response:', JSON.stringify(channelInfo));
+
+      let channelTitle = 'Unknown Channel';
+      let channelThumbnail = null;
+      let subscriberCount = 0;
+      let videoCount = 0;
+      let youtubeChannelId = null;
+
+      if (channelInfo.items && channelInfo.items.length > 0) {
+        const ytChannel = channelInfo.items[0];
+        youtubeChannelId = ytChannel.id;
+        channelTitle = ytChannel.snippet?.title || 'Unknown Channel';
+        channelThumbnail = ytChannel.snippet?.thumbnails?.default?.url || null;
+        subscriberCount = parseInt(ytChannel.statistics?.subscriberCount || '0', 10);
+        videoCount = parseInt(ytChannel.statistics?.videoCount || '0', 10);
+      }
+
+      // Calculate token expiration time
+      const tokenExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
+
+      // Update channel with tokens and info
+      const { error: updateError } = await supabase
+        .from('youtube_channels')
+        .update({
+          channel_id: youtubeChannelId,
+          channel_title: channelTitle,
+          channel_thumbnail: channelThumbnail,
+          subscriber_count: subscriberCount,
+          video_count: videoCount,
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          token_expires_at: tokenExpiresAt,
+          auth_status: 'connected',
+          is_connected: true,
+        })
+        .eq('id', stateObj.channel_id);
+
+      if (updateError) {
+        console.error('Failed to update channel:', updateError);
+        return new Response(`
+          <html>
+            <body>
+              <script>
+                window.opener?.postMessage({ type: 'youtube-oauth-error', error: 'Failed to save tokens' }, '*');
+                window.close();
+              </script>
+              <p>Failed to save tokens. You can close this window.</p>
+            </body>
+          </html>
+        `, {
+          headers: { 'Content-Type': 'text/html' },
+        });
+      }
+
+      console.log(`Channel ${stateObj.channel_id} successfully connected as "${channelTitle}"`);
+
+      // Return success page that communicates with opener window
+      return new Response(`
+        <html>
+          <body>
+            <script>
+              window.opener?.postMessage({ 
+                type: 'youtube-oauth-success', 
+                channelId: '${stateObj.channel_id}',
+                channelTitle: '${channelTitle.replace(/'/g, "\\'")}'
+              }, '*');
+              setTimeout(() => window.close(), 1500);
+            </script>
+            <div style="font-family: system-ui; text-align: center; padding: 50px;">
+              <h2>✅ Successfully Connected!</h2>
+              <p>Channel: <strong>${channelTitle}</strong></p>
+              <p>This window will close automatically...</p>
+            </div>
+          </body>
+        </html>
+      `, {
+        headers: { 'Content-Type': 'text/html' },
+      });
+    }
+
+    // ============================================
+    // ACTION: refresh-token
+    // Refreshes access token for a channel
+    // ============================================
+    if (action === 'refresh-token') {
+      const channelId = url.searchParams.get('channel_id');
+
+      if (!channelId) {
+        return new Response(JSON.stringify({ error: 'channel_id is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`Refreshing token for channel: ${channelId}`);
+
+      // Fetch channel's credentials and refresh token
+      const { data: channel, error: channelError } = await supabase
+        .from('youtube_channels')
+        .select('id, google_client_id, google_client_secret, refresh_token')
+        .eq('id', channelId)
+        .single();
+
+      if (channelError || !channel) {
+        return new Response(JSON.stringify({ error: 'Channel not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!channel.refresh_token || !channel.google_client_id || !channel.google_client_secret) {
+        return new Response(JSON.stringify({ error: 'Channel not properly configured' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Refresh the access token using THIS channel's credentials
+      const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: channel.google_client_id,
+          client_secret: channel.google_client_secret,
+          refresh_token: channel.refresh_token,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      const tokenData = await tokenResponse.json();
+
+      if (tokenData.error) {
+        console.error('Token refresh error:', tokenData);
+        return new Response(JSON.stringify({ error: tokenData.error_description || tokenData.error }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const tokenExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
+
+      // Update channel with new access token
+      await supabase
+        .from('youtube_channels')
+        .update({
+          access_token: tokenData.access_token,
+          token_expires_at: tokenExpiresAt,
+        })
+        .eq('id', channelId);
+
+      console.log(`Token refreshed for channel ${channelId}`);
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        access_token: tokenData.access_token,
+        expires_at: tokenExpiresAt 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Unknown action
+    return new Response(JSON.stringify({ error: 'Unknown action. Use: start-auth, callback, or refresh-token' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error: unknown) {
+    console.error('Error in youtube-oauth function:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return new Response(JSON.stringify({ error: errorMessage }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});

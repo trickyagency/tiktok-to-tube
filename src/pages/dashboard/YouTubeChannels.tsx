@@ -1,46 +1,108 @@
+import { useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Plus, Youtube } from 'lucide-react';
+import { Youtube, Loader2 } from 'lucide-react';
+import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
+import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
+import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 
 const YouTubeChannels = () => {
+  const { channels, isLoading, refetch } = useYouTubeChannels();
+
+  // Listen for OAuth completion messages from popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'youtube-oauth-success' || event.data?.type === 'youtube-oauth-error') {
+        refetch();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [refetch]);
+
+  const connectedChannels = channels.filter(c => c.auth_status === 'connected');
+  const pendingChannels = channels.filter(c => c.auth_status !== 'connected');
+
   return (
     <DashboardLayout
       title="YouTube Channels"
-      description="Connect and manage your YouTube channels"
+      description="Connect and manage your YouTube channels with per-channel OAuth credentials"
     >
       <div className="space-y-6">
         <div className="flex justify-end">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            Connect Channel
-          </Button>
+          <AddYouTubeChannelDialog onSuccess={refetch} />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Youtube className="h-5 w-5" />
-              Your Channels
-            </CardTitle>
-            <CardDescription>
-              YouTube channels connected using your own API credentials
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center py-12">
-              <Youtube className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="font-medium mb-2">No channels connected</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Connect your YouTube channel to start uploading TikTok videos
-              </p>
-              <Button variant="outline">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Channel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        {isLoading ? (
+          <Card>
+            <CardContent className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </CardContent>
+          </Card>
+        ) : channels.length === 0 ? (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Youtube className="h-5 w-5 text-red-500" />
+                Your Channels
+              </CardTitle>
+              <CardDescription>
+                Each YouTube channel uses its own Google Cloud project credentials
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <Youtube className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                <h3 className="font-medium mb-2">No channels connected</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Add your YouTube channel with Google OAuth credentials to start uploading
+                </p>
+                <AddYouTubeChannelDialog onSuccess={refetch} />
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Pending Authorization */}
+            {pendingChannels.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-amber-500" />
+                  Pending Authorization ({pendingChannels.length})
+                </h2>
+                <div className="grid gap-4">
+                  {pendingChannels.map((channel) => (
+                    <YouTubeChannelCard 
+                      key={channel.id} 
+                      channel={channel} 
+                      onAuthComplete={refetch}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Connected Channels */}
+            {connectedChannels.length > 0 && (
+              <div className="space-y-3">
+                <h2 className="text-lg font-semibold flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
+                  Connected Channels ({connectedChannels.length})
+                </h2>
+                <div className="grid gap-4">
+                  {connectedChannels.map((channel) => (
+                    <YouTubeChannelCard 
+                      key={channel.id} 
+                      channel={channel}
+                      onAuthComplete={refetch}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
     </DashboardLayout>
   );
