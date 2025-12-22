@@ -22,6 +22,10 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import DashboardSidebar from './DashboardSidebar';
 import ThemeToggle from './ThemeToggle';
 import NotificationsDropdown from './NotificationsDropdown';
+import MobileBottomNav from './MobileBottomNav';
+import OnboardingTour from './OnboardingTour';
+import { useOnboardingTour } from '@/hooks/useOnboardingTour';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Plus, LogOut, Settings, User, ChevronDown, Home, Search } from 'lucide-react';
 
 interface DashboardLayoutProps {
@@ -45,6 +49,16 @@ const routeLabels: Record<string, string> = {
 const DashboardLayout = ({ children, title, description }: DashboardLayoutProps) => {
   const location = useLocation();
   const { user, signOut } = useAuth();
+  const isMobile = useIsMobile();
+  const {
+    isActive: tourActive,
+    currentTourStep,
+    currentStep,
+    totalSteps,
+    nextStep,
+    prevStep,
+    skipTour,
+  } = useOnboardingTour();
 
   const getBreadcrumbs = () => {
     const path = location.pathname;
@@ -73,7 +87,7 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
             <div className="flex items-center justify-between h-16 px-6">
               {/* Left: Trigger + Breadcrumbs */}
               <div className="flex items-center gap-4">
-                <SidebarTrigger className="-ml-1 h-9 w-9" />
+                <SidebarTrigger className="-ml-1 h-9 w-9 hidden md:flex" />
                 
                 <Breadcrumb>
                   <BreadcrumbList>
@@ -81,13 +95,13 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
                       {location.pathname === '/dashboard' ? (
                         <BreadcrumbPage className="flex items-center gap-2">
                           <Home className="h-4 w-4" />
-                          Dashboard
+                          <span className="hidden sm:inline">Dashboard</span>
                         </BreadcrumbPage>
                       ) : (
                         <BreadcrumbLink asChild>
                           <Link to="/dashboard" className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors">
                             <Home className="h-4 w-4" />
-                            Dashboard
+                            <span className="hidden sm:inline">Dashboard</span>
                           </Link>
                         </BreadcrumbLink>
                       )}
@@ -105,12 +119,13 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
               </div>
 
               {/* Right: Search + Quick Actions + Notifications + User Menu */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {/* Search Button */}
                 <Button
                   variant="outline"
                   size="sm"
                   className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                  data-tour="search-button"
                   onClick={() => {
                     const event = new KeyboardEvent('keydown', {
                       key: 'k',
@@ -130,7 +145,7 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
                 {/* Quick Add Button */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button size="sm" className="gradient-primary text-white border-0 shadow-glow gap-2">
+                    <Button size="sm" className="gradient-primary text-white border-0 shadow-glow gap-1 sm:gap-2">
                       <Plus className="h-4 w-4" />
                       <span className="hidden sm:inline">Add New</span>
                       <ChevronDown className="h-3 w-3" />
@@ -162,7 +177,7 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
                           {getUserInitials()}
                         </AvatarFallback>
                       </Avatar>
-                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                      <ChevronDown className="h-3 w-3 text-muted-foreground hidden sm:block" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-56">
@@ -204,11 +219,27 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
             </div>
           </header>
 
-          <div className="flex-1 p-6">
+          <div className={`flex-1 p-6 ${isMobile ? 'pb-24' : ''}`}>
             {children}
           </div>
         </main>
+
+        {/* Mobile Bottom Navigation */}
+        {isMobile && <MobileBottomNav />}
       </div>
+
+      {/* Onboarding Tour */}
+      {tourActive && currentTourStep && (
+        <OnboardingTour
+          isActive={tourActive}
+          currentStep={currentTourStep}
+          stepNumber={currentStep}
+          totalSteps={totalSteps}
+          onNext={nextStep}
+          onPrev={prevStep}
+          onSkip={skipTour}
+        />
+      )}
     </SidebarProvider>
   );
 };

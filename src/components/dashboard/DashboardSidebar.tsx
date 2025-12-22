@@ -107,7 +107,7 @@ const DashboardSidebar = () => {
   );
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
+    <Sidebar collapsible="icon" className="border-r border-sidebar-border hidden md:flex" data-tour="sidebar">
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <Link to="/dashboard" className="flex items-center gap-3">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg gradient-primary shadow-glow">
@@ -127,7 +127,7 @@ const DashboardSidebar = () => {
           <SidebarGroupLabel className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Overview
           </SidebarGroupLabel>
-          <SidebarGroupContent>
+          <SidebarGroupContent data-tour="queue-link">
             {renderMenuItems(mainMenuItems)}
           </SidebarGroupContent>
         </SidebarGroup>
@@ -137,7 +137,33 @@ const DashboardSidebar = () => {
             Platforms
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            {renderMenuItems(platformMenuItems)}
+            <SidebarMenu>
+              {platformMenuItems.map((item) => (
+                <SidebarMenuItem key={item.title} data-tour={item.url === '/dashboard/youtube' ? 'youtube-link' : item.url === '/dashboard/tiktok' ? 'tiktok-link' : undefined}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    tooltip={isCollapsed ? item.title : undefined}
+                  >
+                    <Link 
+                      to={item.url}
+                      className="group relative"
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span className="flex-1">{item.title}</span>
+                      {item.badge && (
+                        <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">
+                          {item.badge}
+                        </Badge>
+                      )}
+                      {isActive(item.url) && (
+                        <ChevronRight className="h-4 w-4 ml-auto opacity-50" />
+                      )}
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
 
