@@ -539,6 +539,28 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_cron_history: {
+        Args: { limit_rows?: number }
+        Returns: {
+          end_time: string
+          job_name: string
+          jobid: number
+          return_message: string
+          runid: number
+          start_time: string
+          status: string
+        }[]
+      }
+      get_cron_jobs: {
+        Args: never
+        Returns: {
+          active: boolean
+          command: string
+          jobid: number
+          jobname: string
+          schedule: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

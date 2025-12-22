@@ -22,6 +22,7 @@ import {
   Settings,
   LogOut,
   Sparkles,
+  Clock,
 } from 'lucide-react';
 
 const menuItems = [
@@ -30,6 +31,7 @@ const menuItems = [
   { title: 'TikTok Accounts', url: '/dashboard/tiktok', icon: Video },
   { title: 'Video Queue', url: '/dashboard/queue', icon: Calendar },
   { title: 'Upload History', url: '/dashboard/history', icon: History },
+  { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
 ];
 
