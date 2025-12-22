@@ -1,0 +1,74 @@
+import { useEffect, useState } from 'react';
+import { Card, CardContent } from '@/components/ui/card';
+import { LucideIcon } from 'lucide-react';
+
+interface AnimatedStatCardProps {
+  title: string;
+  value: number;
+  icon: LucideIcon;
+  description: string;
+  trend?: { value: number; isPositive: boolean };
+  gradientClass: string;
+}
+
+const AnimatedStatCard = ({ 
+  title, 
+  value, 
+  icon: Icon, 
+  description, 
+  trend,
+  gradientClass 
+}: AnimatedStatCardProps) => {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (value === 0) {
+      setDisplayValue(0);
+      return;
+    }
+
+    const duration = 1000;
+    const steps = 20;
+    const stepValue = value / steps;
+    const stepDuration = duration / steps;
+    let current = 0;
+
+    const timer = setInterval(() => {
+      current += stepValue;
+      if (current >= value) {
+        setDisplayValue(value);
+        clearInterval(timer);
+      } else {
+        setDisplayValue(Math.floor(current));
+      }
+    }, stepDuration);
+
+    return () => clearInterval(timer);
+  }, [value]);
+
+  return (
+    <Card className={`card-hover border-0 ${gradientClass}`}>
+      <CardContent className="p-6">
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <div className="flex items-baseline gap-2">
+              <span className="text-3xl font-bold tracking-tight">{displayValue}</span>
+              {trend && (
+                <span className={`text-xs font-medium ${trend.isPositive ? 'text-success' : 'text-destructive'}`}>
+                  {trend.isPositive ? '+' : ''}{trend.value}%
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">{description}</p>
+          </div>
+          <div className="p-3 rounded-xl bg-background/80 border border-border/50">
+            <Icon className="h-5 w-5 text-primary" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default AnimatedStatCard;
