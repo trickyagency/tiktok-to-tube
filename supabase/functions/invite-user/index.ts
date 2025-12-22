@@ -12,6 +12,55 @@ interface InviteRequest {
   role: "user" | "admin";
 }
 
+interface BrandingSettings {
+  platformName: string;
+  senderName: string;
+  senderAddress: string;
+  logoUrl: string;
+  primaryColor: string;
+  accentColor: string;
+}
+
+function generateInviteEmailHtml(options: BrandingSettings & { role: string }): string {
+  const { platformName, logoUrl, primaryColor, accentColor, role } = options;
+  
+  const logoHtml = logoUrl 
+    ? `<img src="${logoUrl}" alt="${platformName}" style="max-height: 48px; margin-bottom: 24px;" />`
+    : `<div style="color: ${primaryColor}; font-size: 24px; font-weight: 700; margin-bottom: 24px;">${platformName}</div>`;
+  
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 40px 20px;">
+      <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+        ${logoHtml}
+        <h1 style="color: ${primaryColor}; font-size: 24px; font-weight: 600; margin: 0 0 16px 0;">Welcome to ${platformName}!</h1>
+        <p style="color: #52525b; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
+          You've been invited to join ${platformName}${role === "admin" ? " as an Admin" : ""}. 
+          Click the button below to set up your account.
+        </p>
+        <p style="color: #71717a; font-size: 14px; margin: 0 0 24px 0;">
+          Check your email for a separate message from Supabase with your account setup link.
+        </p>
+        <div style="background: #f4f4f5; border-radius: 8px; padding: 16px; margin: 24px 0;">
+          <p style="color: #52525b; font-size: 14px; margin: 0;">
+            <strong>Note:</strong> This invitation expires in 7 days.
+          </p>
+        </div>
+        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;">
+        <p style="color: #a1a1aa; font-size: 12px; margin: 0;">
+          If you didn't expect this invitation, you can safely ignore this email.
+        </p>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -66,6 +115,35 @@ serve(async (req) => {
     const assignRole = role || "user";
 
     console.log(`Owner ${user.email} inviting ${email} as ${assignRole}`);
+
+    // Fetch branding settings from platform_settings
+    const { data: brandingData } = await supabaseAdmin
+      .from("platform_settings")
+      .select("key, value")
+      .in("key", [
+        "EMAIL_PLATFORM_NAME",
+        "EMAIL_SENDER_NAME",
+        "EMAIL_SENDER_ADDRESS",
+        "EMAIL_LOGO_URL",
+        "EMAIL_PRIMARY_COLOR",
+        "EMAIL_ACCENT_COLOR",
+      ]);
+
+    const getBrandingSetting = (key: string, defaultValue: string): string => {
+      const setting = brandingData?.find((s) => s.key === key);
+      return setting?.value || defaultValue;
+    };
+
+    const branding: BrandingSettings = {
+      platformName: getBrandingSetting("EMAIL_PLATFORM_NAME", "TrickyHub"),
+      senderName: getBrandingSetting("EMAIL_SENDER_NAME", "TrickyHub"),
+      senderAddress: getBrandingSetting("EMAIL_SENDER_ADDRESS", "onboarding@resend.dev"),
+      logoUrl: getBrandingSetting("EMAIL_LOGO_URL", ""),
+      primaryColor: getBrandingSetting("EMAIL_PRIMARY_COLOR", "#18181b"),
+      accentColor: getBrandingSetting("EMAIL_ACCENT_COLOR", "#3b82f6"),
+    };
+
+    console.log("Using branding:", branding);
 
     // Check if user already exists
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
@@ -142,43 +220,19 @@ serve(async (req) => {
       try {
         const resend = new Resend(resendApiKey);
         
-        await resend.emails.send({
-          from: "TrickyHub <onboarding@resend.dev>",
-          to: [email],
-          subject: "You've been invited to TrickyHub",
-          html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
-            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 40px 20px;">
-              <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-                <h1 style="color: #18181b; font-size: 24px; font-weight: 600; margin: 0 0 16px 0;">Welcome to TrickyHub!</h1>
-                <p style="color: #52525b; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-                  You've been invited to join TrickyHub${assignRole === "admin" ? " as an Admin" : ""}. 
-                  Click the button below to set up your account.
-                </p>
-                <p style="color: #71717a; font-size: 14px; margin: 0 0 24px 0;">
-                  Check your email for a separate message from Supabase with your account setup link.
-                </p>
-                <div style="background: #f4f4f5; border-radius: 8px; padding: 16px; margin: 24px 0;">
-                  <p style="color: #52525b; font-size: 14px; margin: 0;">
-                    <strong>Note:</strong> This invitation expires in 7 days.
-                  </p>
-                </div>
-                <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;">
-                <p style="color: #a1a1aa; font-size: 12px; margin: 0;">
-                  If you didn't expect this invitation, you can safely ignore this email.
-                </p>
-              </div>
-            </body>
-            </html>
-          `,
+        const emailHtml = generateInviteEmailHtml({
+          ...branding,
+          role: assignRole,
         });
 
-        console.log("Custom email sent via Resend");
+        await resend.emails.send({
+          from: `${branding.senderName} <${branding.senderAddress}>`,
+          to: [email],
+          subject: `You've been invited to ${branding.platformName}`,
+          html: emailHtml,
+        });
+
+        console.log("Custom branded email sent via Resend");
       } catch (emailError) {
         console.error("Resend email failed (non-critical):", emailError);
         // Don't fail the request, the Supabase invite email was already sent
