@@ -7,16 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useEmailPreferences } from '@/hooks/useEmailPreferences';
+import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import EmailPreview from '@/components/settings/EmailPreview';
 
 const Settings = () => {
   const { user, isOwner } = useAuth();
   const { getSetting, updateSetting, isUpdating, isLoading } = usePlatformSettings();
   const { preferences, updatePreference, isLoading: preferencesLoading } = useEmailPreferences();
+  const { resetTour, hasCompleted: tourCompleted, startTour } = useOnboardingTour();
   
   const [apifyApiKey, setApifyApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -425,10 +427,27 @@ const Settings = () => {
             </CardTitle>
             <CardDescription>Advanced configuration options</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Advanced settings will be available here.
-            </p>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Onboarding Tour</Label>
+                <p className="text-xs text-muted-foreground">
+                  {tourCompleted ? 'You have completed the tour.' : 'Tour will start automatically for new users.'}
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  resetTour();
+                  startTour();
+                }}
+                className="gap-2"
+              >
+                <RotateCcw className="h-4 w-4" />
+                Restart Tour
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

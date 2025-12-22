@@ -197,4 +197,9 @@
     content: '';
     @apply absolute inset-0 rounded-full bg-current animate-ping opacity-75;
   }
+
+  /* Safe area for mobile devices with notches */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }

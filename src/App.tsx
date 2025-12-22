@@ -6,40 +6,52 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
-import ProtectedRoute from "@/components/ProtectedRoute";
-import CommandPalette from "@/components/dashboard/CommandPalette";
+
+import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import NotFound from "./pages/NotFound";
 import Dashboard from "./pages/dashboard/Dashboard";
 import YouTubeChannels from "./pages/dashboard/YouTubeChannels";
 import TikTokAccounts from "./pages/dashboard/TikTokAccounts";
 import VideoQueue from "./pages/dashboard/VideoQueue";
 import UploadHistory from "./pages/dashboard/UploadHistory";
+import Analytics from "./pages/dashboard/Analytics";
 import Settings from "./pages/dashboard/Settings";
 import CronMonitor from "./pages/dashboard/CronMonitor";
 import UserManagement from "./pages/dashboard/UserManagement";
-import Analytics from "./pages/dashboard/Analytics";
-import NotFound from "./pages/NotFound";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import CommandPalette from "@/components/dashboard/CommandPalette";
+import KeyboardShortcutsHelp from "@/components/dashboard/KeyboardShortcutsHelp";
+import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const queryClient = new QueryClient();
 
 const AppContent = () => {
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [shortcutsHelpOpen, setShortcutsHelpOpen] = useState(false);
 
+  // Handle Cmd+K for command palette
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        setCommandPaletteOpen((prev) => !prev);
+        setCommandPaletteOpen(prev => !prev);
       }
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
   }, []);
+
+  // Handle vim-style keyboard shortcuts (G+key navigation)
+  useKeyboardShortcuts({
+    onOpenShortcutsHelp: () => setShortcutsHelpOpen(true),
+  });
 
   return (
     <>
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+      <KeyboardShortcutsHelp open={shortcutsHelpOpen} onOpenChange={setShortcutsHelpOpen} />
       <Toaster />
       <Sonner />
       <Routes>
