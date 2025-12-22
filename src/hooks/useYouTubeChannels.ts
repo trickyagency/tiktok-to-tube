@@ -176,6 +176,25 @@ export function useYouTubeChannels() {
     }
   };
 
+  const checkForChannel = async (channelId: string): Promise<{ found: boolean; channelTitle?: string }> => {
+    try {
+      const checkUrl = `https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=check-channel&channel_id=${channelId}`;
+      
+      const res = await fetch(checkUrl);
+      const data = await res.json();
+
+      if (data.found) {
+        queryClient.invalidateQueries({ queryKey: ['youtube-channels'] });
+        return { found: true, channelTitle: data.channelTitle };
+      }
+      
+      return { found: false };
+    } catch (error: any) {
+      console.error('Failed to check for channel:', error.message);
+      return { found: false };
+    }
+  };
+
   return {
     channels: channelsQuery.data || [],
     isLoading: channelsQuery.isLoading,
@@ -187,6 +206,7 @@ export function useYouTubeChannels() {
     isDeleting: deleteChannelMutation.isPending,
     startOAuth,
     refreshToken,
+    checkForChannel,
     refetch: channelsQuery.refetch,
   };
 }

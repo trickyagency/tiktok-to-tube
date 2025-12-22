@@ -319,13 +319,15 @@ serve(async (req) => {
               window.opener?.postMessage({ 
                 type: 'youtube-oauth-success', 
                 channelId: '${stateObj.channel_id}',
-                channelTitle: '${channelTitle.replace(/'/g, "\\'")}'
+                channelTitle: '${channelTitle.replace(/'/g, "\\'")}',
+                authStatus: '${authStatus}'
               }, '*');
               setTimeout(() => window.close(), 1500);
             </script>
             <div style="font-family: system-ui; text-align: center; padding: 50px;">
-              <h2>✅ Successfully Connected!</h2>
+              <h2>${authStatus === 'connected' ? '✅ Successfully Connected!' : '⚠️ Authorization Complete'}</h2>
               <p>Channel: <strong>${channelTitle}</strong></p>
+              ${authStatus === 'no_channel' ? '<p style="color: #d97706;">Create a YouTube channel, then we\'ll detect it automatically.</p>' : ''}
               <p>This window will close automatically...</p>
             </div>
           </body>
@@ -418,8 +420,137 @@ serve(async (req) => {
       });
     }
 
+    // ============================================
+    // ACTION: check-channel
+    // Polls to check if a YouTube channel now exists
+    // ============================================
+    if (action === 'check-channel') {
+      const channelId = url.searchParams.get('channel_id');
+
+      if (!channelId) {
+        return new Response(JSON.stringify({ error: 'channel_id is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`Checking for YouTube channel: ${channelId}`);
+
+      // Fetch channel's credentials and tokens
+      const { data: channel, error: channelError } = await supabase
+        .from('youtube_channels')
+        .select('id, google_client_id, google_client_secret, access_token, refresh_token, token_expires_at, auth_status')
+        .eq('id', channelId)
+        .single();
+
+      if (channelError || !channel) {
+        return new Response(JSON.stringify({ error: 'Channel not found' }), {
+          status: 404,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Only check if status is 'no_channel'
+      if (channel.auth_status !== 'no_channel') {
+        return new Response(JSON.stringify({ found: channel.auth_status === 'connected', message: 'Not in no_channel status' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      if (!channel.access_token || !channel.refresh_token) {
+        return new Response(JSON.stringify({ error: 'Channel missing tokens' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      let accessToken = channel.access_token;
+
+      // Check if token is expired and refresh if needed
+      if (channel.token_expires_at && new Date(channel.token_expires_at) < new Date()) {
+        console.log('Token expired, refreshing...');
+        
+        const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: channel.google_client_id!,
+            client_secret: channel.google_client_secret!,
+            refresh_token: channel.refresh_token,
+            grant_type: 'refresh_token',
+          }),
+        });
+
+        const tokenData = await tokenResponse.json();
+        
+        if (tokenData.error) {
+          console.error('Token refresh failed:', tokenData);
+          return new Response(JSON.stringify({ error: 'Token refresh failed', found: false }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        accessToken = tokenData.access_token;
+        const tokenExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
+
+        await supabase
+          .from('youtube_channels')
+          .update({ access_token: accessToken, token_expires_at: tokenExpiresAt })
+          .eq('id', channelId);
+      }
+
+      // Check YouTube API for channel
+      console.log('Checking YouTube API for channel...');
+      const channelInfoResponse = await fetch(
+        'https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true',
+        {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        }
+      );
+
+      const channelInfo = await channelInfoResponse.json();
+
+      if (channelInfo.items && channelInfo.items.length > 0) {
+        const ytChannel = channelInfo.items[0];
+        const channelTitle = ytChannel.snippet?.title || 'Unknown Channel';
+        const channelThumbnail = ytChannel.snippet?.thumbnails?.default?.url || null;
+        const subscriberCount = parseInt(ytChannel.statistics?.subscriberCount || '0', 10);
+        const videoCount = parseInt(ytChannel.statistics?.videoCount || '0', 10);
+
+        // Update channel to connected
+        await supabase
+          .from('youtube_channels')
+          .update({
+            channel_id: ytChannel.id,
+            channel_title: channelTitle,
+            channel_thumbnail: channelThumbnail,
+            subscriber_count: subscriberCount,
+            video_count: videoCount,
+            auth_status: 'connected',
+            is_connected: true,
+          })
+          .eq('id', channelId);
+
+        console.log(`YouTube channel detected: ${channelTitle}`);
+
+        return new Response(JSON.stringify({ 
+          found: true, 
+          channelTitle,
+          channelId: ytChannel.id 
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('No YouTube channel found yet');
+      return new Response(JSON.stringify({ found: false }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     // Unknown action
-    return new Response(JSON.stringify({ error: 'Unknown action. Use: start-auth, callback, or refresh-token' }), {
+    return new Response(JSON.stringify({ error: 'Unknown action. Use: start-auth, callback, refresh-token, or check-channel' }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

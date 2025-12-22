@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { YouTubeChannel, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
+import { toast } from 'sonner';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,9 +47,53 @@ interface YouTubeChannelCardProps {
 export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCardProps) {
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isPolling, setIsPolling] = useState(false);
+  const pollingRef = useRef<{ intervalId: NodeJS.Timeout | null; timeoutId: NodeJS.Timeout | null }>({
+    intervalId: null,
+    timeoutId: null,
+  });
   
-  const { startOAuth, refreshToken, deleteChannel, updateChannel, isDeleting } = useYouTubeChannels();
+  const { startOAuth, refreshToken, deleteChannel, updateChannel, checkForChannel, isDeleting } = useYouTubeChannels();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
+
+  // Automatic polling for no_channel status
+  useEffect(() => {
+    if (channel.auth_status !== 'no_channel') {
+      // Clear any existing polling
+      if (pollingRef.current.intervalId) clearInterval(pollingRef.current.intervalId);
+      if (pollingRef.current.timeoutId) clearTimeout(pollingRef.current.timeoutId);
+      setIsPolling(false);
+      return;
+    }
+
+    const poll = async () => {
+      const result = await checkForChannel(channel.id);
+      if (result.found) {
+        toast.success(`YouTube channel "${result.channelTitle}" detected!`);
+        if (pollingRef.current.intervalId) clearInterval(pollingRef.current.intervalId);
+        if (pollingRef.current.timeoutId) clearTimeout(pollingRef.current.timeoutId);
+        setIsPolling(false);
+        onAuthComplete?.();
+      }
+    };
+
+    // Start polling every 30 seconds
+    setIsPolling(true);
+    pollingRef.current.intervalId = setInterval(poll, 30000);
+    
+    // Stop polling after 5 minutes
+    pollingRef.current.timeoutId = setTimeout(() => {
+      if (pollingRef.current.intervalId) {
+        clearInterval(pollingRef.current.intervalId);
+        setIsPolling(false);
+      }
+    }, 5 * 60 * 1000);
+
+    return () => {
+      if (pollingRef.current.intervalId) clearInterval(pollingRef.current.intervalId);
+      if (pollingRef.current.timeoutId) clearTimeout(pollingRef.current.timeoutId);
+    };
+  }, [channel.auth_status, channel.id, checkForChannel, onAuthComplete]);
 
   const linkedTikTokAccount = tikTokAccounts.find(a => a.id === channel.tiktok_account_id);
 
@@ -175,8 +220,14 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                     <ExternalLink className="h-3 w-3" />
                     Create YouTube Channel
                   </a></span>
-                  <span>2. Click "Re-authorize" button →</span>
+                  <span>2. We'll detect it automatically, or click "Re-authorize"</span>
                 </div>
+                {isPolling && (
+                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    Checking for channel every 30s...
+                  </p>
+                )}
               </div>
             )}
 

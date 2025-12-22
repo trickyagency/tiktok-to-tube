@@ -6,6 +6,7 @@ import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelD
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuide';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { toast } from 'sonner';
 
 const YouTubeChannels = () => {
   const { channels, isLoading, refetch } = useYouTubeChannels();
@@ -13,7 +14,17 @@ const YouTubeChannels = () => {
   // Listen for OAuth completion messages from popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'youtube-oauth-success' || event.data?.type === 'youtube-oauth-error') {
+      if (event.data?.type === 'youtube-oauth-success') {
+        const { channelTitle, authStatus } = event.data;
+        refetch();
+        
+        if (authStatus === 'no_channel') {
+          toast.info('Authorization successful! Create your YouTube channel and we\'ll detect it automatically.');
+        } else {
+          toast.success(`Successfully connected: ${channelTitle}`);
+        }
+      } else if (event.data?.type === 'youtube-oauth-error') {
+        toast.error(`Authorization failed: ${event.data.error}`);
         refetch();
       }
     };
