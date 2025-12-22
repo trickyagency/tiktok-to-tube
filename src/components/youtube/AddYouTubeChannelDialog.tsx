@@ -4,14 +4,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ExternalLink, Info } from 'lucide-react';
+import { Plus, ExternalLink, AlertTriangle } from 'lucide-react';
 import { useYouTubeChannels, CreateChannelInput } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CopyableUrl } from '@/components/ui/copyable-url';
 
 interface AddYouTubeChannelDialogProps {
   onSuccess?: () => void;
 }
+
+const REDIRECT_URI = 'https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=callback';
+const JAVASCRIPT_ORIGIN = 'https://qpufyeeqosvgipslwday.supabase.co';
 
 export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogProps) {
   const [open, setOpen] = useState(false);
@@ -23,8 +27,6 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
 
   const { createChannel, isCreating } = useYouTubeChannels();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
-
-  const defaultRedirectUri = 'https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=callback';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,7 +69,7 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
           Add YouTube Channel
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add YouTube Channel</DialogTitle>
           <DialogDescription>
@@ -75,22 +77,34 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
           </DialogDescription>
         </DialogHeader>
 
-        <Alert className="border-primary/20 bg-primary/5">
-          <Info className="h-4 w-4" />
+        {/* Required URLs Section */}
+        <Alert className="border-amber-500/30 bg-amber-500/10">
+          <AlertTriangle className="h-4 w-4 text-amber-500" />
           <AlertDescription className="text-sm">
-            <strong>Important:</strong> Each YouTube channel needs its own Google Cloud project.
+            <strong className="text-amber-600 dark:text-amber-400">Important:</strong> Copy these URLs to your{' '}
             <a 
               href="https://console.cloud.google.com/apis/credentials" 
               target="_blank" 
               rel="noopener noreferrer"
-              className="ml-1 text-primary hover:underline inline-flex items-center gap-1"
+              className="text-primary hover:underline inline-flex items-center gap-1"
             >
-              Get credentials <ExternalLink className="h-3 w-3" />
+              Google Cloud Console <ExternalLink className="h-3 w-3" />
             </a>
           </AlertDescription>
         </Alert>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <div className="space-y-3 p-3 bg-muted/50 rounded-lg border">
+          <CopyableUrl 
+            url={JAVASCRIPT_ORIGIN} 
+            label="Authorized JavaScript Origin:"
+          />
+          <CopyableUrl 
+            url={REDIRECT_URI} 
+            label="Authorized Redirect URI:"
+          />
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
           <div className="space-y-2">
             <Label htmlFor="channel-name">Channel Name (Label)</Label>
             <Input
@@ -129,19 +143,16 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="redirect-uri">Redirect URI (Optional)</Label>
+            <Label htmlFor="redirect-uri">Custom Redirect URI (Optional)</Label>
             <Input
               id="redirect-uri"
-              placeholder={defaultRedirectUri}
+              placeholder="Leave empty to use the default URI above"
               value={redirectUri}
               onChange={(e) => setRedirectUri(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Leave empty to use default. Add this URI to your Google Cloud Console:
+              Only change this if you're using a custom domain
             </p>
-            <code className="text-xs bg-muted px-2 py-1 rounded block break-all">
-              {defaultRedirectUri}
-            </code>
           </div>
 
           <div className="space-y-2">
@@ -167,19 +178,7 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
             </p>
           </div>
 
-          <div className="pt-4 border-t space-y-3">
-            <h4 className="font-medium text-sm">Setup Instructions:</h4>
-            <ol className="text-xs text-muted-foreground space-y-2 list-decimal list-inside">
-              <li>Go to <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google Cloud Console</a></li>
-              <li>Create a new project (or use existing)</li>
-              <li>Enable <strong>YouTube Data API v3</strong></li>
-              <li>Create OAuth 2.0 credentials (Web application)</li>
-              <li>Add the redirect URI shown above to "Authorized redirect URIs"</li>
-              <li>Copy Client ID and Client Secret here</li>
-            </ol>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button type="button" variant="outline" onClick={() => setOpen(false)}>
               Cancel
             </Button>
