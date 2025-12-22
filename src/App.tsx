@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import CommandPalette from "@/components/dashboard/CommandPalette";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/dashboard/Dashboard";
 import YouTubeChannels from "./pages/dashboard/YouTubeChannels";
@@ -20,91 +22,114 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const AppContent = () => {
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  return (
+    <>
+      <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
+      <Toaster />
+      <Sonner />
+      <Routes>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/auth" element={<Auth />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/youtube"
+          element={
+            <ProtectedRoute>
+              <YouTubeChannels />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/tiktok"
+          element={
+            <ProtectedRoute>
+              <TikTokAccounts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/queue"
+          element={
+            <ProtectedRoute>
+              <VideoQueue />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/history"
+          element={
+            <ProtectedRoute>
+              <UploadHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/settings"
+          element={
+            <ProtectedRoute>
+              <Settings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/cron"
+          element={
+            <ProtectedRoute>
+              <CronMonitor />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/users"
+          element={
+            <ProtectedRoute>
+              <UserManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/analytics"
+          element={
+            <ProtectedRoute>
+              <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
+  );
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange={false}>
       <BrowserRouter>
         <AuthProvider>
           <TooltipProvider>
-            <Toaster />
-            <Sonner />
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/youtube"
-              element={
-                <ProtectedRoute>
-                  <YouTubeChannels />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/tiktok"
-              element={
-                <ProtectedRoute>
-                  <TikTokAccounts />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/queue"
-              element={
-                <ProtectedRoute>
-                  <VideoQueue />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/history"
-              element={
-                <ProtectedRoute>
-                  <UploadHistory />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/settings"
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/cron"
-              element={
-                <ProtectedRoute>
-                  <CronMonitor />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/users"
-              element={
-                <ProtectedRoute>
-                  <UserManagement />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/dashboard/analytics"
-              element={
-                <ProtectedRoute>
-                  <Analytics />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="*" element={<NotFound />} />
-            </Routes>
+            <AppContent />
           </TooltipProvider>
         </AuthProvider>
       </BrowserRouter>

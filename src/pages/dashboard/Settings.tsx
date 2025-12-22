@@ -4,14 +4,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Separator } from '@/components/ui/separator';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
+import { useEmailPreferences } from '@/hooks/useEmailPreferences';
 import EmailPreview from '@/components/settings/EmailPreview';
 
 const Settings = () => {
   const { user, isOwner } = useAuth();
   const { getSetting, updateSetting, isUpdating, isLoading } = usePlatformSettings();
+  const { preferences, updatePreference, isLoading: preferencesLoading } = useEmailPreferences();
   
   const [apifyApiKey, setApifyApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -279,14 +284,136 @@ const Settings = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Bell className="h-5 w-5" />
-              Notifications
+              Email Notifications
             </CardTitle>
-            <CardDescription>Configure how you receive updates</CardDescription>
+            <CardDescription>Configure which events trigger email alerts</CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Notification settings coming soon.
-            </p>
+          <CardContent className="space-y-6">
+            {/* Upload Events */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Upload Events</h4>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="upload-complete" className="text-sm font-medium cursor-pointer">
+                        Upload Completed
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Get notified when a video uploads successfully
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="upload-complete"
+                    checked={preferences.emailOnUploadComplete}
+                    onCheckedChange={(checked) => updatePreference('emailOnUploadComplete', checked)}
+                    disabled={preferencesLoading}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <XCircle className="h-4 w-4 text-destructive" />
+                    <div className="space-y-0.5">
+                      <Label htmlFor="upload-failed" className="text-sm font-medium cursor-pointer">
+                        Upload Failed
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Get notified when an upload fails
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    id="upload-failed"
+                    checked={preferences.emailOnUploadFailed}
+                    onCheckedChange={(checked) => updatePreference('emailOnUploadFailed', checked)}
+                    disabled={preferencesLoading}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Content Events */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Content Events</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Video className="h-4 w-4 text-primary" />
+                  <div className="space-y-0.5">
+                    <Label htmlFor="new-video" className="text-sm font-medium cursor-pointer">
+                      New Video Detected
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Get notified when new TikTok videos are scraped
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="new-video"
+                  checked={preferences.emailOnNewVideo}
+                  onCheckedChange={(checked) => updatePreference('emailOnNewVideo', checked)}
+                  disabled={preferencesLoading}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Schedule Events */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Schedule Events</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Calendar className="h-4 w-4 text-primary" />
+                  <div className="space-y-0.5">
+                    <Label htmlFor="schedule-run" className="text-sm font-medium cursor-pointer">
+                      Schedule Completed
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Get notified when a scheduled task finishes
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="schedule-run"
+                  checked={preferences.emailOnScheduleRun}
+                  onCheckedChange={(checked) => updatePreference('emailOnScheduleRun', checked)}
+                  disabled={preferencesLoading}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Digest Frequency */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">Email Digest</h4>
+              <p className="text-xs text-muted-foreground">
+                Receive a summary of all activity instead of individual notifications
+              </p>
+              <RadioGroup
+                value={preferences.emailDigestFrequency}
+                onValueChange={(value) => updatePreference('emailDigestFrequency', value as 'none' | 'daily' | 'weekly')}
+                disabled={preferencesLoading}
+                className="flex flex-col gap-3"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="none" id="digest-none" />
+                  <Label htmlFor="digest-none" className="cursor-pointer">No digest (individual emails only)</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="daily" id="digest-daily" />
+                  <Label htmlFor="digest-daily" className="cursor-pointer">Daily digest</Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="weekly" id="digest-weekly" />
+                  <Label htmlFor="digest-weekly" className="cursor-pointer">Weekly digest</Label>
+                </div>
+              </RadioGroup>
+            </div>
           </CardContent>
         </Card>
 
