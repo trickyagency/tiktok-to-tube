@@ -45,7 +45,7 @@ export function useAddTikTokAccount() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await supabase.functions.invoke('apify-scraper', {
+      const response = await supabase.functions.invoke('tikwm-scraper', {
         body: { username },
       });
 
@@ -83,7 +83,7 @@ export function useRefreshTikTokAccount() {
         .update({ scrape_status: 'scraping' })
         .eq('id', accountId);
 
-      const response = await supabase.functions.invoke('apify-scraper', {
+      const response = await supabase.functions.invoke('tikwm-scraper', {
         body: { username, accountId },
       });
 
