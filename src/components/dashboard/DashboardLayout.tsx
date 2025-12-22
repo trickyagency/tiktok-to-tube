@@ -22,7 +22,7 @@ import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import DashboardSidebar from './DashboardSidebar';
 import ThemeToggle from './ThemeToggle';
 import NotificationsDropdown from './NotificationsDropdown';
-import { Plus, LogOut, Settings, User, ChevronDown, Home } from 'lucide-react';
+import { Plus, LogOut, Settings, User, ChevronDown, Home, Search } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -104,8 +104,29 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
                 </Breadcrumb>
               </div>
 
-              {/* Right: Quick Actions + Notifications + User Menu */}
+              {/* Right: Search + Quick Actions + Notifications + User Menu */}
               <div className="flex items-center gap-3">
+                {/* Search Button */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="hidden sm:flex items-center gap-2 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    const event = new KeyboardEvent('keydown', {
+                      key: 'k',
+                      metaKey: true,
+                      bubbles: true,
+                    });
+                    document.dispatchEvent(event);
+                  }}
+                >
+                  <Search className="h-4 w-4" />
+                  <span className="text-sm">Search...</span>
+                  <kbd className="pointer-events-none ml-2 hidden h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+                    <span className="text-xs">⌘</span>K
+                  </kbd>
+                </Button>
+
                 {/* Quick Add Button */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
