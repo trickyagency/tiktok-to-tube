@@ -3,6 +3,9 @@ project_id = "qpufyeeqosvgipslwday"
 [functions.tikwm-scraper]
 verify_jwt = false
 
+[functions.apify-scraper]
+verify_jwt = false
+
 [functions.youtube-oauth]
 verify_jwt = false
 

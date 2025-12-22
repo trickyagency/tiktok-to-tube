@@ -35,7 +35,7 @@ export function ManualVideoImport() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await supabase.functions.invoke('tikwm-scraper', {
+      const response = await supabase.functions.invoke('apify-scraper', {
         body: { videoUrl, tiktokAccountId },
       });
 

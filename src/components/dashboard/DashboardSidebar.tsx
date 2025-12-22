@@ -23,21 +23,33 @@ import {
   LogOut,
   Sparkles,
   Clock,
+  Users,
 } from 'lucide-react';
 
-const menuItems = [
+interface MenuItem {
+  title: string;
+  url: string;
+  icon: React.ComponentType<{ className?: string }>;
+  ownerOnly?: boolean;
+}
+
+const menuItems: MenuItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'YouTube Channels', url: '/dashboard/youtube', icon: Youtube },
   { title: 'TikTok Accounts', url: '/dashboard/tiktok', icon: Video },
   { title: 'Video Queue', url: '/dashboard/queue', icon: Calendar },
   { title: 'Upload History', url: '/dashboard/history', icon: History },
   { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
+  { title: 'Users', url: '/dashboard/users', icon: Users, ownerOnly: true },
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
 ];
 
 const DashboardSidebar = () => {
   const location = useLocation();
-  const { signOut, user } = useAuth();
+  const { signOut, user, isOwner } = useAuth();
+
+  // Filter menu items based on owner status
+  const visibleMenuItems = menuItems.filter(item => !item.ownerOnly || isOwner);
 
   return (
     <Sidebar>
@@ -55,7 +67,7 @@ const DashboardSidebar = () => {
           <SidebarGroupLabel>Menu</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {menuItems.map((item) => (
+              {visibleMenuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton
                     asChild
