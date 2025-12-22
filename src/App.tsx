@@ -22,6 +22,7 @@ import UserManagement from "./pages/dashboard/UserManagement";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import CommandPalette from "@/components/dashboard/CommandPalette";
 import KeyboardShortcutsHelp from "@/components/dashboard/KeyboardShortcutsHelp";
+import KeyboardShortcutIndicator from "@/components/dashboard/KeyboardShortcutIndicator";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 
 const queryClient = new QueryClient();
@@ -44,7 +45,7 @@ const AppContent = () => {
   }, []);
 
   // Handle vim-style keyboard shortcuts (G+key navigation)
-  useKeyboardShortcuts({
+  const { waitingForSecondKey } = useKeyboardShortcuts({
     onOpenShortcutsHelp: () => setShortcutsHelpOpen(true),
   });
 
@@ -52,6 +53,7 @@ const AppContent = () => {
     <>
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
       <KeyboardShortcutsHelp open={shortcutsHelpOpen} onOpenChange={setShortcutsHelpOpen} />
+      <KeyboardShortcutIndicator isVisible={waitingForSecondKey} />
       <Toaster />
       <Sonner />
       <Routes>
