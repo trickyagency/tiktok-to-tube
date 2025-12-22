@@ -48,6 +48,8 @@ import {
   Clock,
   X,
   RefreshCw,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -322,6 +324,7 @@ export default function UserManagement() {
                     <TableHead>Email</TableHead>
                     <TableHead>Name</TableHead>
                     <TableHead>Role</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -332,6 +335,19 @@ export default function UserManagement() {
                       <TableCell className="font-medium">{user.email}</TableCell>
                       <TableCell>{user.full_name || '-'}</TableCell>
                       <TableCell>{getRoleBadge(user.role)}</TableCell>
+                      <TableCell>
+                        {user.email_confirmed_at ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Verified
+                          </Badge>
+                        ) : (
+                          <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
+                            <AlertCircle className="h-3 w-3 mr-1" />
+                            Pending
+                          </Badge>
+                        )}
+                      </TableCell>
                       <TableCell className="text-muted-foreground">
                         {format(new Date(user.created_at), 'MMM d, yyyy')}
                       </TableCell>

@@ -621,6 +621,15 @@ export type Database = {
           schedule: string
         }[]
       }
+      get_user_auth_metadata: {
+        Args: never
+        Returns: {
+          auth_created_at: string
+          email_confirmed_at: string
+          last_sign_in_at: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

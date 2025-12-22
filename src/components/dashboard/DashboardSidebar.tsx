@@ -24,6 +24,7 @@ import {
   Sparkles,
   Clock,
   Users,
+  BarChart3,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -41,6 +42,7 @@ const menuItems: MenuItem[] = [
   { title: 'Upload History', url: '/dashboard/history', icon: History },
   { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
   { title: 'Users', url: '/dashboard/users', icon: Users, ownerOnly: true },
+  { title: 'Analytics', url: '/dashboard/analytics', icon: BarChart3, ownerOnly: true },
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
 ];
 
