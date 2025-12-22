@@ -2,13 +2,16 @@ import { useState } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Video, Users, Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Video, Users, Loader2, Info } from 'lucide-react';
 import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 import { ManualVideoImport } from '@/components/tiktok/ManualVideoImport';
+import { BulkVideoImport } from '@/components/tiktok/BulkVideoImport';
+import { ChromeExtensionGuide } from '@/components/tiktok/ChromeExtensionGuide';
 
 const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
@@ -66,10 +69,21 @@ const TikTokAccounts = () => {
           </Card>
         </div>
 
+        {/* Info Alert */}
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription>
+            TikTok limits automatic video scraping. Use <strong>Bulk Import</strong> to add multiple videos at once.
+            Click "How to Export URLs" for easy methods to get your TikTok video links.
+          </AlertDescription>
+        </Alert>
+
         {/* Header with Add Button */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-wrap justify-between items-center gap-2">
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <ChromeExtensionGuide />
+            <BulkVideoImport />
             <ManualVideoImport />
             <AddTikTokAccountDialog />
           </div>
