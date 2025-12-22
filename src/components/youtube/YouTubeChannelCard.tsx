@@ -14,7 +14,8 @@ import {
   Clock,
   Users,
   Video,
-  Unlink
+  Unlink,
+  RotateCcw
 } from 'lucide-react';
 import { YouTubeChannel, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
@@ -162,16 +163,20 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
 
             {channel.auth_status === 'no_channel' && (
               <div className="text-sm text-amber-600 mb-2">
-                <p className="mb-1">Your Google account doesn't have a YouTube channel yet.</p>
-                <a 
-                  href="https://www.youtube.com/create_channel" 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  Create YouTube Channel
-                </a>
+                <p className="mb-2">Your Google account doesn't have a YouTube channel yet.</p>
+                <div className="flex flex-col gap-1 text-muted-foreground">
+                  <span className="font-medium text-amber-600">Steps to connect:</span>
+                  <span>1. <a 
+                    href="https://www.youtube.com/create_channel" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    Create YouTube Channel
+                  </a></span>
+                  <span>2. Click "Re-authorize" button →</span>
+                </div>
               </div>
             )}
 
@@ -213,7 +218,20 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
           </div>
 
           <div className="flex flex-col gap-2">
-            {channel.auth_status !== 'connected' ? (
+            {channel.auth_status === 'no_channel' ? (
+              <Button 
+                size="sm" 
+                onClick={handleAuthorize} 
+                disabled={isAuthorizing}
+                className="bg-amber-500 hover:bg-amber-600 text-white"
+              >
+                {isAuthorizing ? (
+                  <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Re-authorizing...</>
+                ) : (
+                  <><RotateCcw className="h-4 w-4 mr-2" />Re-authorize</>
+                )}
+              </Button>
+            ) : channel.auth_status !== 'connected' ? (
               <Button size="sm" onClick={handleAuthorize} disabled={isAuthorizing}>
                 {isAuthorizing ? (
                   <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Authorizing...</>
