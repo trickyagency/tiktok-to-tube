@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { useEffect, useRef } from 'react';
 
 export interface PublishQueueItem {
   id: string;
@@ -19,6 +20,8 @@ export interface PublishQueueItem {
   processed_at: string | null;
   created_at: string;
   updated_at: string;
+  progress_phase: string | null;
+  progress_percentage: number;
 }
 
 export interface QueueItemWithDetails extends PublishQueueItem {
@@ -39,6 +42,7 @@ export interface QueueItemWithDetails extends PublishQueueItem {
 export function usePublishQueue() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const processingToastsRef = useRef<Set<string>>(new Set());
 
   const queueQuery = useQuery({
     queryKey: ['publish-queue', user?.id],
@@ -60,6 +64,82 @@ export function usePublishQueue() {
     },
     enabled: !!user?.id,
   });
+
+  // Real-time subscription for progress updates and status changes
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel('publish-queue-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'publish_queue',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          const newRecord = payload.new as PublishQueueItem;
+          const oldRecord = payload.old as PublishQueueItem | undefined;
+
+          if (payload.eventType === 'UPDATE' && newRecord && oldRecord) {
+            // Started processing
+            if (newRecord.status === 'processing' && oldRecord.status === 'queued') {
+              processingToastsRef.current.add(newRecord.id);
+              toast.loading('Processing video...', {
+                id: `upload-${newRecord.id}`,
+                description: 'Downloading from TikTok...',
+              });
+            }
+            // Phase/progress update during processing
+            else if (newRecord.status === 'processing' && processingToastsRef.current.has(newRecord.id)) {
+              const phaseLabels: Record<string, string> = {
+                downloading: 'Downloading from TikTok...',
+                uploading: 'Uploading to YouTube...',
+                finalizing: 'Finalizing upload...',
+              };
+              const description = newRecord.progress_phase 
+                ? `${phaseLabels[newRecord.progress_phase] || newRecord.progress_phase} (${newRecord.progress_percentage}%)`
+                : `Progress: ${newRecord.progress_percentage}%`;
+              
+              toast.loading('Processing video...', {
+                id: `upload-${newRecord.id}`,
+                description,
+              });
+            }
+            // Completed
+            else if (newRecord.status === 'completed' && oldRecord.status !== 'completed') {
+              processingToastsRef.current.delete(newRecord.id);
+              toast.success('Video uploaded successfully!', {
+                id: `upload-${newRecord.id}`,
+                description: 'Your video is now live on YouTube',
+                action: newRecord.youtube_video_url ? {
+                  label: 'View',
+                  onClick: () => window.open(newRecord.youtube_video_url!, '_blank'),
+                } : undefined,
+              });
+            }
+            // Failed
+            else if (newRecord.status === 'failed' && oldRecord.status !== 'failed') {
+              processingToastsRef.current.delete(newRecord.id);
+              toast.error('Upload failed', {
+                id: `upload-${newRecord.id}`,
+                description: newRecord.error_message || 'An error occurred during upload',
+              });
+            }
+          }
+
+          // Refetch to update UI
+          queryClient.invalidateQueries({ queryKey: ['publish-queue'] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, queryClient]);
 
   const addToQueueMutation = useMutation({
     mutationFn: async (input: {
@@ -121,6 +201,8 @@ export function usePublishQueue() {
           status: 'queued',
           error_message: null,
           retry_count: 0,
+          progress_phase: null,
+          progress_percentage: 0,
         })
         .eq('id', queueItemId)
         .select()

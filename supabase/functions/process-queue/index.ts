@@ -126,10 +126,14 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
   console.log(`Processing queue item: ${queueId}`);
 
   try {
-    // Update status to processing
+    // Update status to processing with initial progress
     await supabase
       .from('publish_queue')
-      .update({ status: 'processing' })
+      .update({ 
+        status: 'processing',
+        progress_phase: 'downloading',
+        progress_percentage: 0
+      })
       .eq('id', queueId);
 
     // Fetch video details
@@ -165,9 +169,21 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     // Get valid access token
     const accessToken = await refreshAccessToken(supabase, channel);
 
+    // Update progress: downloading
+    await supabase
+      .from('publish_queue')
+      .update({ progress_phase: 'downloading', progress_percentage: 10 })
+      .eq('id', queueId);
+
     // Download video
     console.log(`Downloading video for queue item ${queueId}...`);
     const videoBlob = await downloadVideo(video.download_url);
+
+    // Update progress: uploading
+    await supabase
+      .from('publish_queue')
+      .update({ progress_phase: 'uploading', progress_percentage: 40 })
+      .eq('id', queueId);
 
     // Upload to YouTube
     console.log(`Uploading to YouTube for queue item ${queueId}...`);
@@ -178,6 +194,12 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       video.description || '',
       'public'
     );
+
+    // Update progress: finalizing
+    await supabase
+      .from('publish_queue')
+      .update({ progress_phase: 'finalizing', progress_percentage: 90 })
+      .eq('id', queueId);
 
     // Mark video as published
     await supabase
@@ -193,6 +215,8 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
         youtube_video_id: videoId,
         youtube_video_url: videoUrl,
         processed_at: new Date().toISOString(),
+        progress_phase: null,
+        progress_percentage: 100,
       })
       .eq('id', queueId);
 
