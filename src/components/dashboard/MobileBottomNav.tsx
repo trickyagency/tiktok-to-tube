@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, Calendar, Youtube, Video, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -10,14 +10,26 @@ const navItems = [
   { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
 ];
 
+const triggerHaptic = () => {
+  if ('vibrate' in navigator) {
+    navigator.vibrate(10);
+  }
+};
+
 const MobileBottomNav = () => {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
       return location.pathname === '/dashboard';
     }
     return location.pathname.startsWith(path);
+  };
+
+  const handleNavClick = (path: string) => {
+    triggerHaptic();
+    navigate(path);
   };
 
   return (
@@ -28,9 +40,9 @@ const MobileBottomNav = () => {
           {navItems.map((item) => {
             const active = isActive(item.path);
             return (
-              <Link
+              <button
                 key={item.path}
-                to={item.path}
+                onClick={() => handleNavClick(item.path)}
                 className={cn(
                   'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all min-w-[4rem]',
                   active
@@ -50,7 +62,7 @@ const MobileBottomNav = () => {
                 )}>
                   {item.label}
                 </span>
-              </Link>
+              </button>
             );
           })}
         </div>
