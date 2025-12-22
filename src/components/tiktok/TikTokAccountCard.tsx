@@ -2,8 +2,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink } from 'lucide-react';
 import { TikTokAccount, useRefreshTikTokAccount, useDeleteTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -28,6 +28,10 @@ export function TikTokAccountCard({ account, onViewVideos }: TikTokAccountCardPr
     }
   };
 
+  const openTikTokProfile = () => {
+    window.open(`https://www.tiktok.com/@${account.username}`, '_blank');
+  };
+
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
@@ -44,14 +48,19 @@ export function TikTokAccountCard({ account, onViewVideos }: TikTokAccountCardPr
           </Avatar>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="font-semibold truncate">
                 {account.display_name || account.username}
               </h3>
               {isScraping && (
                 <Badge variant="secondary" className="shrink-0">
                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Scraping
+                  Syncing
+                </Badge>
+              )}
+              {account.scrape_status === 'completed' && (
+                <Badge variant="outline" className="shrink-0 text-green-600 border-green-600/30">
+                  Synced
                 </Badge>
               )}
             </div>
@@ -71,7 +80,7 @@ export function TikTokAccountCard({ account, onViewVideos }: TikTokAccountCardPr
 
             {account.last_scraped_at && (
               <p className="text-xs text-muted-foreground mt-2">
-                Last scraped {formatDistanceToNow(new Date(account.last_scraped_at))} ago
+                Last synced {formatDistanceToNow(new Date(account.last_scraped_at))} ago
               </p>
             )}
           </div>
@@ -87,9 +96,14 @@ export function TikTokAccountCard({ account, onViewVideos }: TikTokAccountCardPr
                 <Eye className="h-4 w-4 mr-2" />
                 View Videos
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={openTikTokProfile}>
+                <ExternalLink className="h-4 w-4 mr-2" />
+                Open TikTok Profile
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleRefresh} disabled={isScraping}>
                 <RefreshCw className="h-4 w-4 mr-2" />
-                Refresh
+                Sync Profile
               </DropdownMenuItem>
               <DropdownMenuItem 
                 onClick={handleDelete} 

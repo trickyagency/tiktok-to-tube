@@ -414,66 +414,88 @@ Deno.serve(async (req) => {
 
     console.log(`Account saved: ${account.id}`);
 
-    // Fetch videos
-    const videos = await fetchAllVideos(userInfo.secUid, cleanUsername);
-    console.log(`Fetched ${videos.length} videos total`);
+    // Try to fetch videos (may fail due to TikTok restrictions)
+    let videos: TikTokVideo[] = [];
+    let videoFetchError = false;
+    
+    try {
+      videos = await fetchAllVideos(userInfo.secUid, cleanUsername);
+      console.log(`Fetched ${videos.length} videos total`);
+    } catch (error) {
+      console.log('Video fetching failed (likely 403 from TikTok):', error);
+      videoFetchError = true;
+    }
 
-    // Get existing video IDs
-    const { data: existingVideos } = await supabase
-      .from('scraped_videos')
-      .select('tiktok_video_id')
-      .eq('tiktok_account_id', account.id);
+    let newVideosCount = 0;
+    
+    // Only try to insert videos if we got some
+    if (videos.length > 0) {
+      // Get existing video IDs
+      const { data: existingVideos } = await supabase
+        .from('scraped_videos')
+        .select('tiktok_video_id')
+        .eq('tiktok_account_id', account.id);
 
-    const existingVideoIds = new Set(existingVideos?.map(v => v.tiktok_video_id) || []);
-    const newVideos = videos.filter(v => !existingVideoIds.has(v.id));
-    console.log(`New videos to insert: ${newVideos.length}`);
+      const existingVideoIds = new Set(existingVideos?.map(v => v.tiktok_video_id) || []);
+      const newVideos = videos.filter(v => !existingVideoIds.has(v.id));
+      newVideosCount = newVideos.length;
+      console.log(`New videos to insert: ${newVideosCount}`);
 
-    // Batch insert new videos
-    if (newVideos.length > 0) {
-      const videosToInsert = newVideos.map(video => ({
-        user_id: user.id,
-        tiktok_account_id: account.id,
-        tiktok_video_id: video.id,
-        title: video.title || null,
-        description: video.title || null,
-        video_url: `https://www.tiktok.com/@${cleanUsername}/video/${video.id}`,
-        thumbnail_url: video.cover,
-        download_url: video.play,
-        duration: video.duration,
-        view_count: video.play_count || 0,
-        like_count: video.digg_count || 0,
-        comment_count: video.comment_count || 0,
-        share_count: video.share_count || 0,
-        scraped_at: new Date().toISOString(),
-      }));
+      // Batch insert new videos
+      if (newVideos.length > 0) {
+        const videosToInsert = newVideos.map(video => ({
+          user_id: user.id,
+          tiktok_account_id: account.id,
+          tiktok_video_id: video.id,
+          title: video.title || null,
+          description: video.title || null,
+          video_url: `https://www.tiktok.com/@${cleanUsername}/video/${video.id}`,
+          thumbnail_url: video.cover,
+          download_url: video.play,
+          duration: video.duration,
+          view_count: video.play_count || 0,
+          like_count: video.digg_count || 0,
+          comment_count: video.comment_count || 0,
+          share_count: video.share_count || 0,
+          scraped_at: new Date().toISOString(),
+        }));
 
-      for (let i = 0; i < videosToInsert.length; i += 100) {
-        const batch = videosToInsert.slice(i, i + 100);
-        const { error: insertError } = await supabase
-          .from('scraped_videos')
-          .insert(batch);
-        
-        if (insertError) {
-          console.error('Error inserting videos batch:', insertError);
+        for (let i = 0; i < videosToInsert.length; i += 100) {
+          const batch = videosToInsert.slice(i, i + 100);
+          const { error: insertError } = await supabase
+            .from('scraped_videos')
+            .insert(batch);
+          
+          if (insertError) {
+            console.error('Error inserting videos batch:', insertError);
+          }
         }
       }
     }
 
-    // Update account status - always update to a valid status
-    const finalStatus = videos.length > 0 ? 'completed' : 'failed';
-    await updateAccountStatus(supabase, account.id, finalStatus, {
+    // Always mark as completed since profile was successfully fetched
+    // The user can use bulk import to add videos manually
+    await updateAccountStatus(supabase, account.id, 'completed', {
       last_scraped_at: new Date().toISOString(),
     });
+
+    // Build response message
+    const message = videoFetchError || videos.length === 0
+      ? 'Profile synced! TikTok limits automatic video fetching. Use Bulk Import to add videos.'
+      : `Synced ${newVideosCount} new videos.`;
 
     return new Response(
       JSON.stringify({
         success: true,
+        message,
+        videoFetchLimited: videoFetchError || videos.length === 0,
         account: {
           id: account.id,
           username: cleanUsername,
           display_name: userInfo.nickname,
-          video_count: videos.length,
-          new_videos: newVideos.length,
+          profile_video_count: userInfo.videoCount,
+          scraped_video_count: videos.length,
+          new_videos: newVideosCount,
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
