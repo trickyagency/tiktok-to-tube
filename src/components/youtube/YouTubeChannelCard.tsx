@@ -48,6 +48,8 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  const [secondsUntilCheck, setSecondsUntilCheck] = useState(30);
+  const [isManualChecking, setIsManualChecking] = useState(false);
   const pollingRef = useRef<{ intervalId: NodeJS.Timeout | null; timeoutId: NodeJS.Timeout | null }>({
     intervalId: null,
     timeoutId: null,
@@ -55,6 +57,20 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   
   const { startOAuth, refreshToken, deleteChannel, updateChannel, checkForChannel, isDeleting } = useYouTubeChannels();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
+
+  // Countdown timer effect
+  useEffect(() => {
+    if (!isPolling) return;
+    
+    const countdownId = setInterval(() => {
+      setSecondsUntilCheck(prev => {
+        if (prev <= 1) return 30; // Reset when hitting 0
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(countdownId);
+  }, [isPolling]);
 
   // Automatic polling for no_channel status
   useEffect(() => {
@@ -75,10 +91,12 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
         setIsPolling(false);
         onAuthComplete?.();
       }
+      setSecondsUntilCheck(30); // Reset countdown after each check
     };
 
     // Start polling every 30 seconds
     setIsPolling(true);
+    setSecondsUntilCheck(30);
     pollingRef.current.intervalId = setInterval(poll, 30000);
     
     // Stop polling after 5 minutes
@@ -94,6 +112,25 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
       if (pollingRef.current.timeoutId) clearTimeout(pollingRef.current.timeoutId);
     };
   }, [channel.auth_status, channel.id, checkForChannel, onAuthComplete]);
+
+  const handleManualCheck = async () => {
+    setIsManualChecking(true);
+    try {
+      const result = await checkForChannel(channel.id);
+      if (result.found) {
+        toast.success(`YouTube channel "${result.channelTitle}" detected!`);
+        if (pollingRef.current.intervalId) clearInterval(pollingRef.current.intervalId);
+        if (pollingRef.current.timeoutId) clearTimeout(pollingRef.current.timeoutId);
+        setIsPolling(false);
+        onAuthComplete?.();
+      } else {
+        toast.info('No YouTube channel found yet. Keep waiting or create one first.');
+      }
+      setSecondsUntilCheck(30); // Reset countdown after manual check
+    } finally {
+      setIsManualChecking(false);
+    }
+  };
 
   const linkedTikTokAccount = tikTokAccounts.find(a => a.id === channel.tiktok_account_id);
 
@@ -223,10 +260,25 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                   <span>2. We'll detect it automatically, or click "Re-authorize"</span>
                 </div>
                 {isPolling && (
-                  <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
-                    <RefreshCw className="h-3 w-3 animate-spin" />
-                    Checking for channel every 30s...
-                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <RefreshCw className="h-3 w-3 animate-spin" />
+                      Next check in {secondsUntilCheck}s
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleManualCheck}
+                      disabled={isManualChecking}
+                      className="h-6 px-2 text-xs"
+                    >
+                      {isManualChecking ? (
+                        <RefreshCw className="h-3 w-3 animate-spin" />
+                      ) : (
+                        'Check Now'
+                      )}
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
