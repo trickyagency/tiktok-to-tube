@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, Calendar, Youtube, Video, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -19,6 +20,7 @@ const triggerHaptic = () => {
 const MobileBottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -32,8 +34,50 @@ const MobileBottomNav = () => {
     navigate(path);
   };
 
+  const getCurrentIndex = () => {
+    const exactMatch = navItems.findIndex(item => item.path === location.pathname);
+    if (exactMatch !== -1) return exactMatch;
+    
+    // Find by prefix match
+    return navItems.findIndex(item => 
+      item.path !== '/dashboard' && location.pathname.startsWith(item.path)
+    );
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+
+    const touchEndX = e.changedTouches[0].clientX;
+    const deltaX = touchEndX - touchStartX;
+    const minSwipeDistance = 50;
+
+    if (Math.abs(deltaX) >= minSwipeDistance) {
+      const currentIndex = getCurrentIndex();
+      
+      if (deltaX < 0 && currentIndex < navItems.length - 1) {
+        // Swipe left - go to next
+        triggerHaptic();
+        navigate(navItems[currentIndex + 1].path);
+      } else if (deltaX > 0 && currentIndex > 0) {
+        // Swipe right - go to previous
+        triggerHaptic();
+        navigate(navItems[currentIndex - 1].path);
+      }
+    }
+
+    setTouchStartX(null);
+  };
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 md:hidden">
+    <nav 
+      className="fixed bottom-0 left-0 right-0 z-50 md:hidden"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Glass effect background */}
       <div className="glass border-t border-border/50 pb-safe">
         <div className="flex items-center justify-around h-16">
