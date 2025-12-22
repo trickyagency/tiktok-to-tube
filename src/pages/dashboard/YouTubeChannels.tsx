@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Youtube, Loader2 } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
+import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuide';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 
 const YouTubeChannels = () => {
@@ -30,6 +31,9 @@ const YouTubeChannels = () => {
       description="Connect and manage your YouTube channels with per-channel OAuth credentials"
     >
       <div className="space-y-6">
+        {/* Setup Guide */}
+        <GoogleCloudSetupGuide />
+
         <div className="flex justify-end">
           <AddYouTubeChannelDialog onSuccess={refetch} />
         </div>
