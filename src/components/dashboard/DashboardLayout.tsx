@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,9 @@ import {
 } from '@/components/ui/breadcrumb';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import DashboardSidebar from './DashboardSidebar';
-import { Bell, Plus, LogOut, Settings, User, ChevronDown, Home } from 'lucide-react';
+import ThemeToggle from './ThemeToggle';
+import NotificationsDropdown from './NotificationsDropdown';
+import { Plus, LogOut, Settings, User, ChevronDown, Home } from 'lucide-react';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -44,7 +45,6 @@ const routeLabels: Record<string, string> = {
 const DashboardLayout = ({ children, title, description }: DashboardLayoutProps) => {
   const location = useLocation();
   const { user, signOut } = useAuth();
-  const [notificationCount] = useState(0);
 
   const getBreadcrumbs = () => {
     const path = location.pathname;
@@ -125,15 +125,11 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
                   </DropdownMenuContent>
                 </DropdownMenu>
 
+                {/* Theme Toggle */}
+                <ThemeToggle />
+
                 {/* Notifications */}
-                <Button variant="ghost" size="icon" className="relative h-9 w-9">
-                  <Bell className="h-4 w-4" />
-                  {notificationCount > 0 && (
-                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-medium flex items-center justify-center">
-                      {notificationCount}
-                    </span>
-                  )}
-                </Button>
+                <NotificationsDropdown />
 
                 {/* User Menu */}
                 <DropdownMenu>
