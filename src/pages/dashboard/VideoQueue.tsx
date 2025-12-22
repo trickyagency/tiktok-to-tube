@@ -1,35 +1,165 @@
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Calendar } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Calendar, CheckCircle, Clock, Loader2, XCircle } from 'lucide-react';
+import { usePublishQueue } from '@/hooks/usePublishQueue';
+import { QueueVideoCard } from '@/components/queue/QueueVideoCard';
+import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
+import { ScheduleCard } from '@/components/schedules/ScheduleCard';
+import { usePublishSchedules } from '@/hooks/usePublishSchedules';
 
 const VideoQueue = () => {
+  const { 
+    queue, 
+    queuedItems, 
+    processingItems, 
+    completedItems, 
+    failedItems,
+    isLoading: isLoadingQueue 
+  } = usePublishQueue();
+  
+  const { schedules, isLoading: isLoadingSchedules } = usePublishSchedules();
+
+  const isLoading = isLoadingQueue || isLoadingSchedules;
+
   return (
     <DashboardLayout
       title="Video Queue"
-      description="Videos scheduled for YouTube upload"
+      description="Manage your video publishing schedule"
     >
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Scheduled Uploads
-          </CardTitle>
-          <CardDescription>
-            Videos waiting to be published to YouTube
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-12">
-            <Calendar className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <h3 className="font-medium mb-2">Queue is empty</h3>
-            <p className="text-sm text-muted-foreground">
-              Add TikTok accounts and set up schedules to populate the queue
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        {/* Schedules Section */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Upload Schedules
+              </CardTitle>
+              <CardDescription>
+                Automated TikTok to YouTube publishing schedules
+              </CardDescription>
+            </div>
+            <CreateScheduleDialog />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : schedules.length === 0 ? (
+              <div className="text-center py-8">
+                <Calendar className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                <h3 className="font-medium mb-1">No schedules yet</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Create a schedule to automatically upload videos
+                </p>
+                <CreateScheduleDialog />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {schedules.map((schedule) => (
+                  <ScheduleCard key={schedule.id} schedule={schedule} />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Queue Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Publishing Queue
+            </CardTitle>
+            <CardDescription>
+              Videos waiting to be published to YouTube
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="queued" className="w-full">
+              <TabsList className="grid w-full grid-cols-4 mb-4">
+                <TabsTrigger value="queued" className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5" />
+                  Queued ({queuedItems.length})
+                </TabsTrigger>
+                <TabsTrigger value="processing" className="flex items-center gap-1">
+                  <Loader2 className="h-3.5 w-3.5" />
+                  Processing ({processingItems.length})
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="flex items-center gap-1">
+                  <CheckCircle className="h-3.5 w-3.5" />
+                  Completed ({completedItems.length})
+                </TabsTrigger>
+                <TabsTrigger value="failed" className="flex items-center gap-1">
+                  <XCircle className="h-3.5 w-3.5" />
+                  Failed ({failedItems.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="queued">
+                {queuedItems.length === 0 ? (
+                  <EmptyState message="No videos queued for upload" />
+                ) : (
+                  <div className="space-y-3">
+                    {queuedItems.map((item) => (
+                      <QueueVideoCard key={item.id} item={item} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="processing">
+                {processingItems.length === 0 ? (
+                  <EmptyState message="No videos currently processing" />
+                ) : (
+                  <div className="space-y-3">
+                    {processingItems.map((item) => (
+                      <QueueVideoCard key={item.id} item={item} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="completed">
+                {completedItems.length === 0 ? (
+                  <EmptyState message="No completed uploads yet" />
+                ) : (
+                  <div className="space-y-3">
+                    {completedItems.map((item) => (
+                      <QueueVideoCard key={item.id} item={item} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="failed">
+                {failedItems.length === 0 ? (
+                  <EmptyState message="No failed uploads" />
+                ) : (
+                  <div className="space-y-3">
+                    {failedItems.map((item) => (
+                      <QueueVideoCard key={item.id} item={item} />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
     </DashboardLayout>
   );
 };
+
+function EmptyState({ message }: { message: string }) {
+  return (
+    <div className="text-center py-8">
+      <Calendar className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
+}
 
 export default VideoQueue;
