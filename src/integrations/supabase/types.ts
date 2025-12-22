@@ -463,10 +463,14 @@ export type Database = {
       youtube_channels: {
         Row: {
           access_token: string | null
+          auth_status: string | null
           channel_id: string
           channel_thumbnail: string | null
           channel_title: string | null
           created_at: string
+          google_client_id: string | null
+          google_client_secret: string | null
+          google_redirect_uri: string | null
           id: string
           is_connected: boolean | null
           last_upload_at: string | null
@@ -480,10 +484,14 @@ export type Database = {
         }
         Insert: {
           access_token?: string | null
+          auth_status?: string | null
           channel_id: string
           channel_thumbnail?: string | null
           channel_title?: string | null
           created_at?: string
+          google_client_id?: string | null
+          google_client_secret?: string | null
+          google_redirect_uri?: string | null
           id?: string
           is_connected?: boolean | null
           last_upload_at?: string | null
@@ -497,10 +505,14 @@ export type Database = {
         }
         Update: {
           access_token?: string | null
+          auth_status?: string | null
           channel_id?: string
           channel_thumbnail?: string | null
           channel_title?: string | null
           created_at?: string
+          google_client_id?: string | null
+          google_client_secret?: string | null
+          google_redirect_uri?: string | null
           id?: string
           is_connected?: boolean | null
           last_upload_at?: string | null
