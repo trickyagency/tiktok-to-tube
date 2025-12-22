@@ -13,7 +13,8 @@ import {
   AlertCircle,
   Clock,
   Users,
-  Video
+  Video,
+  Unlink
 } from 'lucide-react';
 import { YouTubeChannel, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
@@ -28,6 +29,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
 
 interface YouTubeChannelCardProps {
   channel: YouTubeChannel;
@@ -38,15 +46,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   
-  const { startOAuth, refreshToken, deleteChannel, isDeleting } = useYouTubeChannels();
+  const { startOAuth, refreshToken, deleteChannel, updateChannel, isDeleting } = useYouTubeChannels();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
 
   const linkedTikTokAccount = tikTokAccounts.find(a => a.id === channel.tiktok_account_id);
 
   const handleAuthorize = async () => {
     setIsAuthorizing(true);
-    
-    // Listen for OAuth completion message from popup
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'youtube-oauth-success') {
         window.removeEventListener('message', handleMessage);
@@ -57,21 +63,22 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
         setIsAuthorizing(false);
       }
     };
-    
     window.addEventListener('message', handleMessage);
     await startOAuth(channel.id);
-    
-    // Timeout fallback
     setTimeout(() => {
       window.removeEventListener('message', handleMessage);
       setIsAuthorizing(false);
-    }, 120000); // 2 minute timeout
+    }, 120000);
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await refreshToken(channel.id);
     setIsRefreshing(false);
+  };
+
+  const handleLinkTikTok = async (accountId: string | null) => {
+    await updateChannel({ id: channel.id, tiktok_account_id: accountId });
   };
 
   const getStatusBadge = () => {
@@ -115,7 +122,6 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
     <Card className="overflow-hidden">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
-          {/* Channel Avatar */}
           <Avatar className="h-16 w-16 rounded-lg">
             {channel.channel_thumbnail ? (
               <AvatarImage src={channel.channel_thumbnail} alt={channel.channel_title || 'Channel'} />
@@ -126,7 +132,6 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
             )}
           </Avatar>
 
-          {/* Channel Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold truncate">
@@ -148,12 +153,35 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
               </div>
             )}
 
-            {linkedTikTokAccount && (
-              <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                <LinkIcon className="h-3.5 w-3.5" />
-                Linked to @{linkedTikTokAccount.username}
-              </div>
-            )}
+            {/* TikTok Link Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
+                  <LinkIcon className="h-3 w-3 mr-1" />
+                  {linkedTikTokAccount ? `@${linkedTikTokAccount.username}` : 'Link TikTok'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {tikTokAccounts.map((account) => (
+                  <DropdownMenuItem
+                    key={account.id}
+                    onClick={() => handleLinkTikTok(account.id)}
+                    className={account.id === channel.tiktok_account_id ? 'bg-accent' : ''}
+                  >
+                    @{account.username}
+                  </DropdownMenuItem>
+                ))}
+                {linkedTikTokAccount && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleLinkTikTok(null)}>
+                      <Unlink className="h-3.5 w-3.5 mr-2" />
+                      Unlink
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {isTokenExpired && channel.auth_status === 'connected' && (
               <p className="text-xs text-amber-500 mt-1">
@@ -162,33 +190,17 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
             )}
           </div>
 
-          {/* Actions */}
           <div className="flex flex-col gap-2">
             {channel.auth_status !== 'connected' ? (
-              <Button 
-                size="sm" 
-                onClick={handleAuthorize}
-                disabled={isAuthorizing}
-              >
+              <Button size="sm" onClick={handleAuthorize} disabled={isAuthorizing}>
                 {isAuthorizing ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Authorizing...
-                  </>
+                  <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Authorizing...</>
                 ) : (
-                  <>
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Authorize
-                  </>
+                  <><ExternalLink className="h-4 w-4 mr-2" />Authorize</>
                 )}
               </Button>
             ) : (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-              >
+              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
                 <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                 {isRefreshing ? 'Refreshing...' : 'Refresh Token'}
               </Button>
@@ -205,7 +217,7 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                   <AlertDialogTitle>Remove YouTube Channel?</AlertDialogTitle>
                   <AlertDialogDescription>
                     This will remove "{channel.channel_title}" from your account. 
-                    Any scheduled uploads will be cancelled. This action cannot be undone.
+                    Any scheduled uploads will be cancelled.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
