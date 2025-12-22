@@ -146,12 +146,15 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
 
           <div className="space-y-2">
             <Label htmlFor="tiktok-account">Link TikTok Account (Optional)</Label>
-            <Select value={selectedTikTokAccount} onValueChange={setSelectedTikTokAccount}>
+            <Select 
+              value={selectedTikTokAccount || "none"} 
+              onValueChange={(val) => setSelectedTikTokAccount(val === "none" ? "" : val)}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select a TikTok account" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None</SelectItem>
+                <SelectItem value="none">None</SelectItem>
                 {tikTokAccounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
                     @{account.username}
