@@ -11,6 +11,16 @@ export interface UserWithRole {
   role: 'owner' | 'admin' | 'user';
 }
 
+export interface PendingInvitation {
+  id: string;
+  email: string;
+  role: string;
+  invited_by: string;
+  invited_at: string;
+  status: string;
+  expires_at: string;
+}
+
 export function useAllUsers() {
   return useQuery({
     queryKey: ['all-users'],
@@ -54,6 +64,101 @@ export function useAllUsers() {
       })) || [];
 
       return usersWithRoles;
+    },
+  });
+}
+
+export function usePendingInvitations() {
+  return useQuery({
+    queryKey: ['pending-invitations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pending_invitations')
+        .select('*')
+        .eq('status', 'pending')
+        .order('invited_at', { ascending: false });
+
+      if (error) throw error;
+      return data as PendingInvitation[];
+    },
+  });
+}
+
+export function useInviteUser() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ email, role }: { email: string; role: 'user' | 'admin' }) => {
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { email, role },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-invitations'] });
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      toast.success('Invitation sent successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useCancelInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const { error } = await supabase
+        .from('pending_invitations')
+        .update({ status: 'cancelled' })
+        .eq('id', invitationId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-invitations'] });
+      toast.success('Invitation cancelled');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+export function useResendInvitation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ email, role }: { email: string; role: string }) => {
+      // First cancel the old invitation
+      await supabase
+        .from('pending_invitations')
+        .update({ status: 'cancelled' })
+        .eq('email', email)
+        .eq('status', 'pending');
+
+      // Then send a new one
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: { email, role },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pending-invitations'] });
+      toast.success('Invitation resent');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
     },
   });
 }

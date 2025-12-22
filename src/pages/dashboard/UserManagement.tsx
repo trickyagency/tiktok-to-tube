@@ -1,10 +1,22 @@
+import { useState } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
-import { useAllUsers, usePromoteToAdmin, useRemoveAdminRole } from '@/hooks/useUserManagement';
+import { 
+  useAllUsers, 
+  usePromoteToAdmin, 
+  useRemoveAdminRole,
+  usePendingInvitations,
+  useInviteUser,
+  useCancelInvitation,
+  useResendInvitation,
+} from '@/hooks/useUserManagement';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Table,
   TableBody,
@@ -24,20 +36,48 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Users, Crown, Shield, User, ShieldPlus, ShieldMinus } from 'lucide-react';
+import { 
+  Users, 
+  Crown, 
+  Shield, 
+  User, 
+  ShieldPlus, 
+  ShieldMinus, 
+  Mail, 
+  Send,
+  Clock,
+  X,
+  RefreshCw,
+} from 'lucide-react';
 import { Navigate } from 'react-router-dom';
-import { format } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 
 export default function UserManagement() {
   const { isOwner, loading: authLoading } = useAuth();
   const { data: users, isLoading } = useAllUsers();
+  const { data: pendingInvitations, isLoading: invitationsLoading } = usePendingInvitations();
   const promoteToAdmin = usePromoteToAdmin();
   const removeAdminRole = useRemoveAdminRole();
+  const inviteUser = useInviteUser();
+  const cancelInvitation = useCancelInvitation();
+  const resendInvitation = useResendInvitation();
+
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState<'user' | 'admin'>('user');
 
   // Redirect non-owners
   if (!authLoading && !isOwner) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const handleInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    
+    await inviteUser.mutateAsync({ email: inviteEmail.trim(), role: inviteRole });
+    setInviteEmail('');
+    setInviteRole('user');
+  };
 
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -72,6 +112,150 @@ export default function UserManagement() {
   return (
     <DashboardLayout title="User Management" description="Manage platform users and their roles">
       <div className="space-y-6">
+
+        {/* Invite User Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Invite New User
+            </CardTitle>
+            <CardDescription>
+              Send an invitation email to add a new user to the platform
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleInvite} className="space-y-4">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="user@example.com"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    required
+                    className="mt-1.5"
+                  />
+                </div>
+                <div>
+                  <Label>Role</Label>
+                  <RadioGroup
+                    value={inviteRole}
+                    onValueChange={(value) => setInviteRole(value as 'user' | 'admin')}
+                    className="flex gap-4 mt-2"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="user" id="role-user" />
+                      <Label htmlFor="role-user" className="flex items-center gap-1 cursor-pointer">
+                        <User className="h-3 w-3" />
+                        User
+                      </Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="admin" id="role-admin" />
+                      <Label htmlFor="role-admin" className="flex items-center gap-1 cursor-pointer">
+                        <Shield className="h-3 w-3" />
+                        Admin
+                      </Label>
+                    </div>
+                  </RadioGroup>
+                </div>
+              </div>
+              <Button 
+                type="submit" 
+                disabled={inviteUser.isPending || !inviteEmail.trim()}
+              >
+                {inviteUser.isPending ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Invitation
+                  </>
+                )}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* Pending Invitations */}
+        {(pendingInvitations && pendingInvitations.length > 0) && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Pending Invitations
+              </CardTitle>
+              <CardDescription>
+                Users who have been invited but haven't accepted yet
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {invitationsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map(i => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Role</TableHead>
+                      <TableHead>Sent</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pendingInvitations.map(invitation => (
+                      <TableRow key={invitation.id}>
+                        <TableCell className="font-medium">{invitation.email}</TableCell>
+                        <TableCell>{getRoleBadge(invitation.role)}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDistanceToNow(new Date(invitation.invited_at), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {formatDistanceToNow(new Date(invitation.expires_at), { addSuffix: true })}
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => resendInvitation.mutate({ 
+                              email: invitation.email, 
+                              role: invitation.role 
+                            })}
+                            disabled={resendInvitation.isPending}
+                          >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Resend
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => cancelInvitation.mutate(invitation.id)}
+                            disabled={cancelInvitation.isPending}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Cancel
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
