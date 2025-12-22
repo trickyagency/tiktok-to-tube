@@ -4,22 +4,29 @@ import { useNavigate } from 'react-router-dom';
 interface KeyboardShortcutsOptions {
   onOpenCommandPalette?: () => void;
   onOpenShortcutsHelp?: () => void;
+  onNavigate?: (label: string) => void;
   enabled?: boolean;
 }
 
-const NAVIGATION_SHORTCUTS: Record<string, string> = {
-  d: '/dashboard',
-  q: '/dashboard/queue',
-  h: '/dashboard/history',
-  y: '/dashboard/youtube',
-  t: '/dashboard/tiktok',
-  s: '/dashboard/settings',
-  a: '/dashboard/analytics',
+interface NavigationShortcut {
+  route: string;
+  label: string;
+}
+
+const NAVIGATION_SHORTCUTS: Record<string, NavigationShortcut> = {
+  d: { route: '/dashboard', label: 'Dashboard' },
+  q: { route: '/dashboard/queue', label: 'Queue' },
+  h: { route: '/dashboard/history', label: 'History' },
+  y: { route: '/dashboard/youtube', label: 'YouTube' },
+  t: { route: '/dashboard/tiktok', label: 'TikTok' },
+  s: { route: '/dashboard/settings', label: 'Settings' },
+  a: { route: '/dashboard/analytics', label: 'Analytics' },
 };
 
 export const useKeyboardShortcuts = ({
   onOpenCommandPalette,
   onOpenShortcutsHelp,
+  onNavigate,
   enabled = true,
 }: KeyboardShortcutsOptions = {}) => {
   const navigate = useNavigate();
@@ -49,11 +56,12 @@ export const useKeyboardShortcuts = ({
       // If waiting for second key after G
       if (waitingForSecondKey) {
         const lowerKey = e.key.toLowerCase();
-        const route = NAVIGATION_SHORTCUTS[lowerKey];
+        const shortcut = NAVIGATION_SHORTCUTS[lowerKey];
         
-        if (route) {
+        if (shortcut) {
           e.preventDefault();
-          navigate(route);
+          navigate(shortcut.route);
+          onNavigate?.(shortcut.label);
         }
         
         setWaitingForSecondKey(false);
@@ -72,7 +80,7 @@ export const useKeyboardShortcuts = ({
         return;
       }
     },
-    [enabled, navigate, onOpenShortcutsHelp, waitingForSecondKey]
+    [enabled, navigate, onOpenShortcutsHelp, onNavigate, waitingForSecondKey]
   );
 
   useEffect(() => {
