@@ -12,6 +12,7 @@ import TikTokAccounts from "./pages/dashboard/TikTokAccounts";
 import VideoQueue from "./pages/dashboard/VideoQueue";
 import UploadHistory from "./pages/dashboard/UploadHistory";
 import Settings from "./pages/dashboard/Settings";
+import CronMonitor from "./pages/dashboard/CronMonitor";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -71,6 +72,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard/cron"
+              element={
+                <ProtectedRoute>
+                  <CronMonitor />
                 </ProtectedRoute>
               }
             />
