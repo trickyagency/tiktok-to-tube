@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
+import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
@@ -12,10 +13,12 @@ import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity } from
 import { format } from 'date-fns';
 
 const Dashboard = () => {
-  const { channels: youtubeChannels } = useYouTubeChannels();
-  const { data: tikTokAccounts = [] } = useTikTokAccounts();
-  const { queue: queueItems } = usePublishQueue();
-  const { history: uploadHistory } = useUploadHistory();
+  const { channels: youtubeChannels, isLoading: isLoadingYouTube } = useYouTubeChannels();
+  const { data: tikTokAccounts = [], isLoading: isLoadingTikTok } = useTikTokAccounts();
+  const { queue: queueItems, isLoading: isLoadingQueue } = usePublishQueue();
+  const { history: uploadHistory, isLoading: isLoadingHistory } = useUploadHistory();
+
+  const isLoading = isLoadingYouTube || isLoadingTikTok || isLoadingQueue || isLoadingHistory;
 
   const pendingCount = queueItems.filter(item => item.status === 'queued').length;
   const completedCount = uploadHistory.length;
@@ -77,13 +80,24 @@ const Dashboard = () => {
 
   const recentActivity = uploadHistory.slice(0, 5);
 
+  if (isLoading) {
+    return (
+      <DashboardLayout
+        title="Dashboard"
+        description="Overview of your TikTok to YouTube automation"
+      >
+        <DashboardLoadingState />
+      </DashboardLayout>
+    );
+  }
+
   return (
     <DashboardLayout
       title="Dashboard"
       description="Overview of your TikTok to YouTube automation"
     >
       {/* Welcome Banner with Setup Progress */}
-      <WelcomeBanner 
+      <WelcomeBanner
         youtubeCount={youtubeChannels.length}
         tiktokCount={tikTokAccounts.length}
         hasSchedule={queueItems.length > 0}
