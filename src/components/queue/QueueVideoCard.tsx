@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { QueueItemWithDetails, usePublishQueue } from '@/hooks/usePublishQueue';
 import { format } from 'date-fns';
+import { UploadProgressBar } from './UploadProgressBar';
 
 interface QueueVideoCardProps {
   item: QueueItemWithDetails;
@@ -32,7 +33,7 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
         );
       case 'processing':
         return (
-          <Badge variant="secondary">
+          <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20">
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             Processing
           </Badge>
@@ -74,6 +75,12 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
                 <Youtube className="h-6 w-6 text-muted-foreground" />
               </div>
             )}
+            {/* Processing overlay */}
+            {item.status === 'processing' && (
+              <div className="absolute inset-0 bg-background/60 flex items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+              </div>
+            )}
           </div>
 
           {/* Content */}
@@ -90,14 +97,25 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
               {getStatusBadge()}
             </div>
 
-            {/* Schedule Time */}
-            <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-              <Clock className="h-3 w-3" />
-              <span className={isOverdue ? 'text-amber-500' : ''}>
-                {format(scheduledDate, 'MMM d, yyyy • h:mm a')}
-                {isOverdue && ' (overdue)'}
-              </span>
-            </div>
+            {/* Progress Bar for Processing */}
+            {item.status === 'processing' && (
+              <UploadProgressBar 
+                phase={item.progress_phase} 
+                percentage={item.progress_percentage || 0}
+                className="mt-3"
+              />
+            )}
+
+            {/* Schedule Time (hidden during processing) */}
+            {item.status !== 'processing' && (
+              <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span className={isOverdue ? 'text-amber-500' : ''}>
+                  {format(scheduledDate, 'MMM d, yyyy • h:mm a')}
+                  {isOverdue && ' (overdue)'}
+                </span>
+              </div>
+            )}
 
             {/* Error Message */}
             {item.status === 'failed' && item.error_message && (

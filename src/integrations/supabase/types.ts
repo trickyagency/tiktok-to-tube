@@ -200,6 +200,8 @@ export type Database = {
           id: string
           max_retries: number | null
           processed_at: string | null
+          progress_percentage: number | null
+          progress_phase: string | null
           retry_count: number | null
           schedule_id: string | null
           scheduled_for: string
@@ -217,6 +219,8 @@ export type Database = {
           id?: string
           max_retries?: number | null
           processed_at?: string | null
+          progress_percentage?: number | null
+          progress_phase?: string | null
           retry_count?: number | null
           schedule_id?: string | null
           scheduled_for: string
@@ -234,6 +238,8 @@ export type Database = {
           id?: string
           max_retries?: number | null
           processed_at?: string | null
+          progress_percentage?: number | null
+          progress_phase?: string | null
           retry_count?: number | null
           schedule_id?: string | null
           scheduled_for?: string
