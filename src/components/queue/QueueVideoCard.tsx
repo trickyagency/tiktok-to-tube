@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { 
   Clock, 
   CheckCircle, 
@@ -12,7 +13,8 @@ import {
   ExternalLink,
   Youtube,
   ArrowRight,
-  Music2
+  Music2,
+  AlertTriangle
 } from 'lucide-react';
 import { QueueItemWithDetails, usePublishQueue } from '@/hooks/usePublishQueue';
 import { format } from 'date-fns';
@@ -23,6 +25,10 @@ interface QueueVideoCardProps {
 
 export function QueueVideoCard({ item }: QueueVideoCardProps) {
   const { cancelQueueItem, retryQueueItem } = usePublishQueue();
+
+  // Check if video's TikTok account matches YouTube channel's linked account
+  const isAccountMismatch = item.youtube_channel?.tiktok_account_id && 
+    item.scraped_video?.tiktok_account_id !== item.youtube_channel?.tiktok_account_id;
 
   const getStatusBadge = () => {
     switch (item.status) {
@@ -94,24 +100,56 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
                 </h4>
                 {/* TikTok → YouTube flow indicator */}
                 <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Avatar className="h-4 w-4">
-                      <AvatarImage src={item.scraped_video?.tiktok_account?.avatar_url || undefined} />
-                      <AvatarFallback className="text-[8px] bg-gradient-to-br from-pink-500 to-purple-600 text-white">
-                        <Music2 className="h-2.5 w-2.5" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="truncate max-w-[100px]">
-                      @{item.scraped_video?.tiktok_account?.username || 'unknown'}
-                    </span>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1 cursor-help">
+                        <Avatar className="h-4 w-4">
+                          <AvatarImage src={item.scraped_video?.tiktok_account?.avatar_url || undefined} />
+                          <AvatarFallback className="text-[8px] bg-gradient-to-br from-pink-500 to-purple-600 text-white">
+                            <Music2 className="h-2.5 w-2.5" />
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate max-w-[100px]">
+                          @{item.scraped_video?.tiktok_account?.username || 'unknown'}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[200px]">
+                      <p className="font-medium">TikTok Source</p>
+                      <p className="text-muted-foreground">@{item.scraped_video?.tiktok_account?.username || 'unknown'}</p>
+                    </TooltipContent>
+                  </Tooltip>
                   <ArrowRight className="h-3 w-3 flex-shrink-0 text-muted-foreground/50" />
-                  <div className="flex items-center gap-1">
-                    <Youtube className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
-                    <span className="truncate max-w-[100px]">
-                      {item.youtube_channel?.channel_title || 'Unknown Channel'}
-                    </span>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1 cursor-help">
+                        <Youtube className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                        <span className="truncate max-w-[100px]">
+                          {item.youtube_channel?.channel_title || 'Unknown Channel'}
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="max-w-[200px]">
+                      <p className="font-medium">YouTube Destination</p>
+                      <p className="text-muted-foreground">{item.youtube_channel?.channel_title || 'Unknown Channel'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {isAccountMismatch && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Badge variant="outline" className="text-amber-600 border-amber-500/30 bg-amber-500/10 gap-1 ml-1 cursor-help">
+                          <AlertTriangle className="h-3 w-3" />
+                          <span className="hidden sm:inline">Mismatch</span>
+                        </Badge>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[250px]">
+                        <p className="font-medium text-amber-600">Account Mismatch</p>
+                        <p className="text-xs text-muted-foreground">
+                          This video is from @{item.scraped_video?.tiktok_account?.username} but the YouTube channel is linked to a different TikTok account.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
               </div>
               {getStatusBadge()}
