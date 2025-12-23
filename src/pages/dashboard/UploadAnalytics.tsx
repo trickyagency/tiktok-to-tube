@@ -2,8 +2,16 @@ import { useState } from 'react';
 import { subDays } from 'date-fns';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useUploadLogStats, useUploadLogTrends, DateRangeFilter } from '@/hooks/useUploadLogs';
+import { useUploadLogStats, useUploadLogTrends, UploadLogFilter } from '@/hooks/useUploadLogs';
+import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   Upload, 
   CheckCircle, 
@@ -13,7 +21,8 @@ import {
   TrendingDown,
   Loader2,
   BarChart3,
-  Activity
+  Activity,
+  Youtube
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -80,15 +89,26 @@ function StatCard({ title, value, description, icon, trend, gradientClass }: Sta
 }
 
 const UploadAnalytics = () => {
-  const [dateRange, setDateRange] = useState<DateRangeFilter>({
+  const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({
     from: subDays(new Date(), 30),
     to: new Date(),
   });
+  const [selectedChannelId, setSelectedChannelId] = useState<string | undefined>(undefined);
 
-  const { data: stats, isLoading: isLoadingStats } = useUploadLogStats(dateRange);
-  const { data: trends, isLoading: isLoadingTrends } = useUploadLogTrends(dateRange);
+  const { channels, isLoading: isLoadingChannels } = useYouTubeChannels();
+
+  const filter: UploadLogFilter = {
+    from: dateRange.from,
+    to: dateRange.to,
+    channelId: selectedChannelId,
+  };
+
+  const { data: stats, isLoading: isLoadingStats } = useUploadLogStats(filter);
+  const { data: trends, isLoading: isLoadingTrends } = useUploadLogTrends(filter);
 
   const isLoading = isLoadingStats || isLoadingTrends;
+
+  const selectedChannel = channels?.find(c => c.id === selectedChannelId);
 
   const phaseData = stats ? [
     { name: 'Download', value: stats.avgDownloadMs, fill: 'hsl(var(--chart-1))' },
@@ -99,17 +119,35 @@ const UploadAnalytics = () => {
 
   return (
     <DashboardLayout
-      title="Upload Analytics"
-      description="Performance metrics and trends for your video uploads"
+      title={selectedChannel ? `Upload Analytics - ${selectedChannel.channel_title}` : "Upload Analytics"}
+      description={selectedChannel ? "Performance metrics for this channel" : "Performance metrics and trends for your video uploads"}
     >
       <div className="space-y-6">
-        {/* Date Range Picker */}
-        <div className="flex items-center justify-between">
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-4">
           <DateRangePicker
             from={dateRange.from}
             to={dateRange.to}
             onDateChange={(range) => setDateRange({ from: range.from, to: range.to })}
           />
+          
+          <Select
+            value={selectedChannelId || 'all'}
+            onValueChange={(value) => setSelectedChannelId(value === 'all' ? undefined : value)}
+          >
+            <SelectTrigger className="w-[220px]">
+              <Youtube className="h-4 w-4 mr-2 text-muted-foreground" />
+              <SelectValue placeholder="All Channels" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Channels</SelectItem>
+              {channels?.map((channel) => (
+                <SelectItem key={channel.id} value={channel.id}>
+                  {channel.channel_title || 'Unnamed Channel'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (

@@ -30,6 +30,10 @@ export interface DateRangeFilter {
   to?: Date;
 }
 
+export interface UploadLogFilter extends DateRangeFilter {
+  channelId?: string;
+}
+
 export function useUploadLogs(queueItemId?: string) {
   return useQuery({
     queryKey: ['upload-logs', queueItemId],
@@ -50,20 +54,23 @@ export function useUploadLogs(queueItemId?: string) {
   });
 }
 
-export function useUploadLogStats(dateRange?: DateRangeFilter) {
+export function useUploadLogStats(filter?: UploadLogFilter) {
   return useQuery({
-    queryKey: ['upload-log-stats', dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryKey: ['upload-log-stats', filter?.from?.toISOString(), filter?.to?.toISOString(), filter?.channelId],
     queryFn: async () => {
       let query = supabase
         .from('upload_logs')
         .select('status, total_duration_ms, download_duration_ms, upload_duration_ms, token_refresh_duration_ms, finalize_duration_ms, video_size_bytes')
         .order('started_at', { ascending: false });
 
-      if (dateRange?.from) {
-        query = query.gte('started_at', dateRange.from.toISOString());
+      if (filter?.channelId) {
+        query = query.eq('youtube_channel_id', filter.channelId);
       }
-      if (dateRange?.to) {
-        const endDate = new Date(dateRange.to);
+      if (filter?.from) {
+        query = query.gte('started_at', filter.from.toISOString());
+      }
+      if (filter?.to) {
+        const endDate = new Date(filter.to);
         endDate.setDate(endDate.getDate() + 1);
         query = query.lt('started_at', endDate.toISOString());
       }
@@ -119,20 +126,23 @@ export function useUploadLogStats(dateRange?: DateRangeFilter) {
   });
 }
 
-export function useUploadLogTrends(dateRange?: DateRangeFilter) {
+export function useUploadLogTrends(filter?: UploadLogFilter) {
   return useQuery({
-    queryKey: ['upload-log-trends', dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
+    queryKey: ['upload-log-trends', filter?.from?.toISOString(), filter?.to?.toISOString(), filter?.channelId],
     queryFn: async () => {
       let query = supabase
         .from('upload_logs')
         .select('started_at, status, total_duration_ms')
         .order('started_at', { ascending: true });
 
-      if (dateRange?.from) {
-        query = query.gte('started_at', dateRange.from.toISOString());
+      if (filter?.channelId) {
+        query = query.eq('youtube_channel_id', filter.channelId);
       }
-      if (dateRange?.to) {
-        const endDate = new Date(dateRange.to);
+      if (filter?.from) {
+        query = query.gte('started_at', filter.from.toISOString());
+      }
+      if (filter?.to) {
+        const endDate = new Date(filter.to);
         endDate.setDate(endDate.getDate() + 1);
         query = query.lt('started_at', endDate.toISOString());
       }
