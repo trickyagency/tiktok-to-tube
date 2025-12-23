@@ -14,6 +14,7 @@ import {
 import { Eye, Heart, MessageCircle, Share2, ExternalLink } from 'lucide-react';
 import { useScrapedVideos, ScrapedVideo } from '@/hooks/useScrapedVideos';
 import { TikTokAccount } from '@/hooks/useTikTokAccounts';
+import { QueueVideoToYouTube } from '@/components/queue/QueueVideoToYouTube';
 
 interface AccountVideosModalProps {
   account: TikTokAccount | null;
@@ -29,13 +30,13 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
   };
 
   return (
-    <a
-      href={video.video_url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group"
-    >
-      <div className="relative w-24 h-32 shrink-0 rounded-md overflow-hidden bg-muted">
+    <div className="flex gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group">
+      <a
+        href={video.video_url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="relative w-24 h-32 shrink-0 rounded-md overflow-hidden bg-muted"
+      >
         {video.thumbnail_url ? (
           <img
             src={video.thumbnail_url}
@@ -54,11 +55,18 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
             Published
           </Badge>
         )}
-      </div>
+      </a>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className="text-sm font-medium line-clamp-2">{video.title || 'Untitled video'}</p>
+          <a
+            href={video.video_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-1 min-w-0"
+          >
+            <p className="text-sm font-medium line-clamp-2">{video.title || 'Untitled video'}</p>
+          </a>
           <ExternalLink className="h-4 w-4 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
         </div>
 
@@ -81,13 +89,18 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
           </span>
         </div>
 
-        {video.duration && (
-          <p className="text-xs text-muted-foreground mt-1">
-            {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-          </p>
-        )}
+        <div className="flex items-center justify-between mt-2">
+          {video.duration && (
+            <p className="text-xs text-muted-foreground">
+              {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+            </p>
+          )}
+          {!video.is_published && video.download_url && (
+            <QueueVideoToYouTube video={video} />
+          )}
+        </div>
       </div>
-    </a>
+    </div>
   );
 }
 

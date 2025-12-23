@@ -16,6 +16,11 @@ interface ApifyVideoData {
   playCount?: number;
   coverUrl?: string;
   id?: string;
+  // Additional download URL fields that Apify scrapers may provide
+  downloadUrl?: string;
+  videoUrlNoWaterMark?: string;
+  videoPlayUrl?: string;
+  downloadAddr?: string;
 }
 
 // Extract video ID from TikTok URL
@@ -233,6 +238,13 @@ Deno.serve(async (req) => {
         const videoId = extractVideoId(video.videoUrl);
         if (!videoId || existingVideoIds.has(videoId)) return null;
 
+        // Try to get the best download URL (direct video file, not TikTok page)
+        const downloadUrl = video.downloadUrl 
+          || video.videoUrlNoWaterMark 
+          || video.videoPlayUrl 
+          || video.downloadAddr
+          || video.videoUrl; // Fallback to page URL if no direct URL available
+
         return {
           user_id: userId,
           tiktok_account_id: accountId,
@@ -241,7 +253,7 @@ Deno.serve(async (req) => {
           description: video.videoDescription || null,
           video_url: video.videoUrl,
           thumbnail_url: video.coverUrl || null,
-          download_url: video.videoUrl,
+          download_url: downloadUrl,
           duration: video.videoDuration || 0,
           view_count: video.playCount || 0,
           like_count: video.diggCount || 0,

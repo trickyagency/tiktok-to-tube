@@ -8,6 +8,8 @@ import { QueueVideoCard } from '@/components/queue/QueueVideoCard';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 import { usePublishSchedules } from '@/hooks/usePublishSchedules';
+import { TestUploadDialog } from '@/components/queue/TestUploadDialog';
+import { ProcessQueueButton } from '@/components/queue/ProcessQueueButton';
 
 const VideoQueue = () => {
   const { 
@@ -16,10 +18,11 @@ const VideoQueue = () => {
     processingItems, 
     completedItems, 
     failedItems,
-    isLoading: isLoadingQueue 
+    isLoading: isLoadingQueue,
+    refetch: refetchQueue
   } = usePublishQueue();
   
-  const { schedules, isLoading: isLoadingSchedules } = usePublishSchedules();
+  const { schedules, isLoading: isLoadingSchedules, refetch: refetchSchedules } = usePublishSchedules();
 
   const isLoading = isLoadingQueue || isLoadingSchedules;
 
@@ -100,14 +103,20 @@ const VideoQueue = () => {
 
         {/* Queue Section */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Publishing Queue
-            </CardTitle>
-            <CardDescription>
-              Videos waiting to be published to YouTube
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Publishing Queue
+              </CardTitle>
+              <CardDescription>
+                Videos waiting to be published to YouTube
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <TestUploadDialog onSuccess={refetchQueue} />
+              <ProcessQueueButton onComplete={refetchQueue} />
+            </div>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="queued" className="w-full">
