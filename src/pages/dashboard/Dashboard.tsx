@@ -9,7 +9,7 @@ import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useUploadHistory } from '@/hooks/useUploadHistory';
-import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity } from 'lucide-react';
+import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const Dashboard = () => {
@@ -22,6 +22,12 @@ const Dashboard = () => {
 
   const pendingCount = queueItems.filter(item => item.status === 'queued').length;
   const completedCount = uploadHistory.length;
+  
+  // Calculate mismatched items - where video's TikTok account doesn't match channel's linked account
+  const mismatchedCount = queueItems.filter(item => 
+    item.youtube_channel?.tiktok_account_id && 
+    item.scraped_video?.tiktok_account_id !== item.youtube_channel?.tiktok_account_id
+  ).length;
 
   const stats = [
     { 
@@ -51,6 +57,14 @@ const Dashboard = () => {
       icon: TrendingUp, 
       description: 'Total uploads',
       gradientClass: 'stat-gradient-4'
+    },
+    { 
+      title: 'Queue Issues', 
+      value: mismatchedCount, 
+      icon: AlertTriangle, 
+      description: mismatchedCount === 0 ? 'No mismatches' : 'Account mismatches',
+      gradientClass: mismatchedCount > 0 ? 'bg-amber-500/10 border border-amber-500/20' : 'stat-gradient-1',
+      isWarning: mismatchedCount > 0
     },
   ];
 
@@ -104,7 +118,7 @@ const Dashboard = () => {
       />
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
         {stats.map((stat) => (
           <AnimatedStatCard
             key={stat.title}
@@ -113,6 +127,7 @@ const Dashboard = () => {
             icon={stat.icon}
             description={stat.description}
             gradientClass={stat.gradientClass}
+            isWarning={'isWarning' in stat ? stat.isWarning : false}
           />
         ))}
       </div>
