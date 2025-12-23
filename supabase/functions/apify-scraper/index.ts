@@ -251,7 +251,18 @@ async function processScrapingInBackground(
 
     console.log(`[Background] New videos to insert: ${newVideos.length}`);
 
-    // Batch insert new videos
+    // Set progress total before starting batch inserts
+    if (newVideos.length > 0) {
+      await supabase
+        .from('tiktok_accounts')
+        .update({
+          scrape_progress_total: newVideos.length,
+          scrape_progress_current: 0,
+        })
+        .eq('id', accountId);
+    }
+
+    // Batch insert new videos with progress updates
     if (newVideos.length > 0) {
       for (let i = 0; i < newVideos.length; i += 100) {
         const batch = newVideos.slice(i, i + 100);
@@ -262,6 +273,17 @@ async function processScrapingInBackground(
         if (insertError) {
           console.error('[Background] Error inserting videos batch:', insertError);
         }
+
+        // Update progress after each batch
+        const currentProgress = Math.min(i + batch.length, newVideos.length);
+        await supabase
+          .from('tiktok_accounts')
+          .update({
+            scrape_progress_current: currentProgress,
+          })
+          .eq('id', accountId);
+        
+        console.log(`[Background] Progress: ${currentProgress}/${newVideos.length}`);
       }
     }
 

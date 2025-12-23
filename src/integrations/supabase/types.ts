@@ -422,6 +422,8 @@ export type Database = {
           id: string
           is_active: boolean | null
           last_scraped_at: string | null
+          scrape_progress_current: number | null
+          scrape_progress_total: number | null
           scrape_status: string | null
           updated_at: string
           user_id: string
@@ -437,6 +439,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_scraped_at?: string | null
+          scrape_progress_current?: number | null
+          scrape_progress_total?: number | null
           scrape_status?: string | null
           updated_at?: string
           user_id: string
@@ -452,6 +456,8 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           last_scraped_at?: string | null
+          scrape_progress_current?: number | null
+          scrape_progress_total?: number | null
           scrape_status?: string | null
           updated_at?: string
           user_id?: string

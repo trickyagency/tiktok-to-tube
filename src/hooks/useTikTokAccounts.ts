@@ -17,6 +17,8 @@ export interface TikTokAccount {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  scrape_progress_current?: number;
+  scrape_progress_total?: number;
 }
 
 export function useTikTokAccounts() {

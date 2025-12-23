@@ -1,7 +1,8 @@
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Calendar, CheckCircle, Clock, Loader2, XCircle } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload } from 'lucide-react';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { QueueVideoCard } from '@/components/queue/QueueVideoCard';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
@@ -28,6 +29,37 @@ const VideoQueue = () => {
       description="Manage your video publishing schedule"
     >
       <div className="space-y-6">
+        {/* Processing Banner */}
+        {processingItems.length > 0 && (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <Upload className="h-5 w-5 text-primary animate-pulse" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-sm">
+                    {processingItems.length} video{processingItems.length > 1 ? 's' : ''} currently uploading
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {processingItems[0]?.scraped_video?.title || 'Processing video...'} 
+                    {processingItems[0]?.progress_phase && ` - ${processingItems[0].progress_phase}`}
+                  </p>
+                </div>
+                <div className="w-32">
+                  <Progress 
+                    value={processingItems[0]?.progress_percentage || 0} 
+                    className="h-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1 text-right">
+                    {processingItems[0]?.progress_percentage || 0}%
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Schedules Section */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">

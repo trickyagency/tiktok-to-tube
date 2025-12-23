@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download } from 'lucide-react';
@@ -19,6 +20,11 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
   const deleteAccount = useDeleteTikTokAccount();
 
   const isScraping = account.scrape_status === 'scraping' || refreshAccount.isPending;
+  
+  // Progress tracking
+  const progressCurrent = account.scrape_progress_current || 0;
+  const progressTotal = account.scrape_progress_total || 0;
+  const progressPercentage = progressTotal > 0 ? Math.round((progressCurrent / progressTotal) * 100) : 0;
 
   const handleRefresh = () => {
     refreshAccount.mutate({ accountId: account.id, username: account.username });
@@ -95,14 +101,25 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               </div>
             </div>
 
+            {/* Progress bar during scraping */}
+            {isScraping && (
+              <div className="mt-3 space-y-1.5">
+                <Progress 
+                  value={progressPercentage} 
+                  className="h-2"
+                />
+                <p className="text-xs text-primary">
+                  {progressTotal > 0 
+                    ? `Importing videos... (${progressCurrent} of ${progressTotal})`
+                    : 'Fetching videos from TikTok...'
+                  }
+                </p>
+              </div>
+            )}
+
             {account.last_scraped_at && !isScraping && (
               <p className="text-xs text-muted-foreground mt-2">
                 Last synced {formatDistanceToNow(new Date(account.last_scraped_at))} ago
-              </p>
-            )}
-            {isScraping && (
-              <p className="text-xs text-primary mt-2 animate-pulse">
-                Scraping videos in background...
               </p>
             )}
           </div>

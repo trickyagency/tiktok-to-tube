@@ -59,7 +59,7 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
   const isOverdue = scheduledDate < new Date() && item.status === 'queued';
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={`overflow-hidden transition-all ${item.status === 'processing' ? 'ring-2 ring-primary/30 animate-pulse' : ''}`}>
       <CardContent className="p-4">
         <div className="flex gap-4">
           {/* Thumbnail */}
