@@ -24,22 +24,16 @@ async function getApifyApiKey(supabase: any): Promise<string | null> {
   return data.value;
 }
 
-// Start an Apify actor run with webhook configuration
-async function startActorRunWithWebhook(apiKey: string, username: string): Promise<{ runId: string } | null> {
+// Start an Apify actor run and register an ad-hoc webhook for completion
+async function startActorRunWithWebhook(
+  apiKey: string,
+  username: string
+): Promise<{ runId: string } | null> {
   try {
-    // Configure webhooks for actor completion
-    const webhooks = [
-      {
-        eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED', 'ACTOR.RUN.ABORTED', 'ACTOR.RUN.TIMED_OUT'],
-        requestUrl: WEBHOOK_URL,
-        payloadTemplate: '{"eventType": {{eventType}}, "eventData": {{eventData}}, "resource": {{resource}}}',
-      }
-    ];
-
     const response = await fetch('https://api.apify.com/v2/acts/tKV6oSrYXiKNXXNy6/runs', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -54,33 +48,50 @@ async function startActorRunWithWebhook(apiKey: string, username: string): Promi
     }
 
     const data = await response.json();
-    const runId = data.data?.id;
-    
+    const runId = data?.data?.id as string | undefined;
+
+    if (!runId) {
+      console.error('Apify actor started but no runId returned:', JSON.stringify(data));
+      return null;
+    }
+
     console.log('Apify actor started:', runId);
 
-    // Now add the webhook to this specific run
-    if (runId) {
-      try {
-        const webhookResponse = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/webhooks`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            eventTypes: ['ACTOR.RUN.SUCCEEDED', 'ACTOR.RUN.FAILED', 'ACTOR.RUN.ABORTED', 'ACTOR.RUN.TIMED_OUT'],
-            requestUrl: WEBHOOK_URL,
-          }),
-        });
-        
-        if (webhookResponse.ok) {
-          console.log('Webhook registered for run:', runId);
-        } else {
-          console.error('Failed to register webhook:', await webhookResponse.text());
-        }
-      } catch (webhookError) {
-        console.error('Error registering webhook:', webhookError);
-      }
+    // Register an ad-hoc webhook scoped to THIS run.
+    // Apify does not support /actor-runs/{runId}/webhooks; webhooks are created via /v2/webhooks.
+    const webhookPayload = {
+      isAdHoc: true,
+      requestUrl: WEBHOOK_URL,
+      eventTypes: [
+        'ACTOR.RUN.SUCCEEDED',
+        'ACTOR.RUN.FAILED',
+        'ACTOR.RUN.ABORTED',
+        'ACTOR.RUN.TIMED_OUT',
+      ],
+      condition: {
+        actorRunId: runId,
+      },
+      // Provide a consistent payload shape our Supabase webhook expects.
+      shouldInterpolateStrings: true,
+      payloadTemplate:
+        '{"eventType":"{{eventType}}","eventData":{{eventData}},"resource":{{resource}}}',
+    };
+
+    const webhookResponse = await fetch('https://api.apify.com/v2/webhooks', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(webhookPayload),
+    });
+
+    if (!webhookResponse.ok) {
+      const webhookText = await webhookResponse.text();
+      console.error('Failed to register webhook:', webhookResponse.status, webhookText);
+    } else {
+      const webhookData = await webhookResponse.json().catch(() => null);
+      console.log('Webhook registered for run:', runId, webhookData?.data?.id ?? '');
     }
 
     return { runId };
