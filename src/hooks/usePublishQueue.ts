@@ -11,7 +11,7 @@ export interface PublishQueueItem {
   youtube_channel_id: string;
   schedule_id: string | null;
   scheduled_for: string;
-  status: 'queued' | 'processing' | 'completed' | 'failed';
+  status: 'queued' | 'processing' | 'uploading' | 'published' | 'failed' | 'cancelled';
   youtube_video_id: string | null;
   youtube_video_url: string | null;
   error_message: string | null;
@@ -108,8 +108,8 @@ export function usePublishQueue() {
                 description,
               });
             }
-            // Completed
-            else if (newRecord.status === 'completed' && oldRecord.status !== 'completed') {
+            // Published
+            else if (newRecord.status === 'published' && oldRecord.status !== 'published') {
               processingToastsRef.current.delete(newRecord.id);
               toast.success('Video uploaded successfully!', {
                 id: `upload-${newRecord.id}`,
@@ -222,15 +222,15 @@ export function usePublishQueue() {
 
   // Grouped by status for easy filtering
   const queuedItems = queueQuery.data?.filter(item => item.status === 'queued') || [];
-  const processingItems = queueQuery.data?.filter(item => item.status === 'processing') || [];
-  const completedItems = queueQuery.data?.filter(item => item.status === 'completed') || [];
+  const processingItems = queueQuery.data?.filter(item => item.status === 'processing' || item.status === 'uploading') || [];
+  const publishedItems = queueQuery.data?.filter(item => item.status === 'published') || [];
   const failedItems = queueQuery.data?.filter(item => item.status === 'failed') || [];
 
   return {
     queue: queueQuery.data || [],
     queuedItems,
     processingItems,
-    completedItems,
+    publishedItems,
     failedItems,
     isLoading: queueQuery.isLoading,
     error: queueQuery.error,

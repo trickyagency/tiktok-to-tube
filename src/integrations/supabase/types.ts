@@ -253,6 +253,7 @@ export type Database = {
           schedule_id: string | null
           scheduled_for: string
           scraped_video_id: string
+          started_at: string | null
           status: string | null
           updated_at: string
           user_id: string
@@ -272,6 +273,7 @@ export type Database = {
           schedule_id?: string | null
           scheduled_for: string
           scraped_video_id: string
+          started_at?: string | null
           status?: string | null
           updated_at?: string
           user_id: string
@@ -291,6 +293,7 @@ export type Database = {
           schedule_id?: string | null
           scheduled_for?: string
           scraped_video_id?: string
+          started_at?: string | null
           status?: string | null
           updated_at?: string
           user_id?: string

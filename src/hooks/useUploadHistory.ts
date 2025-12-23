@@ -22,7 +22,7 @@ export function useUploadHistory(selectedChannelId?: string) {
           youtube_channel:youtube_channels(id, channel_title, channel_thumbnail)
         `)
         .eq('user_id', user.id)
-        .eq('status', 'completed')
+        .eq('status', 'published')
         .order('processed_at', { ascending: false });
 
       if (selectedChannelId && selectedChannelId !== 'all') {
@@ -54,8 +54,8 @@ export function useUploadHistory(selectedChannelId?: string) {
         (payload) => {
           const newRecord = payload.new as any;
           
-          // Only show toast and refetch when status changes to 'completed'
-          if (newRecord.status === 'completed' && payload.old?.status !== 'completed') {
+          // Only show toast and refetch when status changes to 'published'
+          if (newRecord.status === 'published' && payload.old?.status !== 'published') {
             toast.success('🎉 Video uploaded successfully!', {
               description: 'Your video is now live on YouTube',
             });

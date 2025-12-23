@@ -24,11 +24,11 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
 
   const getStatusBadge = () => {
     switch (item.status) {
-      case 'completed':
+      case 'published':
         return (
           <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
             <CheckCircle className="h-3 w-3 mr-1" />
-            Completed
+            Published
           </Badge>
         );
       case 'processing':
@@ -124,8 +124,8 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
               </p>
             )}
 
-            {/* YouTube Link for completed */}
-            {item.status === 'completed' && item.youtube_video_url && (
+            {/* YouTube Link for published */}
+            {item.status === 'published' && item.youtube_video_url && (
               <a
                 href={item.youtube_video_url}
                 target="_blank"

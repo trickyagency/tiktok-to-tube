@@ -10,6 +10,9 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// Timeout for stuck items (5 minutes)
+const STUCK_TIMEOUT_MS = 5 * 60 * 1000;
+
 // Helper to refresh access token if expired
 async function refreshAccessToken(supabase: any, channel: any): Promise<string> {
   const tokenExpiresAt = new Date(channel.token_expires_at);
@@ -35,10 +38,14 @@ async function refreshAccessToken(supabase: any, channel: any): Promise<string> 
     }
 
     const newExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
-    await supabase
+    const { error: updateError } = await supabase
       .from('youtube_channels')
       .update({ access_token: tokenData.access_token, token_expires_at: newExpiresAt })
       .eq('id', channel.id);
+
+    if (updateError) {
+      console.error('Failed to update token:', updateError.message);
+    }
 
     return tokenData.access_token;
   }
@@ -171,20 +178,54 @@ async function uploadToYouTube(
   };
 }
 
+// Retry wrapper for database updates
+async function updateWithRetry(
+  supabase: any,
+  table: string,
+  data: any,
+  matchColumn: string,
+  matchValue: string,
+  maxRetries: number = 3
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    const { error } = await supabase
+      .from(table)
+      .update(data)
+      .eq(matchColumn, matchValue);
+    
+    if (!error) {
+      return true;
+    }
+    
+    console.error(`DB update attempt ${attempt}/${maxRetries} failed for ${table}:`, error.message);
+    
+    if (attempt < maxRetries) {
+      await new Promise(r => setTimeout(r, 1000 * attempt));
+    }
+  }
+  
+  return false;
+}
+
 async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
   const queueId = queueItem.id;
   console.log(`Processing queue item: ${queueId}`);
 
   try {
-    // Update status to processing with initial progress
-    await supabase
+    // Update status to processing with initial progress and started_at timestamp
+    const { error: startError } = await supabase
       .from('publish_queue')
       .update({ 
         status: 'processing',
         progress_phase: 'downloading',
-        progress_percentage: 0
+        progress_percentage: 0,
+        started_at: new Date().toISOString()
       })
       .eq('id', queueId);
+
+    if (startError) {
+      console.error('Failed to update status to processing:', startError.message);
+    }
 
     // Fetch video details
     const { data: video, error: videoError } = await supabase
@@ -245,36 +286,57 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       'public'
     );
 
+    console.log(`YouTube upload successful: ${videoUrl}`);
+
     // Update progress: finalizing
     await supabase
       .from('publish_queue')
       .update({ progress_phase: 'finalizing', progress_percentage: 90 })
       .eq('id', queueId);
 
-    // Mark video as published
-    await supabase
-      .from('scraped_videos')
-      .update({ is_published: true, published_at: new Date().toISOString() })
-      .eq('id', queueItem.scraped_video_id);
+    // Mark video as published with retry
+    const videoUpdated = await updateWithRetry(
+      supabase,
+      'scraped_videos',
+      { is_published: true, published_at: new Date().toISOString() },
+      'id',
+      queueItem.scraped_video_id
+    );
 
-    // Update queue item as completed
-    await supabase
-      .from('publish_queue')
-      .update({
-        status: 'completed',
+    if (!videoUpdated) {
+      console.error('Failed to mark video as published after retries');
+    }
+
+    // Update queue item as published with retry
+    const queueUpdated = await updateWithRetry(
+      supabase,
+      'publish_queue',
+      {
+        status: 'published',
         youtube_video_id: videoId,
         youtube_video_url: videoUrl,
         processed_at: new Date().toISOString(),
         progress_phase: null,
         progress_percentage: 100,
-      })
-      .eq('id', queueId);
+        started_at: null,
+        error_message: null,
+      },
+      'id',
+      queueId
+    );
+
+    if (!queueUpdated) {
+      throw new Error(`Failed to update queue item after successful upload. Video was uploaded to: ${videoUrl}`);
+    }
 
     // Update channel's last upload
-    await supabase
-      .from('youtube_channels')
-      .update({ last_upload_at: new Date().toISOString() })
-      .eq('id', queueItem.youtube_channel_id);
+    await updateWithRetry(
+      supabase,
+      'youtube_channels',
+      { last_upload_at: new Date().toISOString() },
+      'id',
+      queueItem.youtube_channel_id
+    );
 
     console.log(`Queue item ${queueId} completed: ${videoUrl}`);
 
@@ -286,15 +348,49 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     const newRetryCount = (queueItem.retry_count || 0) + 1;
     const newStatus = newRetryCount >= queueItem.max_retries ? 'failed' : 'queued';
 
-    await supabase
+    const { error: updateError } = await supabase
       .from('publish_queue')
       .update({
         status: newStatus,
         error_message: errorMessage,
         retry_count: newRetryCount,
+        started_at: null,
+        progress_phase: null,
       })
       .eq('id', queueId);
+
+    if (updateError) {
+      console.error('Failed to update queue item with error status:', updateError.message);
+    }
   }
+}
+
+// Reset stuck items that have been processing for too long
+async function resetStuckItems(supabase: any): Promise<number> {
+  const timeoutThreshold = new Date(Date.now() - STUCK_TIMEOUT_MS).toISOString();
+  
+  const { data: stuckItems, error } = await supabase
+    .from('publish_queue')
+    .update({ 
+      status: 'failed', 
+      error_message: 'Processing timeout - stuck for more than 5 minutes',
+      progress_phase: null,
+      started_at: null,
+    })
+    .eq('status', 'processing')
+    .lt('started_at', timeoutThreshold)
+    .select('id');
+
+  if (error) {
+    console.error('Failed to reset stuck items:', error.message);
+    return 0;
+  }
+
+  if (stuckItems && stuckItems.length > 0) {
+    console.log(`Reset ${stuckItems.length} stuck items: ${stuckItems.map((i: any) => i.id).join(', ')}`);
+  }
+
+  return stuckItems?.length || 0;
 }
 
 serve(async (req) => {
@@ -306,6 +402,12 @@ serve(async (req) => {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
     
     console.log('Process queue started at:', new Date().toISOString());
+
+    // First, reset any stuck items
+    const stuckCount = await resetStuckItems(supabase);
+    if (stuckCount > 0) {
+      console.log(`Reset ${stuckCount} stuck items`);
+    }
 
     // Fetch queue items that are due
     const { data: queueItems, error: queueError } = await supabase
@@ -327,6 +429,7 @@ serve(async (req) => {
         success: true,
         message: 'No items to process',
         processed: 0,
+        stuckReset: stuckCount,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -356,6 +459,7 @@ serve(async (req) => {
       processed,
       failed,
       total: queueItems.length,
+      stuckReset: stuckCount,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
