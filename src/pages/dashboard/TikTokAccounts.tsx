@@ -73,8 +73,8 @@ const TikTokAccounts = () => {
         <Alert>
           <Info className="h-4 w-4" />
           <AlertDescription>
-            TikTok limits automatic video scraping. Use <strong>Bulk Import</strong> to add multiple videos at once.
-            Click "How to Export URLs" for easy methods to get your TikTok video links.
+            Videos are scraped using <strong>Apify</strong> (configured by owner in Settings). 
+            Images and 0-duration content are automatically filtered. Already-published videos won't be re-imported.
           </AlertDescription>
         </Alert>
 

@@ -33,7 +33,7 @@ const Settings = () => {
 
   useEffect(() => {
     if (isOwner && !isLoading) {
-      const savedKey = getSetting('APIFY_API_KEY');
+      const savedKey = getSetting('apify_api_key');
       if (savedKey) {
         setApifyApiKey(savedKey);
       }
@@ -50,7 +50,7 @@ const Settings = () => {
 
   const handleSaveApiKey = () => {
     if (apifyApiKey.trim()) {
-      updateSetting('APIFY_API_KEY', apifyApiKey.trim());
+      updateSetting('apify_api_key', apifyApiKey.trim());
     }
   };
 

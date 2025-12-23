@@ -45,7 +45,7 @@ export function useAddTikTokAccount() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await supabase.functions.invoke('tikwm-scraper', {
+      const response = await supabase.functions.invoke('apify-scraper', {
         body: { username },
       });
 
@@ -61,7 +61,8 @@ export function useAddTikTokAccount() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
-      toast.success(`Added @${data.account.username} with ${data.account.video_count} videos`);
+      queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
+      toast.success(`Added @${data.account.username} with ${data.account.new_videos} new videos`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -83,7 +84,7 @@ export function useRefreshTikTokAccount() {
         .update({ scrape_status: 'scraping' })
         .eq('id', accountId);
 
-      const response = await supabase.functions.invoke('tikwm-scraper', {
+      const response = await supabase.functions.invoke('apify-scraper', {
         body: { username, accountId },
       });
 
@@ -100,7 +101,7 @@ export function useRefreshTikTokAccount() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
-      toast.success(`Refreshed @${data.account.username} - ${data.account.new_videos} new videos`);
+      toast.success(`Synced @${data.account.username} - ${data.account.new_videos} new videos`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
