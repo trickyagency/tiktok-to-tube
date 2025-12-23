@@ -5,7 +5,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload, RotateCcw, Filter } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload, RotateCcw, Filter, AlertTriangle } from 'lucide-react';
 import { usePublishQueue, QueueItemWithDetails } from '@/hooks/usePublishQueue';
 import { QueueVideoCard } from '@/components/queue/QueueVideoCard';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
@@ -17,6 +18,7 @@ import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 
 const VideoQueue = () => {
   const [filterAccountId, setFilterAccountId] = useState<string>('all');
+  const [showOnlyMismatched, setShowOnlyMismatched] = useState(false);
   
   const { 
     queue, 
@@ -35,10 +37,22 @@ const VideoQueue = () => {
 
   const isLoading = isLoadingQueue || isLoadingSchedules;
 
-  // Filter function for queue items by TikTok account
+  // Filter function for queue items by TikTok account and mismatch status
   const filterByAccount = (items: QueueItemWithDetails[]) => {
-    if (filterAccountId === 'all') return items;
-    return items.filter(item => item.scraped_video?.tiktok_account_id === filterAccountId);
+    let filtered = items;
+    
+    if (filterAccountId !== 'all') {
+      filtered = filtered.filter(item => item.scraped_video?.tiktok_account_id === filterAccountId);
+    }
+    
+    if (showOnlyMismatched) {
+      filtered = filtered.filter(item => 
+        item.youtube_channel?.tiktok_account_id && 
+        item.scraped_video?.tiktok_account_id !== item.youtube_channel?.tiktok_account_id
+      );
+    }
+    
+    return filtered;
   };
 
   const filteredQueuedItems = filterByAccount(queuedItems);
@@ -139,35 +153,54 @@ const VideoQueue = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {/* TikTok Account Filter */}
-            {tikTokAccounts.length > 0 && (
-              <div className="flex items-center gap-2 mb-4">
-                <Filter className="h-4 w-4 text-muted-foreground" />
-                <Select value={filterAccountId} onValueChange={setFilterAccountId}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="Filter by TikTok" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All TikTok Accounts</SelectItem>
-                    {tikTokAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        @{account.username}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {filterAccountId !== 'all' && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => setFilterAccountId('all')}
-                    className="text-xs"
-                  >
-                    Clear
-                  </Button>
-                )}
+            {/* Filters */}
+            <div className="flex flex-wrap items-center gap-4 mb-4">
+              {/* TikTok Account Filter */}
+              {tikTokAccounts.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <Select value={filterAccountId} onValueChange={setFilterAccountId}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filter by TikTok" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All TikTok Accounts</SelectItem>
+                      {tikTokAccounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          @{account.username}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {filterAccountId !== 'all' && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setFilterAccountId('all')}
+                      className="text-xs"
+                    >
+                      Clear
+                    </Button>
+                  )}
+                </div>
+              )}
+              
+              {/* Mismatch Filter */}
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="mismatch-filter"
+                  checked={showOnlyMismatched}
+                  onCheckedChange={(checked) => setShowOnlyMismatched(checked === true)}
+                />
+                <label 
+                  htmlFor="mismatch-filter" 
+                  className="text-sm flex items-center gap-1.5 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                  Show only mismatched
+                </label>
               </div>
-            )}
+            </div>
             
             <Tabs defaultValue="queued" className="w-full">
               <TabsList className="grid w-full grid-cols-4 mb-4">
