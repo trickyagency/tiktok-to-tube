@@ -62,7 +62,13 @@ export function useAddTikTokAccount() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
-      toast.success(`Added @${data.account.username} with ${data.account.new_videos} new videos`);
+      if (data.background) {
+        toast.info(`Scraping @${data.account?.username || 'account'}...`, {
+          description: 'Videos will appear as they are imported',
+        });
+      } else {
+        toast.success(`Added @${data.account.username} with ${data.account.new_videos} new videos`);
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -101,7 +107,13 @@ export function useRefreshTikTokAccount() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
-      toast.success(`Synced @${data.account.username} - ${data.account.new_videos} new videos`);
+      if (data.background) {
+        toast.info(`Syncing @${data.account?.username || 'account'}...`, {
+          description: 'Videos will appear as they are imported',
+        });
+      } else {
+        toast.success(`Synced @${data.account.username} - ${data.account.new_videos} new videos`);
+      }
     },
     onError: (error: Error) => {
       toast.error(error.message);

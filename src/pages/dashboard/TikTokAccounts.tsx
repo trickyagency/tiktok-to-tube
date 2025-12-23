@@ -4,8 +4,9 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Video, Users, Loader2, Info, AlertTriangle, Settings } from 'lucide-react';
+import { Video, Users, Loader2, Info, AlertTriangle, Settings, RefreshCw } from 'lucide-react';
 import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
+import { useTikTokAccountsRealtime } from '@/hooks/useTikTokAccountsRealtime';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
 import { useApifyStatus } from '@/hooks/useApifyStatus';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
@@ -22,12 +23,16 @@ const TikTokAccounts = () => {
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
 
+  // Enable realtime updates
+  useTikTokAccountsRealtime();
+
   const handleViewVideos = (account: TikTokAccount) => {
     setSelectedAccount(account);
     setVideosModalOpen(true);
   };
 
   const totalFollowers = accounts?.reduce((sum, a) => sum + a.follower_count, 0) || 0;
+  const scrapingAccounts = accounts?.filter(a => a.scrape_status === 'scraping') || [];
 
   return (
     <DashboardLayout
