@@ -1,18 +1,23 @@
+import { useState } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
-import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload, RotateCcw } from 'lucide-react';
-import { usePublishQueue } from '@/hooks/usePublishQueue';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload, RotateCcw, Filter } from 'lucide-react';
+import { usePublishQueue, QueueItemWithDetails } from '@/hooks/usePublishQueue';
 import { QueueVideoCard } from '@/components/queue/QueueVideoCard';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 import { usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { TestUploadDialog } from '@/components/queue/TestUploadDialog';
 import { ProcessQueueButton } from '@/components/queue/ProcessQueueButton';
+import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 
 const VideoQueue = () => {
+  const [filterAccountId, setFilterAccountId] = useState<string>('all');
+  
   const { 
     queue, 
     queuedItems, 
@@ -26,8 +31,20 @@ const VideoQueue = () => {
   } = usePublishQueue();
   
   const { schedules, isLoading: isLoadingSchedules, refetch: refetchSchedules } = usePublishSchedules();
+  const { data: tikTokAccounts = [] } = useTikTokAccounts();
 
   const isLoading = isLoadingQueue || isLoadingSchedules;
+
+  // Filter function for queue items by TikTok account
+  const filterByAccount = (items: QueueItemWithDetails[]) => {
+    if (filterAccountId === 'all') return items;
+    return items.filter(item => item.scraped_video?.tiktok_account_id === filterAccountId);
+  };
+
+  const filteredQueuedItems = filterByAccount(queuedItems);
+  const filteredProcessingItems = filterByAccount(processingItems);
+  const filteredPublishedItems = filterByAccount(publishedItems);
+  const filteredFailedItems = filterByAccount(failedItems);
 
   return (
     <DashboardLayout
@@ -122,32 +139,62 @@ const VideoQueue = () => {
             </div>
           </CardHeader>
           <CardContent>
+            {/* TikTok Account Filter */}
+            {tikTokAccounts.length > 0 && (
+              <div className="flex items-center gap-2 mb-4">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={filterAccountId} onValueChange={setFilterAccountId}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Filter by TikTok" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All TikTok Accounts</SelectItem>
+                    {tikTokAccounts.map((account) => (
+                      <SelectItem key={account.id} value={account.id}>
+                        @{account.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {filterAccountId !== 'all' && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => setFilterAccountId('all')}
+                    className="text-xs"
+                  >
+                    Clear
+                  </Button>
+                )}
+              </div>
+            )}
+            
             <Tabs defaultValue="queued" className="w-full">
               <TabsList className="grid w-full grid-cols-4 mb-4">
                 <TabsTrigger value="queued" className="flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
-                  Queued ({queuedItems.length})
+                  Queued ({filteredQueuedItems.length})
                 </TabsTrigger>
                 <TabsTrigger value="processing" className="flex items-center gap-1">
                   <Loader2 className="h-3.5 w-3.5" />
-                  Processing ({processingItems.length})
+                  Processing ({filteredProcessingItems.length})
                 </TabsTrigger>
                 <TabsTrigger value="published" className="flex items-center gap-1">
                   <CheckCircle className="h-3.5 w-3.5" />
-                  Published ({publishedItems.length})
+                  Published ({filteredPublishedItems.length})
                 </TabsTrigger>
                 <TabsTrigger value="failed" className="flex items-center gap-1">
                   <XCircle className="h-3.5 w-3.5" />
-                  Failed ({failedItems.length})
+                  Failed ({filteredFailedItems.length})
                 </TabsTrigger>
               </TabsList>
 
               <TabsContent value="queued">
-                {queuedItems.length === 0 ? (
-                  <EmptyState message="No videos queued for upload" />
+                {filteredQueuedItems.length === 0 ? (
+                  <EmptyState message={filterAccountId !== 'all' ? "No queued videos from this account" : "No videos queued for upload"} />
                 ) : (
                   <div className="space-y-3">
-                    {queuedItems.map((item) => (
+                    {filteredQueuedItems.map((item) => (
                       <QueueVideoCard key={item.id} item={item} />
                     ))}
                   </div>
@@ -155,11 +202,11 @@ const VideoQueue = () => {
               </TabsContent>
 
               <TabsContent value="processing">
-                {processingItems.length === 0 ? (
-                  <EmptyState message="No videos currently processing" />
+                {filteredProcessingItems.length === 0 ? (
+                  <EmptyState message={filterAccountId !== 'all' ? "No processing videos from this account" : "No videos currently processing"} />
                 ) : (
                   <div className="space-y-3">
-                    {processingItems.map((item) => (
+                    {filteredProcessingItems.map((item) => (
                       <QueueVideoCard key={item.id} item={item} />
                     ))}
                   </div>
@@ -167,11 +214,11 @@ const VideoQueue = () => {
               </TabsContent>
 
               <TabsContent value="published">
-                {publishedItems.length === 0 ? (
-                  <EmptyState message="No published uploads yet" />
+                {filteredPublishedItems.length === 0 ? (
+                  <EmptyState message={filterAccountId !== 'all' ? "No published videos from this account" : "No published uploads yet"} />
                 ) : (
                   <div className="space-y-3">
-                    {publishedItems.map((item) => (
+                    {filteredPublishedItems.map((item) => (
                       <QueueVideoCard key={item.id} item={item} />
                     ))}
                   </div>
@@ -179,8 +226,8 @@ const VideoQueue = () => {
               </TabsContent>
 
               <TabsContent value="failed">
-                {failedItems.length === 0 ? (
-                  <EmptyState message="No failed uploads" />
+                {filteredFailedItems.length === 0 ? (
+                  <EmptyState message={filterAccountId !== 'all' ? "No failed videos from this account" : "No failed uploads"} />
                 ) : (
                   <div className="space-y-3">
                     <div className="flex justify-end">
@@ -198,7 +245,7 @@ const VideoQueue = () => {
                         Retry All ({failedItems.length})
                       </Button>
                     </div>
-                    {failedItems.map((item) => (
+                    {filteredFailedItems.map((item) => (
                       <QueueVideoCard key={item.id} item={item} />
                     ))}
                   </div>

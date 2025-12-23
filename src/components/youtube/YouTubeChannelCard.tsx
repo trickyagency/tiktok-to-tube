@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { YouTubeChannel, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
+import { useScrapedVideos } from '@/hooks/useScrapedVideos';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -57,6 +58,11 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   
   const { startOAuth, refreshToken, deleteChannel, updateChannel, checkForChannel, isDeleting } = useYouTubeChannels();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
+  
+  const linkedTikTokAccount = tikTokAccounts.find(a => a.id === channel.tiktok_account_id);
+  
+  // Fetch video count for the linked TikTok account
+  const { data: linkedAccountVideos = [] } = useScrapedVideos(channel.tiktok_account_id);
 
   // Countdown timer effect
   useEffect(() => {
@@ -132,7 +138,7 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
     }
   };
 
-  const linkedTikTokAccount = tikTokAccounts.find(a => a.id === channel.tiktok_account_id);
+
 
   const handleAuthorize = async () => {
     setIsAuthorizing(true);
@@ -283,35 +289,61 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
               </div>
             )}
 
-            {/* TikTok Link Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">
-                  <LinkIcon className="h-3 w-3 mr-1" />
-                  {linkedTikTokAccount ? `@${linkedTikTokAccount.username}` : 'Link TikTok'}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                {tikTokAccounts.map((account) => (
-                  <DropdownMenuItem
-                    key={account.id}
-                    onClick={() => handleLinkTikTok(account.id)}
-                    className={account.id === channel.tiktok_account_id ? 'bg-accent' : ''}
-                  >
-                    @{account.username}
-                  </DropdownMenuItem>
-                ))}
-                {linkedTikTokAccount && (
-                  <>
+            {/* TikTok Link Display & Dropdown */}
+            {linkedTikTokAccount ? (
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 bg-primary/10 rounded-md px-2.5 py-1.5">
+                  <LinkIcon className="h-3.5 w-3.5 text-primary" />
+                  <span className="text-sm font-medium">@{linkedTikTokAccount.username}</span>
+                  <Badge variant="secondary" className="text-xs">
+                    <Video className="h-2.5 w-2.5 mr-1" />
+                    {linkedAccountVideos.length} videos
+                  </Badge>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    {tikTokAccounts.map((account) => (
+                      <DropdownMenuItem
+                        key={account.id}
+                        onClick={() => handleLinkTikTok(account.id)}
+                        className={account.id === channel.tiktok_account_id ? 'bg-accent' : ''}
+                      >
+                        @{account.username}
+                      </DropdownMenuItem>
+                    ))}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => handleLinkTikTok(null)}>
                       <Unlink className="h-3.5 w-3.5 mr-2" />
                       Unlink
                     </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+                    <LinkIcon className="h-3 w-3 mr-1" />
+                    Link TikTok Account
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  {tikTokAccounts.map((account) => (
+                    <DropdownMenuItem
+                      key={account.id}
+                      onClick={() => handleLinkTikTok(account.id)}
+                    >
+                      @{account.username}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
 
             {isTokenExpired && channel.auth_status === 'connected' && (
               <p className="text-xs text-amber-500 mt-1">

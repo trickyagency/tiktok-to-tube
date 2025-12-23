@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Loader2, Youtube, AlertTriangle, Clock } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Upload, Loader2, Youtube, AlertTriangle, Clock, Link as LinkIcon } from 'lucide-react';
 import { useYouTubeChannels, YouTubeChannel } from '@/hooks/useYouTubeChannels';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { ScrapedVideo } from '@/hooks/useScrapedVideos';
+import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 
@@ -25,14 +27,30 @@ export function QueueVideoToYouTube({ video, onSuccess }: QueueVideoToYouTubePro
 
   const { channels } = useYouTubeChannels();
   const { addToQueue } = usePublishQueue();
+  const { data: tikTokAccounts = [] } = useTikTokAccounts();
 
   const connectedChannels = channels.filter(c => c.auth_status === 'connected');
+
+  // Find the YouTube channel linked to this video's TikTok account
+  const linkedChannel = connectedChannels.find(c => c.tiktok_account_id === video.tiktok_account_id);
+  
+  // Find the TikTok account for this video
+  const videoTikTokAccount = tikTokAccounts.find(a => a.id === video.tiktok_account_id);
+
+  // Auto-select linked channel when dialog opens
+  useEffect(() => {
+    if (open && linkedChannel && !selectedChannelId) {
+      setSelectedChannelId(linkedChannel.id);
+    }
+  }, [open, linkedChannel, selectedChannelId]);
+
+  // Check if selected channel is NOT the linked one
+  const isNonLinkedChannel = selectedChannelId && linkedChannel && selectedChannelId !== linkedChannel.id;
 
   const isTokenExpired = (channel: YouTubeChannel) => {
     if (!channel.token_expires_at) return false;
     return new Date(channel.token_expires_at) < new Date();
   };
-
   const handleSubmit = async () => {
     if (!selectedChannelId) {
       toast.error('Please select a YouTube channel');
@@ -128,24 +146,51 @@ export function QueueVideoToYouTube({ video, onSuccess }: QueueVideoToYouTubePro
             ) : (
               <Select value={selectedChannelId} onValueChange={setSelectedChannelId}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Choose a channel" />
+                  <SelectValue placeholder={linkedChannel ? `@${videoTikTokAccount?.username} → ${linkedChannel.channel_title}` : "Choose a channel"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {connectedChannels.map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id}>
+                  {/* Show linked channel first with indicator */}
+                  {linkedChannel && (
+                    <SelectItem key={linkedChannel.id} value={linkedChannel.id}>
                       <div className="flex items-center gap-2">
                         <Youtube className="h-4 w-4 text-red-500" />
-                        <span>{channel.channel_title}</span>
-                        {isTokenExpired(channel) && (
-                          <Badge variant="destructive" className="text-xs">
-                            Expired
-                          </Badge>
+                        <span>{linkedChannel.channel_title}</span>
+                        <Badge variant="secondary" className="text-xs">
+                          <LinkIcon className="h-2.5 w-2.5 mr-1" />
+                          Linked
+                        </Badge>
+                        {isTokenExpired(linkedChannel) && (
+                          <Badge variant="destructive" className="text-xs">Expired</Badge>
                         )}
                       </div>
                     </SelectItem>
-                  ))}
+                  )}
+                  {/* Show other channels */}
+                  {connectedChannels
+                    .filter(c => c.id !== linkedChannel?.id)
+                    .map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        <div className="flex items-center gap-2">
+                          <Youtube className="h-4 w-4 text-red-500" />
+                          <span>{channel.channel_title}</span>
+                          {isTokenExpired(channel) && (
+                            <Badge variant="destructive" className="text-xs">Expired</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
+            )}
+            
+            {/* Warning for non-linked channel */}
+            {isNonLinkedChannel && videoTikTokAccount && (
+              <Alert className="border-amber-500/50 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-amber-600 text-sm">
+                  This video is from <strong>@{videoTikTokAccount.username}</strong>, which is linked to a different YouTube channel.
+                </AlertDescription>
+              </Alert>
             )}
           </div>
 

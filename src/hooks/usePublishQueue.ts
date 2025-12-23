@@ -31,11 +31,13 @@ export interface QueueItemWithDetails extends PublishQueueItem {
     thumbnail_url: string | null;
     video_url: string;
     download_url: string | null;
+    tiktok_account_id: string;
   };
   youtube_channel?: {
     id: string;
     channel_title: string | null;
     channel_thumbnail: string | null;
+    tiktok_account_id: string | null;
   };
 }
 
@@ -53,8 +55,8 @@ export function usePublishQueue() {
         .from('publish_queue')
         .select(`
           *,
-          scraped_video:scraped_videos(id, title, thumbnail_url, video_url, download_url),
-          youtube_channel:youtube_channels(id, channel_title, channel_thumbnail)
+          scraped_video:scraped_videos(id, title, thumbnail_url, video_url, download_url, tiktok_account_id),
+          youtube_channel:youtube_channels(id, channel_title, channel_thumbnail, tiktok_account_id)
         `)
         .eq('user_id', user.id)
         .order('scheduled_for', { ascending: true });
