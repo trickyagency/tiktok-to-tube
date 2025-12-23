@@ -2,17 +2,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download } from 'lucide-react';
 import { TikTokAccount, useRefreshTikTokAccount, useDeleteTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { formatDistanceToNow } from 'date-fns';
 
 interface TikTokAccountCardProps {
   account: TikTokAccount;
   onViewVideos: (account: TikTokAccount) => void;
+  isApifyConfigured: boolean;
 }
 
-export function TikTokAccountCard({ account, onViewVideos }: TikTokAccountCardProps) {
+export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
 
@@ -85,10 +87,38 @@ export function TikTokAccountCard({ account, onViewVideos }: TikTokAccountCardPr
             )}
           </div>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <MoreVertical className="h-4 w-4" />
+          <div className="flex items-center gap-2">
+            {/* Scrape Now Button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleRefresh}
+                    disabled={isScraping || !isApifyConfigured}
+                    className="shrink-0"
+                  >
+                    {isScraping ? (
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Scrape Now
+                  </Button>
+                </TooltipTrigger>
+                {!isApifyConfigured && (
+                  <TooltipContent>
+                    <p>Apify API key not configured</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -115,6 +145,7 @@ export function TikTokAccountCard({ account, onViewVideos }: TikTokAccountCardPr
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          </div>
         </div>
       </CardContent>
     </Card>

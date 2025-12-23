@@ -1,11 +1,13 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Video, Users, Loader2, Info } from 'lucide-react';
+import { Video, Users, Loader2, Info, AlertTriangle, Settings } from 'lucide-react';
 import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
+import { useApifyStatus } from '@/hooks/useApifyStatus';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
@@ -16,6 +18,7 @@ import { ChromeExtensionGuide } from '@/components/tiktok/ChromeExtensionGuide';
 const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
   const { data: totalVideos } = useScrapedVideosCount();
+  const { data: isApifyConfigured, isLoading: isApifyLoading } = useApifyStatus();
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
 
@@ -69,14 +72,35 @@ const TikTokAccounts = () => {
           </Card>
         </div>
 
-        {/* Info Alert */}
-        <Alert>
-          <Info className="h-4 w-4" />
-          <AlertDescription>
-            Videos are scraped using <strong>Apify</strong> (configured by owner in Settings). 
-            Images and 0-duration content are automatically filtered. Already-published videos won't be re-imported.
-          </AlertDescription>
-        </Alert>
+        {/* Apify Warning Banner */}
+        {!isApifyLoading && !isApifyConfigured && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between gap-4">
+              <span>
+                <strong>Apify API key not configured.</strong> Video scraping is disabled. 
+                The platform owner must configure the API key in Settings.
+              </span>
+              <Button variant="outline" size="sm" asChild className="shrink-0">
+                <Link to="/dashboard/settings">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Go to Settings
+                </Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Info Alert - only show when Apify is configured */}
+        {isApifyConfigured && (
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Videos are scraped using <strong>Apify</strong>. 
+              Images and 0-duration content are automatically filtered. Already-published videos won't be re-imported.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Header with Add Button */}
         <div className="flex flex-wrap justify-between items-center gap-2">
@@ -101,6 +125,7 @@ const TikTokAccounts = () => {
                 key={account.id}
                 account={account}
                 onViewVideos={handleViewVideos}
+                isApifyConfigured={isApifyConfigured ?? false}
               />
             ))}
           </div>
