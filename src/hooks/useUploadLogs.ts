@@ -25,6 +25,11 @@ export interface UploadLog {
   created_at: string;
 }
 
+export interface DateRangeFilter {
+  from?: Date;
+  to?: Date;
+}
+
 export function useUploadLogs(queueItemId?: string) {
   return useQuery({
     queryKey: ['upload-logs', queueItemId],
@@ -45,15 +50,25 @@ export function useUploadLogs(queueItemId?: string) {
   });
 }
 
-export function useUploadLogStats() {
+export function useUploadLogStats(dateRange?: DateRangeFilter) {
   return useQuery({
-    queryKey: ['upload-log-stats'],
+    queryKey: ['upload-log-stats', dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('upload_logs')
         .select('status, total_duration_ms, download_duration_ms, upload_duration_ms, token_refresh_duration_ms, finalize_duration_ms, video_size_bytes')
-        .order('started_at', { ascending: false })
-        .limit(500);
+        .order('started_at', { ascending: false });
+
+      if (dateRange?.from) {
+        query = query.gte('started_at', dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        const endDate = new Date(dateRange.to);
+        endDate.setDate(endDate.getDate() + 1);
+        query = query.lt('started_at', endDate.toISOString());
+      }
+
+      const { data, error } = await query.limit(1000);
 
       if (error) throw error;
 
@@ -104,18 +119,25 @@ export function useUploadLogStats() {
   });
 }
 
-export function useUploadLogTrends(days: number = 30) {
+export function useUploadLogTrends(dateRange?: DateRangeFilter) {
   return useQuery({
-    queryKey: ['upload-log-trends', days],
+    queryKey: ['upload-log-trends', dateRange?.from?.toISOString(), dateRange?.to?.toISOString()],
     queryFn: async () => {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const { data, error } = await supabase
+      let query = supabase
         .from('upload_logs')
         .select('started_at, status, total_duration_ms')
-        .gte('started_at', startDate.toISOString())
         .order('started_at', { ascending: true });
+
+      if (dateRange?.from) {
+        query = query.gte('started_at', dateRange.from.toISOString());
+      }
+      if (dateRange?.to) {
+        const endDate = new Date(dateRange.to);
+        endDate.setDate(endDate.getDate() + 1);
+        query = query.lt('started_at', endDate.toISOString());
+      }
+
+      const { data, error } = await query.limit(1000);
 
       if (error) throw error;
 

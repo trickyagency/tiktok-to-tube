@@ -750,11 +750,59 @@ export type Database = {
           },
         ]
       }
+      youtube_quota_usage: {
+        Row: {
+          created_at: string | null
+          date: string
+          id: string
+          is_paused: boolean
+          quota_limit: number
+          quota_used: number
+          updated_at: string | null
+          uploads_count: number
+          youtube_channel_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          id?: string
+          is_paused?: boolean
+          quota_limit?: number
+          quota_used?: number
+          updated_at?: string | null
+          uploads_count?: number
+          youtube_channel_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          id?: string
+          is_paused?: boolean
+          quota_limit?: number
+          quota_used?: number
+          updated_at?: string | null
+          uploads_count?: number
+          youtube_channel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "youtube_quota_usage_youtube_channel_id_fkey"
+            columns: ["youtube_channel_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      check_quota_available: {
+        Args: { p_channel_id: string; p_quota_cost?: number }
+        Returns: boolean
+      }
       get_cron_history: {
         Args: { limit_rows?: number }
         Returns: {
@@ -792,6 +840,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      increment_quota_usage: {
+        Args: { p_channel_id: string; p_date: string; p_quota_cost: number }
+        Returns: undefined
       }
       is_apify_configured: { Args: never; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }

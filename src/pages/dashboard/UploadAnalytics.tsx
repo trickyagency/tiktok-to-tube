@@ -1,6 +1,9 @@
+import { useState } from 'react';
+import { subDays } from 'date-fns';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useUploadLogStats, useUploadLogTrends } from '@/hooks/useUploadLogs';
+import { useUploadLogStats, useUploadLogTrends, DateRangeFilter } from '@/hooks/useUploadLogs';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { 
   Upload, 
   CheckCircle, 
@@ -77,8 +80,13 @@ function StatCard({ title, value, description, icon, trend, gradientClass }: Sta
 }
 
 const UploadAnalytics = () => {
-  const { data: stats, isLoading: isLoadingStats } = useUploadLogStats();
-  const { data: trends, isLoading: isLoadingTrends } = useUploadLogTrends(30);
+  const [dateRange, setDateRange] = useState<DateRangeFilter>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+
+  const { data: stats, isLoading: isLoadingStats } = useUploadLogStats(dateRange);
+  const { data: trends, isLoading: isLoadingTrends } = useUploadLogTrends(dateRange);
 
   const isLoading = isLoadingStats || isLoadingTrends;
 
@@ -95,6 +103,15 @@ const UploadAnalytics = () => {
       description="Performance metrics and trends for your video uploads"
     >
       <div className="space-y-6">
+        {/* Date Range Picker */}
+        <div className="flex items-center justify-between">
+          <DateRangePicker
+            from={dateRange.from}
+            to={dateRange.to}
+            onDateChange={(range) => setDateRange({ from: range.from, to: range.to })}
+          />
+        </div>
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
