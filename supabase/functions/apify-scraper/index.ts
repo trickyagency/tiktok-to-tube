@@ -158,6 +158,126 @@ async function updateAccountStatus(
   }
 }
 
+// Background task to complete the scraping process
+async function processScrapingInBackground(
+  supabase: any,
+  apiKey: string,
+  runId: string,
+  accountId: string,
+  userId: string,
+  cleanUsername: string
+) {
+  console.log(`[Background] Starting background processing for account ${accountId}, run ${runId}`);
+  
+  try {
+    // Wait for actor to complete
+    const datasetId = await waitForActorCompletion(apiKey, runId);
+    if (!datasetId) {
+      console.error('[Background] Actor failed or timed out');
+      await updateAccountStatus(supabase, accountId, 'failed');
+      return;
+    }
+
+    // Fetch video data
+    const videos = await fetchDatasetItems(apiKey, datasetId);
+    console.log(`[Background] Fetched ${videos.length} videos from Apify`);
+
+    // Filter out videos with 0 duration or no duration (images/slideshows)
+    const validVideos = videos.filter(video => {
+      const duration = video.videoDuration;
+      if (duration === null || duration === undefined || duration === 0) {
+        console.log(`[Background] Skipping video (no duration/image): ${video.videoUrl}`);
+        return false;
+      }
+      return true;
+    });
+    console.log(`[Background] Valid videos after filtering: ${validVideos.length}`);
+
+    if (validVideos.length === 0) {
+      await updateAccountStatus(supabase, accountId, 'completed', {
+        last_scraped_at: new Date().toISOString(),
+        video_count: 0,
+      });
+      console.log('[Background] No valid videos found');
+      return;
+    }
+
+    // Get existing video IDs for this account
+    const { data: existingVideos } = await supabase
+      .from('scraped_videos')
+      .select('tiktok_video_id')
+      .eq('tiktok_account_id', accountId);
+
+    const existingVideoIds = new Set(existingVideos?.map((v: any) => v.tiktok_video_id) || []);
+
+    // Get already published video IDs (to skip re-importing)
+    const { data: publishedVideos } = await supabase
+      .from('scraped_videos')
+      .select('tiktok_video_id')
+      .eq('tiktok_account_id', accountId)
+      .eq('is_published', true);
+
+    const publishedVideoIds = new Set(publishedVideos?.map((v: any) => v.tiktok_video_id) || []);
+    console.log(`[Background] Already published videos: ${publishedVideoIds.size}`);
+
+    // Map and filter new videos
+    const newVideos = validVideos
+      .map(video => {
+        const videoId = extractVideoId(video.videoUrl);
+        if (!videoId) return null;
+        
+        if (existingVideoIds.has(videoId)) return null;
+        if (publishedVideoIds.has(videoId)) return null;
+
+        return {
+          user_id: userId,
+          tiktok_account_id: accountId,
+          tiktok_video_id: videoId,
+          title: video.videoDescription?.substring(0, 255) || null,
+          description: video.videoDescription || null,
+          video_url: video.videoUrl,
+          thumbnail_url: video.coverUrl || null,
+          download_url: video.videoUrl,
+          duration: video.videoDuration || 0,
+          view_count: video.playCount || 0,
+          like_count: video.diggCount || 0,
+          comment_count: video.commentCount || 0,
+          share_count: video.shareCount || 0,
+          scraped_at: video.postDate || new Date().toISOString(),
+          is_published: false,
+        };
+      })
+      .filter(Boolean);
+
+    console.log(`[Background] New videos to insert: ${newVideos.length}`);
+
+    // Batch insert new videos
+    if (newVideos.length > 0) {
+      for (let i = 0; i < newVideos.length; i += 100) {
+        const batch = newVideos.slice(i, i + 100);
+        const { error: insertError } = await supabase
+          .from('scraped_videos')
+          .insert(batch);
+        
+        if (insertError) {
+          console.error('[Background] Error inserting videos batch:', insertError);
+        }
+      }
+    }
+
+    // Update account with video count and completion status
+    await updateAccountStatus(supabase, accountId, 'completed', {
+      last_scraped_at: new Date().toISOString(),
+      video_count: validVideos.length,
+    });
+
+    console.log(`[Background] Completed! Inserted ${newVideos.length} new videos`);
+  } catch (error) {
+    console.error('[Background] Error:', error);
+    await updateAccountStatus(supabase, accountId, 'failed');
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -269,142 +389,35 @@ Deno.serve(async (req) => {
     if (!runResult) {
       await updateAccountStatus(supabase, account.id, 'failed');
       return new Response(
-        JSON.stringify({ error: 'Failed to start TikTok scraper' }),
+        JSON.stringify({ error: 'Failed to start TikTok scraper. Please check your Apify API key and Actor subscription.' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Wait for actor to complete
-    const datasetId = await waitForActorCompletion(apiKey, runResult.runId);
-    if (!datasetId) {
-      await updateAccountStatus(supabase, account.id, 'failed');
-      return new Response(
-        JSON.stringify({ error: 'TikTok scraper failed or timed out' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    console.log(`Apify actor started with run ID: ${runResult.runId}`);
 
-    // Fetch video data
-    const videos = await fetchDatasetItems(apiKey, datasetId);
-    console.log(`Fetched ${videos.length} videos from Apify`);
+    // Use EdgeRuntime.waitUntil to process in background
+    // This allows us to return immediately while the scraping continues
+    // @ts-ignore - EdgeRuntime is available in Supabase Edge Functions
+    EdgeRuntime.waitUntil(
+      processScrapingInBackground(
+        supabase,
+        apiKey,
+        runResult.runId,
+        account.id,
+        user.id,
+        cleanUsername
+      )
+    );
 
-    // Filter out videos with 0 duration or no duration (images/slideshows)
-    const validVideos = videos.filter(video => {
-      const duration = video.videoDuration;
-      if (duration === null || duration === undefined || duration === 0) {
-        console.log(`Skipping video (no duration/image): ${video.videoUrl}`);
-        return false;
-      }
-      return true;
-    });
-    console.log(`Valid videos after filtering images/0-duration: ${validVideos.length}`);
-
-    if (validVideos.length === 0) {
-      await updateAccountStatus(supabase, account.id, 'completed', {
-        last_scraped_at: new Date().toISOString(),
-        video_count: 0,
-      });
-      return new Response(
-        JSON.stringify({
-          success: true,
-          account: {
-            id: account.id,
-            username: cleanUsername,
-            video_count: 0,
-            new_videos: 0,
-          },
-          message: 'No valid videos found (only images or 0-duration content)',
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get existing video IDs for this account
-    const { data: existingVideos } = await supabase
-      .from('scraped_videos')
-      .select('tiktok_video_id')
-      .eq('tiktok_account_id', account.id);
-
-    const existingVideoIds = new Set(existingVideos?.map(v => v.tiktok_video_id) || []);
-
-    // Get already published video IDs (to skip re-importing)
-    const { data: publishedVideos } = await supabase
-      .from('scraped_videos')
-      .select('tiktok_video_id')
-      .eq('tiktok_account_id', account.id)
-      .eq('is_published', true);
-
-    const publishedVideoIds = new Set(publishedVideos?.map(v => v.tiktok_video_id) || []);
-    console.log(`Already published videos: ${publishedVideoIds.size}`);
-
-    // Map and filter new videos (skip existing and already published)
-    const newVideos = validVideos
-      .map(video => {
-        const videoId = extractVideoId(video.videoUrl);
-        if (!videoId) return null;
-        
-        // Skip if already exists
-        if (existingVideoIds.has(videoId)) {
-          console.log(`Skipping existing video: ${videoId}`);
-          return null;
-        }
-        
-        // Skip if already published (shouldn't happen for new, but safety check)
-        if (publishedVideoIds.has(videoId)) {
-          console.log(`Skipping published video: ${videoId}`);
-          return null;
-        }
-
-        return {
-          user_id: user.id,
-          tiktok_account_id: account.id,
-          tiktok_video_id: videoId,
-          title: video.videoDescription?.substring(0, 255) || null,
-          description: video.videoDescription || null,
-          video_url: video.videoUrl,
-          thumbnail_url: video.coverUrl || null,
-          download_url: video.videoUrl,
-          duration: video.videoDuration || 0,
-          view_count: video.playCount || 0,
-          like_count: video.diggCount || 0,
-          comment_count: video.commentCount || 0,
-          share_count: video.shareCount || 0,
-          scraped_at: video.postDate || new Date().toISOString(),
-          is_published: false,
-        };
-      })
-      .filter(Boolean);
-
-    console.log(`New videos to insert: ${newVideos.length}`);
-
-    // Batch insert new videos
-    if (newVideos.length > 0) {
-      for (let i = 0; i < newVideos.length; i += 100) {
-        const batch = newVideos.slice(i, i + 100);
-        const { error: insertError } = await supabase
-          .from('scraped_videos')
-          .insert(batch);
-        
-        if (insertError) {
-          console.error('Error inserting videos batch:', insertError);
-        }
-      }
-    }
-
-    // Update account with video count and completion status
-    await updateAccountStatus(supabase, account.id, 'completed', {
-      last_scraped_at: new Date().toISOString(),
-      video_count: validVideos.length,
-    });
-
+    // Return immediately - scraping will continue in background
     return new Response(
       JSON.stringify({
         success: true,
+        message: 'Scraping started. Videos will appear shortly.',
         account: {
           id: account.id,
           username: cleanUsername,
-          video_count: validVideos.length,
-          new_videos: newVideos.length,
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
