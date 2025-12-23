@@ -1,5 +1,10 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+// Declare EdgeRuntime for background task processing
+declare const EdgeRuntime: {
+  waitUntil(promise: Promise<unknown>): void;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -120,16 +125,18 @@ async function fetchSingleVideoInfo(videoUrl: string): Promise<TikTokVideo | nul
   }
 }
 
-// Fetch videos using TikWM API
-async function fetchVideosFromTikWM(secUid: string, username: string): Promise<TikTokVideo[]> {
+// Fetch videos using TikWM API - optimized for speed
+async function fetchVideosFromTikWM(secUid: string, username: string, onProgress?: (current: number, total: number) => void): Promise<TikTokVideo[]> {
   const allVideos: TikTokVideo[] = [];
   let cursor = 0;
   let attempts = 0;
-  const maxAttempts = 3;
+  const maxAttempts = 5;
+  const maxVideos = 300; // Increased limit
+  const batchSize = 50; // Increased batch size
 
-  console.log(`Fetching videos for ${username} using TikWM API`);
+  console.log(`Fetching videos for ${username} using TikWM API (optimized)`);
 
-  while (attempts < maxAttempts && allVideos.length < 100) {
+  while (attempts < maxAttempts && allVideos.length < maxVideos) {
     try {
       const response = await fetchWithTimeout('https://www.tikwm.com/api/user/posts', {
         method: 'POST',
@@ -137,7 +144,7 @@ async function fetchVideosFromTikWM(secUid: string, username: string): Promise<T
           'Content-Type': 'application/x-www-form-urlencoded',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
-        body: `sec_uid=${encodeURIComponent(secUid)}&count=35&cursor=${cursor}`,
+        body: `sec_uid=${encodeURIComponent(secUid)}&count=${batchSize}&cursor=${cursor}`,
       }, 15000);
 
       if (response.status !== 200) {
@@ -148,7 +155,7 @@ async function fetchVideosFromTikWM(secUid: string, username: string): Promise<T
       const data = await response.json();
       
       if (data.code === 0 && data.data?.videos && data.data.videos.length > 0) {
-        console.log(`TikWM returned ${data.data.videos.length} videos`);
+        console.log(`TikWM returned ${data.data.videos.length} videos (total: ${allVideos.length + data.data.videos.length})`);
         
         for (const video of data.data.videos) {
           allVideos.push({
@@ -165,9 +172,15 @@ async function fetchVideosFromTikWM(secUid: string, username: string): Promise<T
           });
         }
 
-        if (!data.data.hasMore || data.data.videos.length < 35) break;
-        cursor = data.data.cursor || (cursor + 35);
-        await new Promise(r => setTimeout(r, 1500));
+        // Report progress if callback provided
+        if (onProgress) {
+          onProgress(allVideos.length, maxVideos);
+        }
+
+        if (!data.data.hasMore || data.data.videos.length < batchSize) break;
+        cursor = data.data.cursor || (cursor + batchSize);
+        // Reduced delay from 1500ms to 500ms for faster scraping
+        await new Promise(r => setTimeout(r, 500));
       } else {
         console.log(`TikWM posts API: code=${data.code}, msg=${data.msg}`);
         break;
@@ -175,18 +188,118 @@ async function fetchVideosFromTikWM(secUid: string, username: string): Promise<T
     } catch (error) {
       console.error('TikWM posts error:', error);
       attempts++;
+      // Brief delay before retry
+      await new Promise(r => setTimeout(r, 300));
     }
   }
 
   return allVideos;
 }
 
-// Main video fetching function
-async function fetchAllVideos(secUid: string, username: string): Promise<TikTokVideo[]> {
-  console.log('Trying TikWM video scraping...');
-  const videos = await fetchVideosFromTikWM(secUid, username);
+// Main video fetching function with progress callback
+async function fetchAllVideos(secUid: string, username: string, onProgress?: (current: number, total: number) => void): Promise<TikTokVideo[]> {
+  console.log('Trying TikWM video scraping (optimized)...');
+  const videos = await fetchVideosFromTikWM(secUid, username, onProgress);
   console.log(`TikWM returned ${videos.length} videos`);
   return videos;
+}
+
+// Background scraping function
+async function scrapeVideosInBackground(
+  supabase: any,
+  accountId: string,
+  userId: string,
+  userInfo: TikWMUserInfo,
+  cleanUsername: string
+) {
+  console.log(`[Background] Starting video scrape for ${cleanUsername}`);
+  
+  try {
+    // Update progress
+    const updateProgress = async (current: number, total: number) => {
+      await supabase
+        .from('tiktok_accounts')
+        .update({
+          scrape_progress_current: current,
+          scrape_progress_total: total,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', accountId);
+    };
+
+    // Fetch videos with progress updates
+    const videos = await fetchAllVideos(userInfo.secUid, cleanUsername, updateProgress);
+    console.log(`[Background] Fetched ${videos.length} videos`);
+
+    if (videos.length > 0) {
+      // Get existing video IDs
+      const { data: existingVideos } = await supabase
+        .from('scraped_videos')
+        .select('tiktok_video_id')
+        .eq('tiktok_account_id', accountId);
+
+      const existingVideoIds = new Set(existingVideos?.map((v: any) => v.tiktok_video_id) || []);
+      const newVideos = videos.filter(v => !existingVideoIds.has(v.id));
+      console.log(`[Background] New videos to insert: ${newVideos.length}`);
+
+      // Batch insert new videos (increased batch size to 200)
+      if (newVideos.length > 0) {
+        const videosToInsert = newVideos.map(video => ({
+          user_id: userId,
+          tiktok_account_id: accountId,
+          tiktok_video_id: video.id,
+          title: video.title || null,
+          description: video.title || null,
+          video_url: `https://www.tiktok.com/@${cleanUsername}/video/${video.id}`,
+          thumbnail_url: video.cover,
+          download_url: video.play,
+          duration: video.duration,
+          view_count: video.play_count || 0,
+          like_count: video.digg_count || 0,
+          comment_count: video.comment_count || 0,
+          share_count: video.share_count || 0,
+          scraped_at: new Date().toISOString(),
+        }));
+
+        for (let i = 0; i < videosToInsert.length; i += 200) {
+          const batch = videosToInsert.slice(i, i + 200);
+          const { error: insertError } = await supabase
+            .from('scraped_videos')
+            .insert(batch);
+          
+          if (insertError) {
+            console.error('[Background] Error inserting videos batch:', insertError);
+          }
+          
+          // Update progress
+          await updateProgress(Math.min(i + 200, videosToInsert.length), videosToInsert.length);
+        }
+      }
+    }
+
+    // Mark as completed
+    await supabase
+      .from('tiktok_accounts')
+      .update({
+        scrape_status: 'completed',
+        last_scraped_at: new Date().toISOString(),
+        scrape_progress_current: videos.length,
+        scrape_progress_total: videos.length,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', accountId);
+
+    console.log(`[Background] Scraping completed for ${cleanUsername}: ${videos.length} videos`);
+  } catch (error) {
+    console.error('[Background] Scraping error:', error);
+    await supabase
+      .from('tiktok_accounts')
+      .update({
+        scrape_status: 'failed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', accountId);
+  }
 }
 
 // Helper to update account status safely
@@ -414,88 +527,23 @@ Deno.serve(async (req) => {
 
     console.log(`Account saved: ${account.id}`);
 
-    // Try to fetch videos (may fail due to TikTok restrictions)
-    let videos: TikTokVideo[] = [];
-    let videoFetchError = false;
-    
-    try {
-      videos = await fetchAllVideos(userInfo.secUid, cleanUsername);
-      console.log(`Fetched ${videos.length} videos total`);
-    } catch (error) {
-      console.log('Video fetching failed (likely 403 from TikTok):', error);
-      videoFetchError = true;
-    }
+    // Start background scraping using EdgeRuntime.waitUntil
+    // This allows us to return immediately while scraping continues
+    EdgeRuntime.waitUntil(
+      scrapeVideosInBackground(supabase, account.id, user.id, userInfo, cleanUsername)
+    );
 
-    let newVideosCount = 0;
-    
-    // Only try to insert videos if we got some
-    if (videos.length > 0) {
-      // Get existing video IDs
-      const { data: existingVideos } = await supabase
-        .from('scraped_videos')
-        .select('tiktok_video_id')
-        .eq('tiktok_account_id', account.id);
-
-      const existingVideoIds = new Set(existingVideos?.map(v => v.tiktok_video_id) || []);
-      const newVideos = videos.filter(v => !existingVideoIds.has(v.id));
-      newVideosCount = newVideos.length;
-      console.log(`New videos to insert: ${newVideosCount}`);
-
-      // Batch insert new videos
-      if (newVideos.length > 0) {
-        const videosToInsert = newVideos.map(video => ({
-          user_id: user.id,
-          tiktok_account_id: account.id,
-          tiktok_video_id: video.id,
-          title: video.title || null,
-          description: video.title || null,
-          video_url: `https://www.tiktok.com/@${cleanUsername}/video/${video.id}`,
-          thumbnail_url: video.cover,
-          download_url: video.play,
-          duration: video.duration,
-          view_count: video.play_count || 0,
-          like_count: video.digg_count || 0,
-          comment_count: video.comment_count || 0,
-          share_count: video.share_count || 0,
-          scraped_at: new Date().toISOString(),
-        }));
-
-        for (let i = 0; i < videosToInsert.length; i += 100) {
-          const batch = videosToInsert.slice(i, i + 100);
-          const { error: insertError } = await supabase
-            .from('scraped_videos')
-            .insert(batch);
-          
-          if (insertError) {
-            console.error('Error inserting videos batch:', insertError);
-          }
-        }
-      }
-    }
-
-    // Always mark as completed since profile was successfully fetched
-    // The user can use bulk import to add videos manually
-    await updateAccountStatus(supabase, account.id, 'completed', {
-      last_scraped_at: new Date().toISOString(),
-    });
-
-    // Build response message
-    const message = videoFetchError || videos.length === 0
-      ? 'Profile synced! TikTok limits automatic video fetching. Use Bulk Import to add videos.'
-      : `Synced ${newVideosCount} new videos.`;
-
+    // Return immediate response - scraping continues in background
     return new Response(
       JSON.stringify({
         success: true,
-        message,
-        videoFetchLimited: videoFetchError || videos.length === 0,
+        message: 'Scraping started! Videos will appear as they are fetched.',
+        background: true,
         account: {
           id: account.id,
           username: cleanUsername,
           display_name: userInfo.nickname,
           profile_video_count: userInfo.videoCount,
-          scraped_video_count: videos.length,
-          new_videos: newVideosCount,
         },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
