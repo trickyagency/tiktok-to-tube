@@ -246,6 +246,17 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                   <Video className="h-3.5 w-3.5" />
                   {channel.video_count} videos
                 </span>
+                {linkedTikTokAccount ? (
+                  <span className="flex items-center gap-1 text-primary">
+                    <LinkIcon className="h-3.5 w-3.5" />
+                    <span className="font-medium">@{linkedTikTokAccount.username}</span>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-amber-500">
+                    <Unlink className="h-3.5 w-3.5" />
+                    Not linked
+                  </span>
+                )}
               </div>
             )}
 
