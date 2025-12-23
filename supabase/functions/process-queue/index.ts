@@ -13,6 +13,10 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // Timeout for stuck items (5 minutes)
 const STUCK_TIMEOUT_MS = 5 * 60 * 1000;
 
+// YouTube API quota constants
+const UPLOAD_QUOTA_COST = 1600;
+const DEFAULT_DAILY_QUOTA = 10000;
+
 // ============= Upload Logging Helpers =============
 
 async function createUploadLog(
@@ -55,6 +59,57 @@ async function updateUploadLog(
 
   if (error) {
     console.error('Failed to update upload log:', error.message);
+  }
+}
+
+// ============= Quota Management =============
+
+async function checkQuotaAvailable(supabase: any, channelId: string): Promise<{ available: boolean; reason?: string }> {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data, error } = await supabase
+    .from('youtube_quota_usage')
+    .select('quota_used, quota_limit, is_paused')
+    .eq('youtube_channel_id', channelId)
+    .eq('date', today)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to check quota:', error.message);
+    return { available: true }; // Allow on error to not block uploads
+  }
+
+  if (!data) {
+    return { available: true }; // No usage yet today
+  }
+
+  if (data.is_paused) {
+    console.log(`Channel ${channelId} is paused - skipping`);
+    return { available: false, reason: 'Channel uploads are paused' };
+  }
+
+  const remainingQuota = (data.quota_limit || DEFAULT_DAILY_QUOTA) - data.quota_used;
+  if (remainingQuota < UPLOAD_QUOTA_COST) {
+    console.log(`Channel ${channelId} quota exhausted: ${data.quota_used}/${data.quota_limit}`);
+    return { available: false, reason: `Daily quota exhausted (${data.quota_used}/${data.quota_limit} units used)` };
+  }
+
+  return { available: true };
+}
+
+async function trackQuotaUsage(supabase: any, channelId: string): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { error } = await supabase.rpc('increment_quota_usage', {
+    p_channel_id: channelId,
+    p_date: today,
+    p_quota_cost: UPLOAD_QUOTA_COST
+  });
+
+  if (error) {
+    console.error('Failed to track quota usage:', error.message);
+  } else {
+    console.log(`Tracked quota usage: ${UPLOAD_QUOTA_COST} units for channel ${channelId}`);
   }
 }
 
@@ -262,6 +317,21 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
   
   console.log(`Processing queue item: ${queueId} (attempt ${attemptNumber})`);
 
+  // Check quota availability BEFORE processing
+  const quotaCheck = await checkQuotaAvailable(supabase, queueItem.youtube_channel_id);
+  if (!quotaCheck.available) {
+    console.log(`Skipping queue item ${queueId}: ${quotaCheck.reason}`);
+    // Update queue item with skip reason but don't count as failure
+    await supabase
+      .from('publish_queue')
+      .update({
+        error_message: quotaCheck.reason,
+        progress_phase: 'quota_exceeded',
+      })
+      .eq('id', queueId);
+    return;
+  }
+
   // Create upload log entry
   const logId = await createUploadLog(supabase, queueItem, attemptNumber);
   
@@ -403,6 +473,9 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       'id',
       queueItem.youtube_channel_id
     );
+
+    // Track quota usage after successful upload
+    await trackQuotaUsage(supabase, queueItem.youtube_channel_id);
 
     const finalizeDuration = Date.now() - finalizeStartTime;
     const totalDuration = Date.now() - overallStartTime;
