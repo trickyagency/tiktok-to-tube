@@ -16,6 +16,7 @@ import YouTubeChannels from "./pages/dashboard/YouTubeChannels";
 import TikTokAccounts from "./pages/dashboard/TikTokAccounts";
 import VideoQueue from "./pages/dashboard/VideoQueue";
 import UploadHistory from "./pages/dashboard/UploadHistory";
+import UploadAnalytics from "./pages/dashboard/UploadAnalytics";
 import Analytics from "./pages/dashboard/Analytics";
 import Settings from "./pages/dashboard/Settings";
 import CronMonitor from "./pages/dashboard/CronMonitor";
@@ -102,6 +103,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <UploadHistory />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/upload-analytics"
+          element={
+            <ProtectedRoute>
+              <UploadAnalytics />
             </ProtectedRoute>
           }
         />

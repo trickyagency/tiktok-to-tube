@@ -2,7 +2,8 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload, RotateCcw } from 'lucide-react';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { QueueVideoCard } from '@/components/queue/QueueVideoCard';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
@@ -19,7 +20,9 @@ const VideoQueue = () => {
     publishedItems, 
     failedItems,
     isLoading: isLoadingQueue,
-    refetch: refetchQueue
+    refetch: refetchQueue,
+    retryAllFailed,
+    isRetryingAll
   } = usePublishQueue();
   
   const { schedules, isLoading: isLoadingSchedules, refetch: refetchSchedules } = usePublishSchedules();
@@ -180,6 +183,21 @@ const VideoQueue = () => {
                   <EmptyState message="No failed uploads" />
                 ) : (
                   <div className="space-y-3">
+                    <div className="flex justify-end">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => retryAllFailed()}
+                        disabled={isRetryingAll || failedItems.length === 0}
+                      >
+                        {isRetryingAll ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <RotateCcw className="h-4 w-4 mr-2" />
+                        )}
+                        Retry All ({failedItems.length})
+                      </Button>
+                    </div>
                     {failedItems.map((item) => (
                       <QueueVideoCard key={item.id} item={item} />
                     ))}

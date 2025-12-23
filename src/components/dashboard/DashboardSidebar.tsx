@@ -30,6 +30,7 @@ import {
   BarChart3,
   ChevronRight,
   Zap,
+  Activity,
 } from 'lucide-react';
 
 interface MenuItem {
@@ -44,6 +45,7 @@ const mainMenuItems: MenuItem[] = [
   { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
   { title: 'Video Queue', url: '/dashboard/queue', icon: Calendar },
   { title: 'Upload History', url: '/dashboard/history', icon: History },
+  { title: 'Upload Analytics', url: '/dashboard/upload-analytics', icon: BarChart3 },
 ];
 
 const platformMenuItems: MenuItem[] = [
@@ -54,7 +56,7 @@ const platformMenuItems: MenuItem[] = [
 const adminMenuItems: MenuItem[] = [
   { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
   { title: 'Users', url: '/dashboard/users', icon: Users, ownerOnly: true },
-  { title: 'Analytics', url: '/dashboard/analytics', icon: BarChart3, ownerOnly: true },
+  { title: 'Platform Stats', url: '/dashboard/analytics', icon: Activity, ownerOnly: true },
   { title: 'Settings', url: '/dashboard/settings', icon: Settings },
 ];
 
