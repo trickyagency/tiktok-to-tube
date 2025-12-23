@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LucideIcon } from 'lucide-react';
 
 interface AnimatedStatCardProps {
@@ -10,6 +12,8 @@ interface AnimatedStatCardProps {
   trend?: { value: number; isPositive: boolean };
   gradientClass: string;
   isWarning?: boolean;
+  href?: string;
+  tooltip?: string;
 }
 
 const AnimatedStatCard = ({ 
@@ -19,7 +23,9 @@ const AnimatedStatCard = ({
   description, 
   trend,
   gradientClass,
-  isWarning = false
+  isWarning = false,
+  href,
+  tooltip
 }: AnimatedStatCardProps) => {
   const [displayValue, setDisplayValue] = useState(0);
 
@@ -48,8 +54,8 @@ const AnimatedStatCard = ({
     return () => clearInterval(timer);
   }, [value]);
 
-  return (
-    <Card className={`card-hover border-0 ${gradientClass}`}>
+  const cardContent = (
+    <Card className={`card-hover border-0 ${gradientClass} ${href ? 'cursor-pointer hover:scale-[1.02] transition-transform' : ''}`}>
       <CardContent className="p-6">
         <div className="flex items-start justify-between">
           <div className="space-y-2">
@@ -71,6 +77,27 @@ const AnimatedStatCard = ({
       </CardContent>
     </Card>
   );
+
+  const wrappedCard = href ? (
+    <Link to={href} className="block">
+      {cardContent}
+    </Link>
+  ) : cardContent;
+
+  if (tooltip) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {wrappedCard}
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-[280px]">
+          <p className="text-sm">{tooltip}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
+  return wrappedCard;
 };
 
 export default AnimatedStatCard;

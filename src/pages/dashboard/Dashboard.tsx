@@ -64,7 +64,9 @@ const Dashboard = () => {
       icon: AlertTriangle, 
       description: mismatchedCount === 0 ? 'No mismatches' : 'Account mismatches',
       gradientClass: mismatchedCount > 0 ? 'bg-amber-500/10 border border-amber-500/20' : 'stat-gradient-1',
-      isWarning: mismatchedCount > 0
+      isWarning: mismatchedCount > 0,
+      href: '/dashboard/queue?showMismatched=true',
+      tooltip: 'Account mismatches occur when a video from one TikTok account is queued to a YouTube channel linked to a different TikTok account. Click to view and resolve these issues.'
     },
   ];
 
@@ -128,6 +130,8 @@ const Dashboard = () => {
             description={stat.description}
             gradientClass={stat.gradientClass}
             isWarning={'isWarning' in stat ? stat.isWarning : false}
+            href={'href' in stat ? stat.href : undefined}
+            tooltip={'tooltip' in stat ? stat.tooltip : undefined}
           />
         ))}
       </div>
