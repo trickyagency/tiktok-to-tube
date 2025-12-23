@@ -41,13 +41,18 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
   };
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={`overflow-hidden transition-all ${isScraping ? 'ring-2 ring-primary/20' : ''}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
-          <Avatar className="h-16 w-16">
-            <AvatarImage src={account.avatar_url || undefined} alt={account.username} />
-            <AvatarFallback>{account.username[0]?.toUpperCase()}</AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="h-16 w-16">
+              <AvatarImage src={account.avatar_url || undefined} alt={account.username} />
+              <AvatarFallback>{account.username[0]?.toUpperCase()}</AvatarFallback>
+            </Avatar>
+            {isScraping && (
+              <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            )}
+          </div>
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -55,14 +60,19 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                 {account.display_name || account.username}
               </h3>
               {isScraping && (
-                <Badge variant="secondary" className="shrink-0">
+                <Badge variant="secondary" className="shrink-0 animate-pulse">
                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                  Syncing
+                  Importing...
                 </Badge>
               )}
-              {account.scrape_status === 'completed' && (
+              {!isScraping && account.scrape_status === 'completed' && (
                 <Badge variant="outline" className="shrink-0 text-green-600 border-green-600/30">
                   Synced
+                </Badge>
+              )}
+              {!isScraping && account.scrape_status === 'failed' && (
+                <Badge variant="destructive" className="shrink-0">
+                  Failed
                 </Badge>
               )}
             </div>
@@ -71,8 +81,13 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Video className="h-4 w-4" />
-                <span className="font-medium text-foreground">{account.video_count}</span>
+                <span className={`font-medium text-foreground ${isScraping ? 'animate-pulse' : ''}`}>
+                  {account.video_count}
+                </span>
                 <span>videos</span>
+                {isScraping && (
+                  <span className="text-xs text-primary ml-1">(updating...)</span>
+                )}
               </div>
               <div className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
@@ -80,9 +95,14 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               </div>
             </div>
 
-            {account.last_scraped_at && (
+            {account.last_scraped_at && !isScraping && (
               <p className="text-xs text-muted-foreground mt-2">
                 Last synced {formatDistanceToNow(new Date(account.last_scraped_at))} ago
+              </p>
+            )}
+            {isScraping && (
+              <p className="text-xs text-primary mt-2 animate-pulse">
+                Scraping videos in background...
               </p>
             )}
           </div>
