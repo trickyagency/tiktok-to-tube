@@ -17,18 +17,26 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { QueueItemWithDetails, usePublishQueue } from '@/hooks/usePublishQueue';
+import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { format } from 'date-fns';
 import { UploadProgressBar } from './UploadProgressBar';
+
 interface QueueVideoCardProps {
   item: QueueItemWithDetails;
 }
 
 export function QueueVideoCard({ item }: QueueVideoCardProps) {
   const { cancelQueueItem, retryQueueItem } = usePublishQueue();
+  const { channels } = useYouTubeChannels();
 
   // Check if video's TikTok account matches YouTube channel's linked account
   const isAccountMismatch = item.youtube_channel?.tiktok_account_id && 
     item.scraped_video?.tiktok_account_id !== item.youtube_channel?.tiktok_account_id;
+
+  // Find the correct channel for this video's TikTok account
+  const correctChannel = isAccountMismatch
+    ? channels.find(ch => ch.tiktok_account_id === item.scraped_video?.tiktok_account_id)
+    : null;
 
   const getStatusBadge = () => {
     switch (item.status) {
@@ -142,11 +150,21 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
                           <span className="hidden sm:inline">Mismatch</span>
                         </Badge>
                       </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-[250px]">
+                      <TooltipContent side="bottom" className="max-w-[280px]">
                         <p className="font-medium text-amber-600">Account Mismatch</p>
                         <p className="text-xs text-muted-foreground">
                           This video is from @{item.scraped_video?.tiktok_account?.username} but the YouTube channel is linked to a different TikTok account.
                         </p>
+                        {correctChannel ? (
+                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3" />
+                            Should be: {correctChannel.channel_title}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-amber-500 mt-1">
+                            No matching channel found for this TikTok account.
+                          </p>
+                        )}
                       </TooltipContent>
                     </Tooltip>
                   )}
