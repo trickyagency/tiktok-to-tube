@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -17,8 +18,21 @@ import { ProcessQueueButton } from '@/components/queue/ProcessQueueButton';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 
 const VideoQueue = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [filterAccountId, setFilterAccountId] = useState<string>('all');
-  const [showOnlyMismatched, setShowOnlyMismatched] = useState(false);
+  const [showOnlyMismatched, setShowOnlyMismatched] = useState(() => 
+    searchParams.get('showMismatched') === 'true'
+  );
+
+  const handleMismatchFilterChange = (checked: boolean) => {
+    setShowOnlyMismatched(checked);
+    if (checked) {
+      searchParams.set('showMismatched', 'true');
+    } else {
+      searchParams.delete('showMismatched');
+    }
+    setSearchParams(searchParams, { replace: true });
+  };
   
   const { 
     queue, 
@@ -190,7 +204,7 @@ const VideoQueue = () => {
                 <Checkbox 
                   id="mismatch-filter"
                   checked={showOnlyMismatched}
-                  onCheckedChange={(checked) => setShowOnlyMismatched(checked === true)}
+                  onCheckedChange={(checked) => handleMismatchFilterChange(checked === true)}
                 />
                 <label 
                   htmlFor="mismatch-filter" 
