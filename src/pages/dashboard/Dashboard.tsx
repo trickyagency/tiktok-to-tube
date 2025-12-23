@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons';
+import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
@@ -13,12 +15,15 @@ import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, Alert
 import { format } from 'date-fns';
 
 const Dashboard = () => {
+  const [showQuickFixDialog, setShowQuickFixDialog] = useState(false);
+  
   const { channels: youtubeChannels, isLoading: isLoadingYouTube } = useYouTubeChannels();
   const { data: tikTokAccounts = [], isLoading: isLoadingTikTok } = useTikTokAccounts();
   const { 
     queue: queueItems, 
     isLoading: isLoadingQueue, 
-    mismatchedCount, 
+    mismatchedCount,
+    mismatchedItems,
     reassignMismatched, 
     isReassigning 
   } = usePublishQueue();
@@ -69,7 +74,7 @@ const Dashboard = () => {
       tooltip: 'Account mismatches occur when a video from one TikTok account is queued to a YouTube channel linked to a different TikTok account. Click to view and resolve these issues.',
       action: mismatchedCount > 0 ? {
         label: 'Quick Fix',
-        onClick: () => reassignMismatched(),
+        onClick: () => setShowQuickFixDialog(true),
         isLoading: isReassigning,
       } : undefined,
     },
@@ -243,6 +248,19 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Quick Fix Confirmation Dialog */}
+      <QuickFixConfirmDialog
+        isOpen={showQuickFixDialog}
+        onClose={() => setShowQuickFixDialog(false)}
+        onConfirm={async () => {
+          await reassignMismatched();
+          setShowQuickFixDialog(false);
+        }}
+        isLoading={isReassigning}
+        mismatchedItems={mismatchedItems}
+        youtubeChannels={youtubeChannels}
+      />
     </DashboardLayout>
   );
 };
