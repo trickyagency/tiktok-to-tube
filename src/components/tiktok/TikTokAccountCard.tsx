@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download } from 'lucide-react';
-import { TikTokAccount, useRefreshTikTokAccount, useDeleteTikTokAccount } from '@/hooks/useTikTokAccounts';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw } from 'lucide-react';
+import { TikTokAccount, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { formatDistanceToNow } from 'date-fns';
 
 interface TikTokAccountCardProps {
@@ -18,6 +18,7 @@ interface TikTokAccountCardProps {
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
+  const resetAccount = useResetTikTokAccount();
 
   const isScraping = account.scrape_status === 'scraping' || refreshAccount.isPending;
   
@@ -39,6 +40,14 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
   const openTikTokProfile = () => {
     window.open(`https://www.tiktok.com/@${account.username}`, '_blank');
   };
+
+  const handleReset = () => {
+    resetAccount.mutate(account.id);
+  };
+
+  // Show reset button if scraping for more than 5 minutes
+  const scrapingStartedAt = new Date(account.updated_at);
+  const isStuckScraping = isScraping && (Date.now() - scrapingStartedAt.getTime() > 5 * 60 * 1000);
 
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
@@ -108,12 +117,26 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                   value={progressPercentage} 
                   className="h-2"
                 />
-                <p className="text-xs text-primary">
-                  {progressTotal > 0 
-                    ? `Importing videos... (${progressCurrent} of ${progressTotal})`
-                    : 'Fetching videos from TikTok...'
-                  }
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-primary">
+                    {progressTotal > 0 
+                      ? `Importing videos... (${progressCurrent} of ${progressTotal})`
+                      : 'Fetching videos from TikTok...'
+                    }
+                  </p>
+                  {isStuckScraping && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleReset}
+                      disabled={resetAccount.isPending}
+                      className="h-6 px-2 text-xs text-muted-foreground hover:text-destructive"
+                    >
+                      <RotateCcw className="h-3 w-3 mr-1" />
+                      Reset
+                    </Button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -172,6 +195,12 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Sync Profile
               </DropdownMenuItem>
+              {isScraping && (
+                <DropdownMenuItem onClick={handleReset} disabled={resetAccount.isPending}>
+                  <RotateCcw className="h-4 w-4 mr-2" />
+                  Cancel Scrape
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem 
                 onClick={handleDelete} 
                 className="text-destructive"

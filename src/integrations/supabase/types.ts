@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      apify_runs: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          dataset_id: string | null
+          error_message: string | null
+          id: string
+          run_id: string
+          status: string
+          tiktok_account_id: string
+          user_id: string
+          videos_imported: number | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          dataset_id?: string | null
+          error_message?: string | null
+          id?: string
+          run_id: string
+          status?: string
+          tiktok_account_id: string
+          user_id: string
+          videos_imported?: number | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          dataset_id?: string | null
+          error_message?: string | null
+          id?: string
+          run_id?: string
+          status?: string
+          tiktok_account_id?: string
+          user_id?: string
+          videos_imported?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "apify_runs_tiktok_account_id_fkey"
+            columns: ["tiktok_account_id"]
+            isOneToOne: false
+            referencedRelation: "tiktok_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       earnings: {
         Row: {
           amount: number

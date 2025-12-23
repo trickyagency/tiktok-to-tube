@@ -154,3 +154,30 @@ export function useDeleteTikTokAccount() {
     },
   });
 }
+
+export function useResetTikTokAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (accountId: string) => {
+      const { error } = await supabase
+        .from('tiktok_accounts')
+        .update({
+          scrape_status: 'pending',
+          scrape_progress_current: 0,
+          scrape_progress_total: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', accountId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
+      toast.success('Scrape reset - you can try again');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
