@@ -1,6 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { 
   Clock, 
   CheckCircle, 
@@ -9,12 +10,13 @@ import {
   Trash2,
   RotateCcw,
   ExternalLink,
-  Youtube
+  Youtube,
+  ArrowRight,
+  Music2
 } from 'lucide-react';
 import { QueueItemWithDetails, usePublishQueue } from '@/hooks/usePublishQueue';
 import { format } from 'date-fns';
 import { UploadProgressBar } from './UploadProgressBar';
-
 interface QueueVideoCardProps {
   item: QueueItemWithDetails;
 }
@@ -90,9 +92,27 @@ export function QueueVideoCard({ item }: QueueVideoCardProps) {
                 <h4 className="font-medium truncate text-sm">
                   {item.scraped_video?.title || 'Untitled Video'}
                 </h4>
-                <p className="text-xs text-muted-foreground truncate">
-                  → {item.youtube_channel?.channel_title || 'Unknown Channel'}
-                </p>
+                {/* TikTok → YouTube flow indicator */}
+                <div className="flex items-center gap-1.5 mt-1 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <Avatar className="h-4 w-4">
+                      <AvatarImage src={item.scraped_video?.tiktok_account?.avatar_url || undefined} />
+                      <AvatarFallback className="text-[8px] bg-gradient-to-br from-pink-500 to-purple-600 text-white">
+                        <Music2 className="h-2.5 w-2.5" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate max-w-[100px]">
+                      @{item.scraped_video?.tiktok_account?.username || 'unknown'}
+                    </span>
+                  </div>
+                  <ArrowRight className="h-3 w-3 flex-shrink-0 text-muted-foreground/50" />
+                  <div className="flex items-center gap-1">
+                    <Youtube className="h-3.5 w-3.5 text-red-500 flex-shrink-0" />
+                    <span className="truncate max-w-[100px]">
+                      {item.youtube_channel?.channel_title || 'Unknown Channel'}
+                    </span>
+                  </div>
+                </div>
               </div>
               {getStatusBadge()}
             </div>
