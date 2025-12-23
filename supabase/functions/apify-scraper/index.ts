@@ -288,15 +288,38 @@ Deno.serve(async (req) => {
     const videos = await fetchDatasetItems(apiKey, datasetId);
     console.log(`Fetched ${videos.length} videos from Apify`);
 
-    if (videos.length === 0) {
-      await updateAccountStatus(supabase, account.id, 'failed');
+    // Filter out videos with 0 duration or no duration (images/slideshows)
+    const validVideos = videos.filter(video => {
+      const duration = video.videoDuration;
+      if (duration === null || duration === undefined || duration === 0) {
+        console.log(`Skipping video (no duration/image): ${video.videoUrl}`);
+        return false;
+      }
+      return true;
+    });
+    console.log(`Valid videos after filtering images/0-duration: ${validVideos.length}`);
+
+    if (validVideos.length === 0) {
+      await updateAccountStatus(supabase, account.id, 'completed', {
+        last_scraped_at: new Date().toISOString(),
+        video_count: 0,
+      });
       return new Response(
-        JSON.stringify({ error: 'No videos found for this account' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          success: true,
+          account: {
+            id: account.id,
+            username: cleanUsername,
+            video_count: 0,
+            new_videos: 0,
+          },
+          message: 'No valid videos found (only images or 0-duration content)',
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get existing video IDs
+    // Get existing video IDs for this account
     const { data: existingVideos } = await supabase
       .from('scraped_videos')
       .select('tiktok_video_id')
@@ -304,11 +327,33 @@ Deno.serve(async (req) => {
 
     const existingVideoIds = new Set(existingVideos?.map(v => v.tiktok_video_id) || []);
 
-    // Map and filter new videos
-    const newVideos = videos
+    // Get already published video IDs (to skip re-importing)
+    const { data: publishedVideos } = await supabase
+      .from('scraped_videos')
+      .select('tiktok_video_id')
+      .eq('tiktok_account_id', account.id)
+      .eq('is_published', true);
+
+    const publishedVideoIds = new Set(publishedVideos?.map(v => v.tiktok_video_id) || []);
+    console.log(`Already published videos: ${publishedVideoIds.size}`);
+
+    // Map and filter new videos (skip existing and already published)
+    const newVideos = validVideos
       .map(video => {
         const videoId = extractVideoId(video.videoUrl);
-        if (!videoId || existingVideoIds.has(videoId)) return null;
+        if (!videoId) return null;
+        
+        // Skip if already exists
+        if (existingVideoIds.has(videoId)) {
+          console.log(`Skipping existing video: ${videoId}`);
+          return null;
+        }
+        
+        // Skip if already published (shouldn't happen for new, but safety check)
+        if (publishedVideoIds.has(videoId)) {
+          console.log(`Skipping published video: ${videoId}`);
+          return null;
+        }
 
         return {
           user_id: user.id,
@@ -325,6 +370,7 @@ Deno.serve(async (req) => {
           comment_count: video.commentCount || 0,
           share_count: video.shareCount || 0,
           scraped_at: video.postDate || new Date().toISOString(),
+          is_published: false,
         };
       })
       .filter(Boolean);
@@ -348,7 +394,7 @@ Deno.serve(async (req) => {
     // Update account with video count and completion status
     await updateAccountStatus(supabase, account.id, 'completed', {
       last_scraped_at: new Date().toISOString(),
-      video_count: videos.length,
+      video_count: validVideos.length,
     });
 
     return new Response(
@@ -357,7 +403,7 @@ Deno.serve(async (req) => {
         account: {
           id: account.id,
           username: cleanUsername,
-          video_count: videos.length,
+          video_count: validVideos.length,
           new_videos: newVideos.length,
         },
       }),
