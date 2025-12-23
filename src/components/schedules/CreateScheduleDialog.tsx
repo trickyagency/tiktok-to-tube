@@ -47,7 +47,6 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
   const [scheduleName, setScheduleName] = useState('');
   const [tiktokAccountId, setTiktokAccountId] = useState('');
   const [youtubeChannelId, setYoutubeChannelId] = useState('');
-  const [videosPerDay, setVideosPerDay] = useState('1');
   const [publishTimes, setPublishTimes] = useState<string[]>(['10:00']);
   const [timezone, setTimezone] = useState('America/New_York');
 
@@ -59,7 +58,7 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
   const connectedChannels = youtubeChannels.filter(c => c.auth_status === 'connected');
 
   const addTimeSlot = () => {
-    if (publishTimes.length < 5) {
+    if (publishTimes.length < 10) {
       setPublishTimes([...publishTimes, '12:00']);
     }
   };
@@ -87,7 +86,7 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
       tiktok_account_id: tiktokAccountId,
       youtube_channel_id: youtubeChannelId,
       schedule_name: scheduleName,
-      videos_per_day: parseInt(videosPerDay, 10),
+      videos_per_day: publishTimes.length, // One video per time slot
       publish_times: publishTimes,
       timezone,
     });
@@ -101,7 +100,6 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
     setScheduleName('');
     setTiktokAccountId('');
     setYoutubeChannelId('');
-    setVideosPerDay('1');
     setPublishTimes(['10:00']);
     setTimezone('America/New_York');
   };
@@ -181,35 +179,21 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
             )}
           </div>
 
-          {/* Videos Per Day */}
-          <div className="space-y-2">
-            <Label>Videos Per Day</Label>
-            <Select value={videosPerDay} onValueChange={setVideosPerDay}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[1, 2, 3, 4, 5].map((num) => (
-                  <SelectItem key={num} value={num.toString()}>
-                    {num} video{num > 1 ? 's' : ''} per day
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
           {/* Publish Times */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Publish Times</Label>
-              {publishTimes.length < 5 && (
+              <Label>Publish Times (one video per time)</Label>
+              {publishTimes.length < 10 && (
                 <Button type="button" variant="ghost" size="sm" onClick={addTimeSlot}>
                   <Plus className="h-3 w-3 mr-1" />
                   Add Time
                 </Button>
               )}
             </div>
-            <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {publishTimes.length} video{publishTimes.length > 1 ? 's' : ''} will be uploaded per day
+            </p>
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {publishTimes.map((time, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <Clock className="h-4 w-4 text-muted-foreground" />
