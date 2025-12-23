@@ -220,6 +220,45 @@ export function usePublishQueue() {
     },
   });
 
+  const retryAllFailedMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      // Get all failed items
+      const { data: failedItems, error: fetchError } = await supabase
+        .from('publish_queue')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('status', 'failed');
+
+      if (fetchError) throw fetchError;
+      if (!failedItems?.length) throw new Error('No failed items to retry');
+
+      // Update all to queued status
+      const { error } = await supabase
+        .from('publish_queue')
+        .update({
+          status: 'queued',
+          error_message: null,
+          retry_count: 0,
+          progress_phase: null,
+          progress_percentage: 0,
+        })
+        .eq('user_id', user.id)
+        .eq('status', 'failed');
+
+      if (error) throw error;
+      return failedItems.length;
+    },
+    onSuccess: (count) => {
+      queryClient.invalidateQueries({ queryKey: ['publish-queue'] });
+      toast.success(`${count} failed upload${count > 1 ? 's' : ''} queued for retry`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to retry: ${error.message}`);
+    },
+  });
+
   // Grouped by status for easy filtering
   const queuedItems = queueQuery.data?.filter(item => item.status === 'queued') || [];
   const processingItems = queueQuery.data?.filter(item => item.status === 'processing' || item.status === 'uploading') || [];
@@ -237,6 +276,8 @@ export function usePublishQueue() {
     addToQueue: addToQueueMutation.mutateAsync,
     cancelQueueItem: cancelQueueItemMutation.mutateAsync,
     retryQueueItem: retryQueueItemMutation.mutateAsync,
+    retryAllFailed: retryAllFailedMutation.mutateAsync,
+    isRetryingAll: retryAllFailedMutation.isPending,
     refetch: queueQuery.refetch,
   };
 }

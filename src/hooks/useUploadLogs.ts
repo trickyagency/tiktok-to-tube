@@ -51,7 +51,7 @@ export function useUploadLogStats() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('upload_logs')
-        .select('status, total_duration_ms, download_duration_ms, upload_duration_ms, video_size_bytes')
+        .select('status, total_duration_ms, download_duration_ms, upload_duration_ms, token_refresh_duration_ms, finalize_duration_ms, video_size_bytes')
         .order('started_at', { ascending: false })
         .limit(500);
 
@@ -72,9 +72,19 @@ export function useUploadLogStats() {
         ? Math.round(successLogs.reduce((sum, l) => sum + (l.upload_duration_ms || 0), 0) / successLogs.length)
         : 0;
 
+      const avgTokenRefresh = successLogs.length > 0
+        ? Math.round(successLogs.reduce((sum, l) => sum + (l.token_refresh_duration_ms || 0), 0) / successLogs.length)
+        : 0;
+
+      const avgFinalize = successLogs.length > 0
+        ? Math.round(successLogs.reduce((sum, l) => sum + (l.finalize_duration_ms || 0), 0) / successLogs.length)
+        : 0;
+
       const avgSize = successLogs.length > 0
         ? Math.round(successLogs.reduce((sum, l) => sum + (l.video_size_bytes || 0), 0) / successLogs.length)
         : 0;
+
+      const totalSize = logs.reduce((sum, l) => sum + (l.video_size_bytes || 0), 0);
 
       return {
         total: logs.length,
@@ -84,9 +94,55 @@ export function useUploadLogStats() {
         avgDurationMs: avgDuration,
         avgDownloadMs: avgDownload,
         avgUploadMs: avgUpload,
+        avgTokenRefreshMs: avgTokenRefresh,
+        avgFinalizeMs: avgFinalize,
         avgSizeBytes: avgSize,
+        totalSizeBytes: totalSize,
         successRate: logs.length > 0 ? Math.round((successLogs.length / logs.length) * 100) : 0,
       };
+    },
+  });
+}
+
+export function useUploadLogTrends(days: number = 30) {
+  return useQuery({
+    queryKey: ['upload-log-trends', days],
+    queryFn: async () => {
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const { data, error } = await supabase
+        .from('upload_logs')
+        .select('started_at, status, total_duration_ms')
+        .gte('started_at', startDate.toISOString())
+        .order('started_at', { ascending: true });
+
+      if (error) throw error;
+
+      const logs = data as UploadLog[];
+
+      // Group by date
+      const dailyStats = logs.reduce((acc, log) => {
+        const date = new Date(log.started_at).toISOString().split('T')[0];
+        if (!acc[date]) acc[date] = { success: 0, failed: 0, total: 0, totalDuration: 0 };
+        if (log.status === 'success') {
+          acc[date].success++;
+          acc[date].totalDuration += log.total_duration_ms || 0;
+        } else if (log.status === 'failed') {
+          acc[date].failed++;
+        }
+        acc[date].total++;
+        return acc;
+      }, {} as Record<string, { success: number; failed: number; total: number; totalDuration: number }>);
+
+      return Object.entries(dailyStats).map(([date, stats]) => ({
+        date,
+        success: stats.success,
+        failed: stats.failed,
+        total: stats.total,
+        successRate: stats.total > 0 ? Math.round((stats.success / stats.total) * 100) : 0,
+        avgDuration: stats.success > 0 ? Math.round(stats.totalDuration / stats.success / 1000) : 0,
+      }));
     },
   });
 }
