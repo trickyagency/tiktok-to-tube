@@ -1,9 +1,10 @@
 import { format, formatDistanceToNow } from 'date-fns';
-import { ExternalLink, Play, Youtube } from 'lucide-react';
+import { ExternalLink, FileText, Play, Youtube } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QueueItemWithDetails } from '@/hooks/usePublishQueue';
+import { UploadLogDetails } from './UploadLogDetails';
 
 interface UploadHistoryCardProps {
   item: QueueItemWithDetails;
@@ -66,24 +67,35 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
                 </span>
               </div>
 
-              {item.youtube_video_url && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5 text-xs"
-                  asChild
-                >
-                  <a
-                    href={item.youtube_video_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+              <div className="flex items-center gap-2">
+                <UploadLogDetails 
+                  queueItemId={item.id}
+                  trigger={
+                    <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
+                      <FileText className="h-3.5 w-3.5" />
+                      Logs
+                    </Button>
+                  }
+                />
+                {item.youtube_video_url && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 text-xs"
+                    asChild
                   >
-                    <Youtube className="h-3.5 w-3.5 text-red-500" />
-                    Watch
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </Button>
-              )}
+                    <a
+                      href={item.youtube_video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Youtube className="h-3.5 w-3.5 text-red-500" />
+                      Watch
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         </div>

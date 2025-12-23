@@ -516,6 +516,100 @@ export type Database = {
         }
         Relationships: []
       }
+      upload_logs: {
+        Row: {
+          attempt_number: number | null
+          completed_at: string | null
+          created_at: string | null
+          download_duration_ms: number | null
+          error_code: string | null
+          error_message: string | null
+          error_phase: string | null
+          finalize_duration_ms: number | null
+          id: string
+          queue_item_id: string
+          scraped_video_id: string | null
+          started_at: string
+          status: string
+          token_refresh_duration_ms: number | null
+          total_duration_ms: number | null
+          upload_duration_ms: number | null
+          user_id: string
+          video_size_bytes: number | null
+          youtube_channel_id: string | null
+          youtube_video_id: string | null
+          youtube_video_url: string | null
+        }
+        Insert: {
+          attempt_number?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          download_duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          error_phase?: string | null
+          finalize_duration_ms?: number | null
+          id?: string
+          queue_item_id: string
+          scraped_video_id?: string | null
+          started_at?: string
+          status?: string
+          token_refresh_duration_ms?: number | null
+          total_duration_ms?: number | null
+          upload_duration_ms?: number | null
+          user_id: string
+          video_size_bytes?: number | null
+          youtube_channel_id?: string | null
+          youtube_video_id?: string | null
+          youtube_video_url?: string | null
+        }
+        Update: {
+          attempt_number?: number | null
+          completed_at?: string | null
+          created_at?: string | null
+          download_duration_ms?: number | null
+          error_code?: string | null
+          error_message?: string | null
+          error_phase?: string | null
+          finalize_duration_ms?: number | null
+          id?: string
+          queue_item_id?: string
+          scraped_video_id?: string | null
+          started_at?: string
+          status?: string
+          token_refresh_duration_ms?: number | null
+          total_duration_ms?: number | null
+          upload_duration_ms?: number | null
+          user_id?: string
+          video_size_bytes?: number | null
+          youtube_channel_id?: string | null
+          youtube_video_id?: string | null
+          youtube_video_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_logs_queue_item_id_fkey"
+            columns: ["queue_item_id"]
+            isOneToOne: false
+            referencedRelation: "publish_queue"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_logs_scraped_video_id_fkey"
+            columns: ["scraped_video_id"]
+            isOneToOne: false
+            referencedRelation: "scraped_videos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_logs_youtube_channel_id_fkey"
+            columns: ["youtube_channel_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
