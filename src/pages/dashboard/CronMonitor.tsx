@@ -1,28 +1,72 @@
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useCronJobs } from '@/hooks/useCronJobs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RefreshCw, Clock, CheckCircle2, XCircle, Activity, Timer } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
+const AUTO_REFRESH_INTERVAL = 30; // seconds
+
 const CronMonitor = () => {
   const { jobs, history, isLoading, refetch } = useCronJobs();
+  const [selectedJob, setSelectedJob] = useState<string>('all');
+  const [refreshCountdown, setRefreshCountdown] = useState(AUTO_REFRESH_INTERVAL);
 
-  // Calculate stats
-  const totalJobs = jobs.length;
-  const activeJobs = jobs.filter(j => j.active).length;
-  const successfulRuns = history.filter(h => h.status === 'succeeded').length;
-  const failedRuns = history.filter(h => h.status === 'failed').length;
-  const lastRun = history[0]?.start_time;
+  // Auto-refresh countdown timer
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setRefreshCountdown(prev => {
+        if (prev <= 1) {
+          refetch();
+          return AUTO_REFRESH_INTERVAL;
+        }
+        return prev - 1;
+      });
+    }, 1000);
 
-  const getDuration = (start: string, end: string | null) => {
+    return () => clearInterval(timer);
+  }, [refetch]);
+
+  // Reset countdown on manual refresh
+  const handleManualRefresh = useCallback(() => {
+    refetch();
+    setRefreshCountdown(AUTO_REFRESH_INTERVAL);
+  }, [refetch]);
+
+  // Memoized stats calculation
+  const stats = useMemo(() => ({
+    totalJobs: jobs.length,
+    activeJobs: jobs.filter(j => j.active).length,
+    successfulRuns: history.filter(h => h.status === 'succeeded').length,
+    failedRuns: history.filter(h => h.status === 'failed').length,
+    lastRun: history[0]?.start_time,
+  }), [jobs, history]);
+
+  // Get unique job names for filter
+  const jobNames = useMemo(() => {
+    const names = new Set<string>();
+    history.forEach(h => {
+      if (h.job_name) names.add(h.job_name);
+    });
+    return Array.from(names);
+  }, [history]);
+
+  // Filtered history based on selected job
+  const filteredHistory = useMemo(() => {
+    if (selectedJob === 'all') return history;
+    return history.filter(h => h.job_name === selectedJob);
+  }, [history, selectedJob]);
+
+  const getDuration = useCallback((start: string, end: string | null) => {
     if (!end) return '-';
     const durationMs = new Date(end).getTime() - new Date(start).getTime();
     if (durationMs < 1000) return `${durationMs}ms`;
     return `${(durationMs / 1000).toFixed(1)}s`;
-  };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -32,10 +76,18 @@ const CronMonitor = () => {
           <h1 className="text-3xl font-bold tracking-tight">Cron Monitor</h1>
           <p className="text-muted-foreground">Monitor scheduled jobs and execution history</p>
         </div>
-        <Button variant="outline" size="sm" onClick={refetch} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              <span>Auto-refresh in {refreshCountdown}s</span>
+            </div>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={isLoading}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -49,7 +101,7 @@ const CronMonitor = () => {
             {isLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold">{activeJobs}/{totalJobs}</div>
+              <div className="text-2xl font-bold">{stats.activeJobs}/{stats.totalJobs}</div>
             )}
           </CardContent>
         </Card>
@@ -63,7 +115,7 @@ const CronMonitor = () => {
             {isLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-green-600">{successfulRuns}</div>
+              <div className="text-2xl font-bold text-green-600">{stats.successfulRuns}</div>
             )}
           </CardContent>
         </Card>
@@ -77,7 +129,7 @@ const CronMonitor = () => {
             {isLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
-              <div className="text-2xl font-bold text-destructive">{failedRuns}</div>
+              <div className="text-2xl font-bold text-destructive">{stats.failedRuns}</div>
             )}
           </CardContent>
         </Card>
@@ -90,9 +142,9 @@ const CronMonitor = () => {
           <CardContent>
             {isLoading ? (
               <Skeleton className="h-8 w-24" />
-            ) : lastRun ? (
+            ) : stats.lastRun ? (
               <div className="text-2xl font-bold">
-                {formatDistanceToNow(new Date(lastRun), { addSuffix: true })}
+                {formatDistanceToNow(new Date(stats.lastRun), { addSuffix: true })}
               </div>
             ) : (
               <div className="text-2xl font-bold text-muted-foreground">-</div>
@@ -151,11 +203,28 @@ const CronMonitor = () => {
       {/* Execution History Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="h-5 w-5" />
-            Execution History
-          </CardTitle>
-          <CardDescription>Recent job execution results (last 50 runs)</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Execution History
+              </CardTitle>
+              <CardDescription>Recent job execution results (last 50 runs)</CardDescription>
+            </div>
+            {jobNames.length > 0 && (
+              <Select value={selectedJob} onValueChange={setSelectedJob}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by job" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Jobs</SelectItem>
+                  {jobNames.map(name => (
+                    <SelectItem key={name} value={name}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -164,8 +233,10 @@ const CronMonitor = () => {
                 <Skeleton key={i} className="h-12 w-full" />
               ))}
             </div>
-          ) : history.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">No execution history yet</p>
+          ) : filteredHistory.length === 0 ? (
+            <p className="text-muted-foreground text-center py-8">
+              {selectedJob === 'all' ? 'No execution history yet' : `No history for ${selectedJob}`}
+            </p>
           ) : (
             <Table>
               <TableHeader>
@@ -178,7 +249,7 @@ const CronMonitor = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {history.map((entry) => (
+                {filteredHistory.map((entry) => (
                   <TableRow key={entry.runid}>
                     <TableCell>
                       {entry.status === 'succeeded' ? (
