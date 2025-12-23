@@ -186,8 +186,8 @@ const Dashboard = () => {
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          item.status === 'completed' 
-                            ? 'bg-success/10 text-success' 
+                          item.status === 'published' 
+                            ? 'bg-success/10 text-success'
                             : item.status === 'failed'
                               ? 'bg-destructive/10 text-destructive'
                               : 'bg-muted text-muted-foreground'

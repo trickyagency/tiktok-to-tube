@@ -16,7 +16,7 @@ const VideoQueue = () => {
     queue, 
     queuedItems, 
     processingItems, 
-    completedItems, 
+    publishedItems, 
     failedItems,
     isLoading: isLoadingQueue,
     refetch: refetchQueue
@@ -129,9 +129,9 @@ const VideoQueue = () => {
                   <Loader2 className="h-3.5 w-3.5" />
                   Processing ({processingItems.length})
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="flex items-center gap-1">
+                <TabsTrigger value="published" className="flex items-center gap-1">
                   <CheckCircle className="h-3.5 w-3.5" />
-                  Completed ({completedItems.length})
+                  Published ({publishedItems.length})
                 </TabsTrigger>
                 <TabsTrigger value="failed" className="flex items-center gap-1">
                   <XCircle className="h-3.5 w-3.5" />
@@ -163,12 +163,12 @@ const VideoQueue = () => {
                 )}
               </TabsContent>
 
-              <TabsContent value="completed">
-                {completedItems.length === 0 ? (
-                  <EmptyState message="No completed uploads yet" />
+              <TabsContent value="published">
+                {publishedItems.length === 0 ? (
+                  <EmptyState message="No published uploads yet" />
                 ) : (
                   <div className="space-y-3">
-                    {completedItems.map((item) => (
+                    {publishedItems.map((item) => (
                       <QueueVideoCard key={item.id} item={item} />
                     ))}
                   </div>
