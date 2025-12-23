@@ -13,14 +13,61 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 // Timeout for stuck items (5 minutes)
 const STUCK_TIMEOUT_MS = 5 * 60 * 1000;
 
-// Helper to refresh access token if expired
-async function refreshAccessToken(supabase: any, channel: any): Promise<string> {
+// ============= Upload Logging Helpers =============
+
+async function createUploadLog(
+  supabase: any, 
+  queueItem: any, 
+  attemptNumber: number
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('upload_logs')
+    .insert({
+      queue_item_id: queueItem.id,
+      user_id: queueItem.user_id,
+      youtube_channel_id: queueItem.youtube_channel_id,
+      scraped_video_id: queueItem.scraped_video_id,
+      attempt_number: attemptNumber,
+      status: 'in_progress',
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Failed to create upload log:', error.message);
+    return null;
+  }
+  console.log(`Created upload log: ${data.id} for queue item ${queueItem.id}`);
+  return data.id;
+}
+
+async function updateUploadLog(
+  supabase: any, 
+  logId: string | null, 
+  updates: Record<string, any>
+): Promise<void> {
+  if (!logId) return;
+  
+  const { error } = await supabase
+    .from('upload_logs')
+    .update(updates)
+    .eq('id', logId);
+
+  if (error) {
+    console.error('Failed to update upload log:', error.message);
+  }
+}
+
+// ============= Core Functions =============
+
+async function refreshAccessToken(supabase: any, channel: any): Promise<{ token: string; duration: number }> {
+  const startTime = Date.now();
   const tokenExpiresAt = new Date(channel.token_expires_at);
   const now = new Date();
-  
+
   if (tokenExpiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
     console.log(`Refreshing token for channel ${channel.id}...`);
-    
+
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -47,16 +94,15 @@ async function refreshAccessToken(supabase: any, channel: any): Promise<string> 
       console.error('Failed to update token:', updateError.message);
     }
 
-    return tokenData.access_token;
+    return { token: tokenData.access_token, duration: Date.now() - startTime };
   }
 
-  return channel.access_token;
+  return { token: channel.access_token, duration: Date.now() - startTime };
 }
 
-// Get direct video URL from TikTok page URL using TikWM API
 async function getDirectVideoUrl(tiktokUrl: string): Promise<string> {
   console.log(`Getting direct video URL for: ${tiktokUrl}`);
-  
+
   const response = await fetch('https://tikwm.com/api/', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -68,12 +114,11 @@ async function getDirectVideoUrl(tiktokUrl: string): Promise<string> {
   }
 
   const data = await response.json();
-  
+
   if (data.code !== 0 || !data.data) {
     throw new Error(`TikWM API error: ${data.msg || 'Unknown error'}`);
   }
 
-  // Prefer HD version, fallback to regular
   const directUrl = data.data.hdplay || data.data.play;
   if (!directUrl) {
     throw new Error('No video URL in TikWM response');
@@ -83,18 +128,18 @@ async function getDirectVideoUrl(tiktokUrl: string): Promise<string> {
   return directUrl;
 }
 
-async function downloadVideo(videoUrl: string): Promise<Blob> {
+async function downloadVideo(videoUrl: string): Promise<{ blob: Blob; duration: number }> {
+  const startTime = Date.now();
   let downloadUrl = videoUrl;
 
-  // If this is a TikTok page URL, get the direct video URL first
   if (videoUrl.includes('tiktok.com')) {
     downloadUrl = await getDirectVideoUrl(videoUrl);
   }
 
   console.log(`Downloading from: ${downloadUrl.substring(0, 80)}...`);
-  
+
   const response = await fetch(downloadUrl, {
-    headers: { 
+    headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       'Referer': 'https://www.tiktok.com/',
     },
@@ -106,13 +151,12 @@ async function downloadVideo(videoUrl: string): Promise<Blob> {
 
   const blob = await response.blob();
   console.log(`Downloaded video: ${blob.size} bytes, type: ${blob.type}`);
-  
-  // Validate it's actually a video
+
   if (blob.size < 10000) {
     throw new Error(`Downloaded file too small (${blob.size} bytes), likely not a video`);
   }
 
-  return blob;
+  return { blob, duration: Date.now() - startTime };
 }
 
 async function uploadToYouTube(
@@ -121,7 +165,9 @@ async function uploadToYouTube(
   title: string,
   description: string,
   privacyStatus: string
-): Promise<{ videoId: string; videoUrl: string }> {
+): Promise<{ videoId: string; videoUrl: string; duration: number }> {
+  const startTime = Date.now();
+  
   const metadata = {
     snippet: {
       title: title.substring(0, 100),
@@ -175,10 +221,10 @@ async function uploadToYouTube(
   return {
     videoId: result.id,
     videoUrl: `https://www.youtube.com/watch?v=${result.id}`,
+    duration: Date.now() - startTime,
   };
 }
 
-// Retry wrapper for database updates
 async function updateWithRetry(
   supabase: any,
   table: string,
@@ -192,30 +238,45 @@ async function updateWithRetry(
       .from(table)
       .update(data)
       .eq(matchColumn, matchValue);
-    
+
     if (!error) {
       return true;
     }
-    
+
     console.error(`DB update attempt ${attempt}/${maxRetries} failed for ${table}:`, error.message);
-    
+
     if (attempt < maxRetries) {
       await new Promise(r => setTimeout(r, 1000 * attempt));
     }
   }
-  
+
   return false;
 }
 
+// ============= Main Processing =============
+
 async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
   const queueId = queueItem.id;
-  console.log(`Processing queue item: ${queueId}`);
+  const overallStartTime = Date.now();
+  const attemptNumber = (queueItem.retry_count || 0) + 1;
+  
+  console.log(`Processing queue item: ${queueId} (attempt ${attemptNumber})`);
+
+  // Create upload log entry
+  const logId = await createUploadLog(supabase, queueItem, attemptNumber);
+  
+  // Phase timing trackers
+  let tokenRefreshDuration = 0;
+  let downloadDuration = 0;
+  let uploadDuration = 0;
+  let videoSizeBytes = 0;
+  let currentPhase = 'initializing';
 
   try {
-    // Update status to processing with initial progress and started_at timestamp
-    const { error: startError } = await supabase
+    // Update status to processing
+    await supabase
       .from('publish_queue')
-      .update({ 
+      .update({
         status: 'processing',
         progress_phase: 'downloading',
         progress_percentage: 0,
@@ -223,11 +284,8 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       })
       .eq('id', queueId);
 
-    if (startError) {
-      console.error('Failed to update status to processing:', startError.message);
-    }
-
     // Fetch video details
+    currentPhase = 'fetching_video';
     const { data: video, error: videoError } = await supabase
       .from('scraped_videos')
       .select('*')
@@ -243,6 +301,7 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     }
 
     // Fetch channel with credentials
+    currentPhase = 'fetching_channel';
     const { data: channel, error: channelError } = await supabase
       .from('youtube_channels')
       .select('*')
@@ -258,9 +317,13 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     }
 
     // Get valid access token
-    const accessToken = await refreshAccessToken(supabase, channel);
+    currentPhase = 'token_refresh';
+    const tokenResult = await refreshAccessToken(supabase, channel);
+    tokenRefreshDuration = tokenResult.duration;
+    const accessToken = tokenResult.token;
 
     // Update progress: downloading
+    currentPhase = 'downloading';
     await supabase
       .from('publish_queue')
       .update({ progress_phase: 'downloading', progress_percentage: 10 })
@@ -268,9 +331,12 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
 
     // Download video
     console.log(`Downloading video for queue item ${queueId}...`);
-    const videoBlob = await downloadVideo(video.download_url);
+    const downloadResult = await downloadVideo(video.download_url);
+    downloadDuration = downloadResult.duration;
+    videoSizeBytes = downloadResult.blob.size;
 
     // Update progress: uploading
+    currentPhase = 'uploading';
     await supabase
       .from('publish_queue')
       .update({ progress_phase: 'uploading', progress_percentage: 40 })
@@ -278,24 +344,28 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
 
     // Upload to YouTube
     console.log(`Uploading to YouTube for queue item ${queueId}...`);
-    const { videoId, videoUrl } = await uploadToYouTube(
+    const uploadResult = await uploadToYouTube(
       accessToken,
-      videoBlob,
+      downloadResult.blob,
       video.title || 'TikTok Video',
       video.description || '',
       'public'
     );
+    uploadDuration = uploadResult.duration;
 
-    console.log(`YouTube upload successful: ${videoUrl}`);
+    console.log(`YouTube upload successful: ${uploadResult.videoUrl}`);
 
     // Update progress: finalizing
+    currentPhase = 'finalizing';
     await supabase
       .from('publish_queue')
       .update({ progress_phase: 'finalizing', progress_percentage: 90 })
       .eq('id', queueId);
 
-    // Mark video as published with retry
-    const videoUpdated = await updateWithRetry(
+    const finalizeStartTime = Date.now();
+
+    // Mark video as published
+    await updateWithRetry(
       supabase,
       'scraped_videos',
       { is_published: true, published_at: new Date().toISOString() },
@@ -303,18 +373,14 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       queueItem.scraped_video_id
     );
 
-    if (!videoUpdated) {
-      console.error('Failed to mark video as published after retries');
-    }
-
-    // Update queue item as published with retry
+    // Update queue item as published
     const queueUpdated = await updateWithRetry(
       supabase,
       'publish_queue',
       {
         status: 'published',
-        youtube_video_id: videoId,
-        youtube_video_url: videoUrl,
+        youtube_video_id: uploadResult.videoId,
+        youtube_video_url: uploadResult.videoUrl,
         processed_at: new Date().toISOString(),
         progress_phase: null,
         progress_percentage: 100,
@@ -326,7 +392,7 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     );
 
     if (!queueUpdated) {
-      throw new Error(`Failed to update queue item after successful upload. Video was uploaded to: ${videoUrl}`);
+      throw new Error(`Failed to update queue item after successful upload. Video was uploaded to: ${uploadResult.videoUrl}`);
     }
 
     // Update channel's last upload
@@ -338,17 +404,49 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       queueItem.youtube_channel_id
     );
 
-    console.log(`Queue item ${queueId} completed: ${videoUrl}`);
+    const finalizeDuration = Date.now() - finalizeStartTime;
+    const totalDuration = Date.now() - overallStartTime;
+
+    // Update upload log with success
+    await updateUploadLog(supabase, logId, {
+      status: 'success',
+      completed_at: new Date().toISOString(),
+      token_refresh_duration_ms: tokenRefreshDuration,
+      download_duration_ms: downloadDuration,
+      upload_duration_ms: uploadDuration,
+      finalize_duration_ms: finalizeDuration,
+      total_duration_ms: totalDuration,
+      video_size_bytes: videoSizeBytes,
+      youtube_video_id: uploadResult.videoId,
+      youtube_video_url: uploadResult.videoUrl,
+    });
+
+    console.log(`Queue item ${queueId} completed in ${totalDuration}ms: ${uploadResult.videoUrl}`);
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error(`Queue item ${queueId} failed:`, errorMessage);
+    console.error(`Queue item ${queueId} failed at phase '${currentPhase}':`, errorMessage);
 
-    // Update with error and increment retry
-    const newRetryCount = (queueItem.retry_count || 0) + 1;
+    const totalDuration = Date.now() - overallStartTime;
+
+    // Update upload log with failure
+    await updateUploadLog(supabase, logId, {
+      status: 'failed',
+      completed_at: new Date().toISOString(),
+      error_phase: currentPhase,
+      error_message: errorMessage,
+      token_refresh_duration_ms: tokenRefreshDuration,
+      download_duration_ms: downloadDuration,
+      upload_duration_ms: uploadDuration,
+      total_duration_ms: totalDuration,
+      video_size_bytes: videoSizeBytes,
+    });
+
+    // Update queue with error and increment retry
+    const newRetryCount = attemptNumber;
     const newStatus = newRetryCount >= queueItem.max_retries ? 'failed' : 'queued';
 
-    const { error: updateError } = await supabase
+    await supabase
       .from('publish_queue')
       .update({
         status: newStatus,
@@ -358,21 +456,16 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
         progress_phase: null,
       })
       .eq('id', queueId);
-
-    if (updateError) {
-      console.error('Failed to update queue item with error status:', updateError.message);
-    }
   }
 }
 
-// Reset stuck items that have been processing for too long
 async function resetStuckItems(supabase: any): Promise<number> {
   const timeoutThreshold = new Date(Date.now() - STUCK_TIMEOUT_MS).toISOString();
-  
+
   const { data: stuckItems, error } = await supabase
     .from('publish_queue')
-    .update({ 
-      status: 'failed', 
+    .update({
+      status: 'failed',
       error_message: 'Processing timeout - stuck for more than 5 minutes',
       progress_phase: null,
       started_at: null,
@@ -400,7 +493,7 @@ serve(async (req) => {
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    
+
     console.log('Process queue started at:', new Date().toISOString());
 
     // First, reset any stuck items
@@ -416,7 +509,7 @@ serve(async (req) => {
       .eq('status', 'queued')
       .lte('scheduled_for', new Date().toISOString())
       .order('scheduled_for', { ascending: true })
-      .limit(10); // Process up to 10 items per run
+      .limit(20); // Increased limit for concurrent processing
 
     if (queueError) {
       throw new Error(`Failed to fetch queue: ${queueError.message}`);
@@ -435,22 +528,48 @@ serve(async (req) => {
       });
     }
 
-    // Process items sequentially to avoid rate limits
+    // Group items by YouTube channel for concurrent processing
+    const itemsByChannel: Map<string, typeof queueItems> = new Map();
+    for (const item of queueItems) {
+      const channelId = item.youtube_channel_id;
+      if (!itemsByChannel.has(channelId)) {
+        itemsByChannel.set(channelId, []);
+      }
+      itemsByChannel.get(channelId)!.push(item);
+    }
+
+    console.log(`Processing ${queueItems.length} items across ${itemsByChannel.size} channels concurrently`);
+
+    // Track results
     let processed = 0;
     let failed = 0;
 
-    for (const item of queueItems) {
-      try {
-        await processQueueItem(supabase, item);
-        processed++;
-      } catch (e) {
-        console.error(`Failed to process item ${item.id}:`, e);
-        failed++;
+    // Process channels concurrently - one item at a time per channel
+    const channelPromises = Array.from(itemsByChannel.entries()).map(
+      async ([channelId, items]) => {
+        console.log(`Channel ${channelId}: processing ${items.length} items`);
+        
+        // Process items sequentially within a channel (YouTube rate limits)
+        for (let i = 0; i < items.length; i++) {
+          const item = items[i];
+          try {
+            await processQueueItem(supabase, item);
+            processed++;
+          } catch (e) {
+            console.error(`Failed to process item ${item.id}:`, e);
+            failed++;
+          }
+
+          // 2s delay between uploads on same channel to respect rate limits
+          if (i < items.length - 1) {
+            await new Promise(r => setTimeout(r, 2000));
+          }
+        }
       }
-      
-      // Small delay between uploads to avoid rate limits
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
+    );
+
+    // All channels process in parallel
+    await Promise.all(channelPromises);
 
     console.log(`Process queue completed: ${processed} processed, ${failed} failed`);
 
@@ -459,6 +578,7 @@ serve(async (req) => {
       processed,
       failed,
       total: queueItems.length,
+      channelsProcessed: itemsByChannel.size,
       stuckReset: stuckCount,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -467,7 +587,7 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error('Error in process-queue:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
+
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
