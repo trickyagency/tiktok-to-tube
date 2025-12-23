@@ -9,6 +9,7 @@ interface AnimatedStatCardProps {
   description: string;
   trend?: { value: number; isPositive: boolean };
   gradientClass: string;
+  isWarning?: boolean;
 }
 
 const AnimatedStatCard = ({ 
@@ -17,7 +18,8 @@ const AnimatedStatCard = ({
   icon: Icon, 
   description, 
   trend,
-  gradientClass 
+  gradientClass,
+  isWarning = false
 }: AnimatedStatCardProps) => {
   const [displayValue, setDisplayValue] = useState(0);
 
@@ -62,8 +64,8 @@ const AnimatedStatCard = ({
             </div>
             <p className="text-xs text-muted-foreground">{description}</p>
           </div>
-          <div className="p-3 rounded-xl bg-background/80 border border-border/50">
-            <Icon className="h-5 w-5 text-primary" />
+          <div className={`p-3 rounded-xl bg-background/80 border ${isWarning ? 'border-amber-500/50' : 'border-border/50'}`}>
+            <Icon className={`h-5 w-5 ${isWarning ? 'text-amber-500' : 'text-primary'}`} />
           </div>
         </div>
       </CardContent>
