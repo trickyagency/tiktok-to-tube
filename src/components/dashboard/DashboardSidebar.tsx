@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePublishQueue } from '@/hooks/usePublishQueue';
 import {
   Sidebar,
   SidebarContent,
@@ -39,32 +40,15 @@ interface MenuItem {
   icon: React.ComponentType<{ className?: string }>;
   ownerOnly?: boolean;
   badge?: string;
+  badgeVariant?: 'secondary' | 'destructive';
 }
-
-const mainMenuItems: MenuItem[] = [
-  { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
-  { title: 'Video Queue', url: '/dashboard/queue', icon: Calendar },
-  { title: 'Upload History', url: '/dashboard/history', icon: History },
-  { title: 'Upload Analytics', url: '/dashboard/upload-analytics', icon: BarChart3 },
-];
-
-const platformMenuItems: MenuItem[] = [
-  { title: 'YouTube Channels', url: '/dashboard/youtube', icon: Youtube },
-  { title: 'TikTok Accounts', url: '/dashboard/tiktok', icon: Video },
-];
-
-const adminMenuItems: MenuItem[] = [
-  { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
-  { title: 'Users', url: '/dashboard/users', icon: Users, ownerOnly: true },
-  { title: 'Platform Stats', url: '/dashboard/analytics', icon: Activity, ownerOnly: true },
-  { title: 'Settings', url: '/dashboard/settings', icon: Settings },
-];
 
 const DashboardSidebar = () => {
   const location = useLocation();
   const { signOut, user, isOwner } = useAuth();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const { mismatchedCount } = usePublishQueue();
 
   const getUserInitials = () => {
     if (user?.email) {
@@ -77,6 +61,32 @@ const DashboardSidebar = () => {
     items.filter(item => !item.ownerOnly || isOwner);
 
   const isActive = (url: string) => location.pathname === url;
+
+  // Build menu items with dynamic badge
+  const mainMenuItems: MenuItem[] = [
+    { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+    { 
+      title: 'Video Queue', 
+      url: '/dashboard/queue', 
+      icon: Calendar,
+      badge: mismatchedCount > 0 ? mismatchedCount.toString() : undefined,
+      badgeVariant: 'destructive' as const,
+    },
+    { title: 'Upload History', url: '/dashboard/history', icon: History },
+    { title: 'Upload Analytics', url: '/dashboard/upload-analytics', icon: BarChart3 },
+  ];
+
+  const platformMenuItems: MenuItem[] = [
+    { title: 'YouTube Channels', url: '/dashboard/youtube', icon: Youtube },
+    { title: 'TikTok Accounts', url: '/dashboard/tiktok', icon: Video },
+  ];
+
+  const adminMenuItems: MenuItem[] = [
+    { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
+    { title: 'Users', url: '/dashboard/users', icon: Users, ownerOnly: true },
+    { title: 'Platform Stats', url: '/dashboard/analytics', icon: Activity, ownerOnly: true },
+    { title: 'Settings', url: '/dashboard/settings', icon: Settings },
+  ];
 
   const renderMenuItems = (items: MenuItem[]) => (
     <SidebarMenu>
@@ -94,11 +104,16 @@ const DashboardSidebar = () => {
               <item.icon className="h-4 w-4" />
               <span className="flex-1">{item.title}</span>
               {item.badge && (
-                <Badge variant="secondary" className="ml-auto text-xs px-1.5 py-0">
+                <Badge 
+                  variant={item.badgeVariant || 'secondary'} 
+                  className={`ml-auto text-xs px-1.5 py-0 ${
+                    item.badgeVariant === 'destructive' ? 'bg-amber-500 hover:bg-amber-600 text-white' : ''
+                  }`}
+                >
                   {item.badge}
                 </Badge>
               )}
-              {isActive(item.url) && (
+              {isActive(item.url) && !item.badge && (
                 <ChevronRight className="h-4 w-4 ml-auto opacity-50" />
               )}
             </Link>

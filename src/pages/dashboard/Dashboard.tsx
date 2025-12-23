@@ -15,19 +15,19 @@ import { format } from 'date-fns';
 const Dashboard = () => {
   const { channels: youtubeChannels, isLoading: isLoadingYouTube } = useYouTubeChannels();
   const { data: tikTokAccounts = [], isLoading: isLoadingTikTok } = useTikTokAccounts();
-  const { queue: queueItems, isLoading: isLoadingQueue } = usePublishQueue();
+  const { 
+    queue: queueItems, 
+    isLoading: isLoadingQueue, 
+    mismatchedCount, 
+    reassignMismatched, 
+    isReassigning 
+  } = usePublishQueue();
   const { history: uploadHistory, isLoading: isLoadingHistory } = useUploadHistory();
 
   const isLoading = isLoadingYouTube || isLoadingTikTok || isLoadingQueue || isLoadingHistory;
 
   const pendingCount = queueItems.filter(item => item.status === 'queued').length;
   const completedCount = uploadHistory.length;
-  
-  // Calculate mismatched items - where video's TikTok account doesn't match channel's linked account
-  const mismatchedCount = queueItems.filter(item => 
-    item.youtube_channel?.tiktok_account_id && 
-    item.scraped_video?.tiktok_account_id !== item.youtube_channel?.tiktok_account_id
-  ).length;
 
   const stats = [
     { 
@@ -66,7 +66,12 @@ const Dashboard = () => {
       gradientClass: mismatchedCount > 0 ? 'bg-amber-500/10 border border-amber-500/20' : 'stat-gradient-1',
       isWarning: mismatchedCount > 0,
       href: '/dashboard/queue?showMismatched=true',
-      tooltip: 'Account mismatches occur when a video from one TikTok account is queued to a YouTube channel linked to a different TikTok account. Click to view and resolve these issues.'
+      tooltip: 'Account mismatches occur when a video from one TikTok account is queued to a YouTube channel linked to a different TikTok account. Click to view and resolve these issues.',
+      action: mismatchedCount > 0 ? {
+        label: 'Quick Fix',
+        onClick: () => reassignMismatched(),
+        isLoading: isReassigning,
+      } : undefined,
     },
   ];
 
@@ -132,6 +137,7 @@ const Dashboard = () => {
             isWarning={'isWarning' in stat ? stat.isWarning : false}
             href={'href' in stat ? stat.href : undefined}
             tooltip={'tooltip' in stat ? stat.tooltip : undefined}
+            action={'action' in stat ? stat.action : undefined}
           />
         ))}
       </div>

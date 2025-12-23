@@ -269,11 +269,88 @@ export function usePublishQueue() {
     },
   });
 
+  const reassignMismatchedMutation = useMutation({
+    mutationFn: async () => {
+      if (!user?.id) throw new Error('Not authenticated');
+
+      // Get all queued/failed items with mismatches
+      const { data: queueItems, error: fetchError } = await supabase
+        .from('publish_queue')
+        .select(`
+          id,
+          youtube_channel_id,
+          scraped_video:scraped_videos!inner(tiktok_account_id),
+          youtube_channel:youtube_channels!inner(id, tiktok_account_id)
+        `)
+        .eq('user_id', user.id)
+        .in('status', ['queued', 'failed']);
+
+      if (fetchError) throw fetchError;
+
+      // Find mismatched items
+      const mismatched = queueItems?.filter(item => 
+        item.youtube_channel?.tiktok_account_id && 
+        item.scraped_video?.tiktok_account_id !== item.youtube_channel?.tiktok_account_id
+      ) || [];
+
+      if (!mismatched.length) throw new Error('No mismatched items to fix');
+
+      // Get all user's youtube channels
+      const { data: channels } = await supabase
+        .from('youtube_channels')
+        .select('id, tiktok_account_id')
+        .eq('user_id', user.id);
+
+      // For each mismatched item, find the correct channel and update
+      let fixedCount = 0;
+      for (const item of mismatched) {
+        const correctChannel = channels?.find(
+          ch => ch.tiktok_account_id === item.scraped_video.tiktok_account_id
+        );
+
+        if (correctChannel) {
+          const { error: updateError } = await supabase
+            .from('publish_queue')
+            .update({ youtube_channel_id: correctChannel.id })
+            .eq('id', item.id);
+
+          if (!updateError) fixedCount++;
+        }
+      }
+
+      return { fixed: fixedCount, total: mismatched.length };
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['publish-queue'] });
+      if (result.fixed === result.total) {
+        toast.success(`Fixed ${result.fixed} mismatched video${result.fixed > 1 ? 's' : ''}`);
+      } else if (result.fixed > 0) {
+        toast.warning(`Fixed ${result.fixed}/${result.total} items`, {
+          description: `${result.total - result.fixed} items have no matching channel`,
+        });
+      } else {
+        toast.error('Could not fix any items', {
+          description: 'No matching YouTube channels found for these TikTok accounts',
+        });
+      }
+    },
+    onError: (error) => {
+      toast.error(`Failed to fix mismatches: ${error.message}`);
+    },
+  });
+
   // Grouped by status for easy filtering
   const queuedItems = queueQuery.data?.filter(item => item.status === 'queued') || [];
   const processingItems = queueQuery.data?.filter(item => item.status === 'processing' || item.status === 'uploading') || [];
   const publishedItems = queueQuery.data?.filter(item => item.status === 'published') || [];
   const failedItems = queueQuery.data?.filter(item => item.status === 'failed') || [];
+
+  // Calculate mismatched count
+  const mismatchedItems = queueQuery.data?.filter(item => 
+    (item.status === 'queued' || item.status === 'failed') &&
+    item.youtube_channel?.tiktok_account_id && 
+    item.scraped_video?.tiktok_account_id !== item.youtube_channel?.tiktok_account_id
+  ) || [];
 
   return {
     queue: queueQuery.data || [],
@@ -281,6 +358,8 @@ export function usePublishQueue() {
     processingItems,
     publishedItems,
     failedItems,
+    mismatchedItems,
+    mismatchedCount: mismatchedItems.length,
     isLoading: queueQuery.isLoading,
     error: queueQuery.error,
     addToQueue: addToQueueMutation.mutateAsync,
@@ -288,6 +367,8 @@ export function usePublishQueue() {
     retryQueueItem: retryQueueItemMutation.mutateAsync,
     retryAllFailed: retryAllFailedMutation.mutateAsync,
     isRetryingAll: retryAllFailedMutation.isPending,
+    reassignMismatched: reassignMismatchedMutation.mutateAsync,
+    isReassigning: reassignMismatchedMutation.isPending,
     refetch: queueQuery.refetch,
   };
 }
