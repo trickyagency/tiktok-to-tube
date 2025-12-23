@@ -19,7 +19,7 @@ interface CronHistoryEntry {
   end_time: string | null;
 }
 
-export const useCronJobs = () => {
+export const useCronJobs = (historyLimit: number = 50) => {
   const jobsQuery = useQuery({
     queryKey: ['cron-jobs'],
     queryFn: async () => {
@@ -27,17 +27,19 @@ export const useCronJobs = () => {
       if (error) throw error;
       return data as CronJob[];
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
+    staleTime: 10000, // Consider data fresh for 10 seconds
   });
 
   const historyQuery = useQuery({
-    queryKey: ['cron-history'],
+    queryKey: ['cron-history', historyLimit],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_cron_history', { limit_rows: 50 });
+      const { data, error } = await supabase.rpc('get_cron_history', { limit_rows: historyLimit });
       if (error) throw error;
       return data as CronHistoryEntry[];
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
+    staleTime: 10000,
   });
 
   const refetch = () => {
@@ -49,6 +51,7 @@ export const useCronJobs = () => {
     jobs: jobsQuery.data ?? [],
     history: historyQuery.data ?? [],
     isLoading: jobsQuery.isLoading || historyQuery.isLoading,
+    isFetching: jobsQuery.isFetching || historyQuery.isFetching,
     isError: jobsQuery.isError || historyQuery.isError,
     error: jobsQuery.error || historyQuery.error,
     refetch,

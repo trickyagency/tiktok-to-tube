@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback, memo } from 'react';
 import { useCronJobs } from '@/hooks/useCronJobs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -6,15 +6,69 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { RefreshCw, Clock, CheckCircle2, XCircle, Activity, Timer } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { RefreshCw, Clock, CheckCircle2, XCircle, Activity, Timer, ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatDistanceToNow, format } from 'date-fns';
 
-const AUTO_REFRESH_INTERVAL = 30; // seconds
+const AUTO_REFRESH_INTERVAL = 30;
+const ITEMS_PER_PAGE = 10;
+
+// Memoized table row components
+const JobTableRow = memo(({ job }: { job: { jobid: number; jobname: string; schedule: string; active: boolean } }) => (
+  <TableRow>
+    <TableCell className="font-medium">{job.jobname}</TableCell>
+    <TableCell>
+      <code className="bg-muted px-2 py-1 rounded text-sm">{job.schedule}</code>
+    </TableCell>
+    <TableCell>
+      <Badge variant={job.active ? 'default' : 'secondary'}>
+        {job.active ? 'Active' : 'Inactive'}
+      </Badge>
+    </TableCell>
+  </TableRow>
+));
+JobTableRow.displayName = 'JobTableRow';
+
+const HistoryTableRow = memo(({ 
+  entry, 
+  getDuration 
+}: { 
+  entry: { runid: number; jobid: number; job_name: string; status: string; return_message: string | null; start_time: string; end_time: string | null };
+  getDuration: (start: string, end: string | null) => string;
+}) => (
+  <TableRow>
+    <TableCell>
+      {entry.status === 'succeeded' ? (
+        <CheckCircle2 className="h-5 w-5 text-green-500" />
+      ) : (
+        <XCircle className="h-5 w-5 text-destructive" />
+      )}
+    </TableCell>
+    <TableCell className="font-medium">{entry.job_name || `Job #${entry.jobid}`}</TableCell>
+    <TableCell>
+      <span title={format(new Date(entry.start_time), 'PPpp')}>
+        {formatDistanceToNow(new Date(entry.start_time), { addSuffix: true })}
+      </span>
+    </TableCell>
+    <TableCell>{getDuration(entry.start_time, entry.end_time)}</TableCell>
+    <TableCell className="max-w-xs truncate">
+      {entry.return_message && entry.status === 'failed' ? (
+        <span className="text-destructive text-sm" title={entry.return_message}>
+          {entry.return_message}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">-</span>
+      )}
+    </TableCell>
+  </TableRow>
+));
+HistoryTableRow.displayName = 'HistoryTableRow';
 
 const CronMonitor = () => {
-  const { jobs, history, isLoading, refetch } = useCronJobs();
+  const { jobs, history, isLoading, isFetching, refetch } = useCronJobs();
   const [selectedJob, setSelectedJob] = useState<string>('all');
   const [refreshCountdown, setRefreshCountdown] = useState(AUTO_REFRESH_INTERVAL);
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Auto-refresh countdown timer
   useEffect(() => {
@@ -38,13 +92,21 @@ const CronMonitor = () => {
   }, [refetch]);
 
   // Memoized stats calculation
-  const stats = useMemo(() => ({
-    totalJobs: jobs.length,
-    activeJobs: jobs.filter(j => j.active).length,
-    successfulRuns: history.filter(h => h.status === 'succeeded').length,
-    failedRuns: history.filter(h => h.status === 'failed').length,
-    lastRun: history[0]?.start_time,
-  }), [jobs, history]);
+  const stats = useMemo(() => {
+    const successfulRuns = history.filter(h => h.status === 'succeeded').length;
+    const failedRuns = history.filter(h => h.status === 'failed').length;
+    const totalRuns = successfulRuns + failedRuns;
+    const successRate = totalRuns > 0 ? Math.round((successfulRuns / totalRuns) * 100) : 0;
+    
+    return {
+      totalJobs: jobs.length,
+      activeJobs: jobs.filter(j => j.active).length,
+      successfulRuns,
+      failedRuns,
+      successRate,
+      lastRun: history[0]?.start_time,
+    };
+  }, [jobs, history]);
 
   // Get unique job names for filter
   const jobNames = useMemo(() => {
@@ -60,6 +122,18 @@ const CronMonitor = () => {
     if (selectedJob === 'all') return history;
     return history.filter(h => h.job_name === selectedJob);
   }, [history, selectedJob]);
+
+  // Pagination
+  const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
+  const paginatedHistory = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredHistory.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredHistory, currentPage]);
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedJob]);
 
   const getDuration = useCallback((start: string, end: string | null) => {
     if (!end) return '-';
@@ -79,19 +153,19 @@ const CronMonitor = () => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
-              <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-              <span>Auto-refresh in {refreshCountdown}s</span>
+              <div className={`h-2 w-2 rounded-full ${isFetching ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`} />
+              <span>{isFetching ? 'Refreshing...' : `Auto-refresh in ${refreshCountdown}s`}</span>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+          <Button variant="outline" size="sm" onClick={handleManualRefresh} disabled={isFetching}>
+            <RefreshCw className={`h-4 w-4 mr-2 ${isFetching ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
@@ -108,7 +182,24 @@ const CronMonitor = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Successful Runs</CardTitle>
+            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-8 w-16" />
+            ) : (
+              <div className="space-y-2">
+                <div className="text-2xl font-bold text-green-600">{stats.successRate}%</div>
+                <Progress value={stats.successRate} className="h-1" />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Successful</CardTitle>
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
@@ -122,7 +213,7 @@ const CronMonitor = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed Runs</CardTitle>
+            <CardTitle className="text-sm font-medium">Failed</CardTitle>
             <XCircle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
@@ -182,17 +273,7 @@ const CronMonitor = () => {
               </TableHeader>
               <TableBody>
                 {jobs.map((job) => (
-                  <TableRow key={job.jobid}>
-                    <TableCell className="font-medium">{job.jobname}</TableCell>
-                    <TableCell>
-                      <code className="bg-muted px-2 py-1 rounded text-sm">{job.schedule}</code>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={job.active ? 'default' : 'secondary'}>
-                        {job.active ? 'Active' : 'Inactive'}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
+                  <JobTableRow key={job.jobid} job={job} />
                 ))}
               </TableBody>
             </Table>
@@ -209,7 +290,12 @@ const CronMonitor = () => {
                 <Activity className="h-5 w-5" />
                 Execution History
               </CardTitle>
-              <CardDescription>Recent job execution results (last 50 runs)</CardDescription>
+              <CardDescription>
+                {selectedJob === 'all' 
+                  ? `Showing ${filteredHistory.length} total runs`
+                  : `Showing ${filteredHistory.length} runs for ${selectedJob}`
+                }
+              </CardDescription>
             </div>
             {jobNames.length > 0 && (
               <Select value={selectedJob} onValueChange={setSelectedJob}>
@@ -238,46 +324,53 @@ const CronMonitor = () => {
               {selectedJob === 'all' ? 'No execution history yet' : `No history for ${selectedJob}`}
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Job Name</TableHead>
-                  <TableHead>Started</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Message</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredHistory.map((entry) => (
-                  <TableRow key={entry.runid}>
-                    <TableCell>
-                      {entry.status === 'succeeded' ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <XCircle className="h-5 w-5 text-destructive" />
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{entry.job_name || `Job #${entry.jobid}`}</TableCell>
-                    <TableCell>
-                      <span title={format(new Date(entry.start_time), 'PPpp')}>
-                        {formatDistanceToNow(new Date(entry.start_time), { addSuffix: true })}
-                      </span>
-                    </TableCell>
-                    <TableCell>{getDuration(entry.start_time, entry.end_time)}</TableCell>
-                    <TableCell className="max-w-xs truncate">
-                      {entry.return_message && entry.status === 'failed' ? (
-                        <span className="text-destructive text-sm" title={entry.return_message}>
-                          {entry.return_message}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">Status</TableHead>
+                    <TableHead>Job Name</TableHead>
+                    <TableHead>Started</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Message</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {paginatedHistory.map((entry) => (
+                    <HistoryTableRow key={entry.runid} entry={entry} getDuration={getDuration} />
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <p className="text-sm text-muted-foreground">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
