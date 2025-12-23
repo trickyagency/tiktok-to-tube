@@ -112,18 +112,26 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
 
             {/* Progress bar during scraping */}
             {isScraping && (
-              <div className="mt-3 space-y-1.5">
+              <div className="mt-3 space-y-2">
                 <Progress 
                   value={progressPercentage} 
-                  className="h-2"
+                  className="h-2 transition-all duration-300"
                 />
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-primary">
-                    {progressTotal > 0 
-                      ? `Importing videos... (${progressCurrent} of ${progressTotal})`
-                      : 'Fetching videos from TikTok...'
-                    }
-                  </p>
+                
+                {/* Live stats row */}
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center">
+                      <Video className="h-3 w-3 mr-1 text-primary animate-pulse" />
+                      <span className="font-medium text-primary tabular-nums transition-all duration-200">
+                        {progressCurrent}
+                      </span>
+                      <span className="text-muted-foreground ml-1">
+                        / {progressTotal > 0 ? `~${progressTotal}` : '?'} videos
+                      </span>
+                    </span>
+                  </div>
+                  
                   {isStuckScraping && (
                     <Button
                       variant="ghost"
@@ -136,6 +144,17 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                       Reset
                     </Button>
                   )}
+                </div>
+                
+                {/* Phase indicator */}
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                  {progressCurrent === 0 
+                    ? 'Connecting to TikTok API...'
+                    : progressCurrent < (progressTotal || Infinity)
+                    ? 'Downloading video metadata...'
+                    : 'Saving to database...'
+                  }
                 </div>
               </div>
             )}

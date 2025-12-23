@@ -32,6 +32,14 @@ export function useTikTokAccountsRealtime() {
           const newAccount = payload.new as TikTokAccountRow;
           const oldAccount = payload.old as TikTokAccountRow;
           
+          // Direct cache update for instant UI feedback during scraping
+          queryClient.setQueryData<TikTokAccountRow[]>(['tiktok-accounts'], (old) => {
+            if (!old) return old;
+            return old.map(acc => 
+              acc.id === newAccount.id ? { ...acc, ...newAccount } : acc
+            );
+          });
+          
           // Check if scraping just completed
           if (oldAccount?.scrape_status === 'scraping' && newAccount?.scrape_status === 'completed') {
             const previousCount = previousCountRef.current[newAccount.id] || 0;
@@ -39,15 +47,17 @@ export function useTikTokAccountsRealtime() {
             toast.success(`Synced @${newAccount.username}`, {
               description: `${newVideos > 0 ? newVideos : 0} new videos imported`,
             });
+            // Full refresh on completion
+            queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
+            queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
+            queryClient.invalidateQueries({ queryKey: ['scraped-videos-count'] });
           }
           
           // Check if scraping failed
           if (oldAccount?.scrape_status === 'scraping' && newAccount?.scrape_status === 'failed') {
             toast.error(`Failed to sync @${newAccount.username}`);
+            queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
           }
-          
-          // Invalidate queries to refresh UI
-          queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
         }
       )
       .on<TikTokAccountRow>(
@@ -77,7 +87,6 @@ export function useTikTokAccountsRealtime() {
         },
         () => {
           // Invalidate to update video counts
-          queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
           queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
           queryClient.invalidateQueries({ queryKey: ['scraped-videos-count'] });
         }
