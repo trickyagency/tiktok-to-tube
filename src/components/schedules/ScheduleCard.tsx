@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { ScheduleHistoryDialog } from './ScheduleHistoryDialog';
 
 interface ScheduleCardProps {
   schedule: PublishSchedule;
@@ -78,7 +79,7 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
             <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <Video className="h-3.5 w-3.5" />
-                {schedule.videos_per_day} video{schedule.videos_per_day > 1 ? 's' : ''}/day
+                {schedule.publish_times.length} video{schedule.publish_times.length > 1 ? 's' : ''}/day
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
@@ -92,7 +93,9 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <ScheduleHistoryDialog schedule={schedule} />
+            
             <Switch
               checked={schedule.is_active}
               onCheckedChange={handleToggle}
