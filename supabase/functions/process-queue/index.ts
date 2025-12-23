@@ -46,16 +46,66 @@ async function refreshAccessToken(supabase: any, channel: any): Promise<string> 
   return channel.access_token;
 }
 
-async function downloadVideo(downloadUrl: string): Promise<Blob> {
+// Get direct video URL from TikTok page URL using TikWM API
+async function getDirectVideoUrl(tiktokUrl: string): Promise<string> {
+  console.log(`Getting direct video URL for: ${tiktokUrl}`);
+  
+  const response = await fetch('https://tikwm.com/api/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ url: tiktokUrl }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`TikWM API failed: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  if (data.code !== 0 || !data.data) {
+    throw new Error(`TikWM API error: ${data.msg || 'Unknown error'}`);
+  }
+
+  // Prefer HD version, fallback to regular
+  const directUrl = data.data.hdplay || data.data.play;
+  if (!directUrl) {
+    throw new Error('No video URL in TikWM response');
+  }
+
+  console.log(`Got direct video URL: ${directUrl.substring(0, 50)}...`);
+  return directUrl;
+}
+
+async function downloadVideo(videoUrl: string): Promise<Blob> {
+  let downloadUrl = videoUrl;
+
+  // If this is a TikTok page URL, get the direct video URL first
+  if (videoUrl.includes('tiktok.com')) {
+    downloadUrl = await getDirectVideoUrl(videoUrl);
+  }
+
+  console.log(`Downloading from: ${downloadUrl.substring(0, 80)}...`);
+  
   const response = await fetch(downloadUrl, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+    headers: { 
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://www.tiktok.com/',
+    },
   });
 
   if (!response.ok) {
     throw new Error(`Failed to download video: ${response.status}`);
   }
 
-  return await response.blob();
+  const blob = await response.blob();
+  console.log(`Downloaded video: ${blob.size} bytes, type: ${blob.type}`);
+  
+  // Validate it's actually a video
+  if (blob.size < 10000) {
+    throw new Error(`Downloaded file too small (${blob.size} bytes), likely not a video`);
+  }
+
+  return blob;
 }
 
 async function uploadToYouTube(
