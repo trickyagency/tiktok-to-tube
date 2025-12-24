@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -7,11 +7,9 @@ import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload, RotateCcw, Filter, AlertTriangle } from 'lucide-react';
+import { Calendar, CheckCircle, Clock, Loader2, XCircle, Upload, RotateCcw, Filter, AlertTriangle, CalendarClock, ArrowRight } from 'lucide-react';
 import { usePublishQueue, QueueItemWithDetails } from '@/hooks/usePublishQueue';
 import { QueueVideoCard } from '@/components/queue/QueueVideoCard';
-import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
-import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 import { usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { TestUploadDialog } from '@/components/queue/TestUploadDialog';
 import { ProcessQueueButton } from '@/components/queue/ProcessQueueButton';
@@ -46,10 +44,10 @@ const VideoQueue = () => {
     isRetryingAll
   } = usePublishQueue();
   
-  const { schedules, isLoading: isLoadingSchedules, refetch: refetchSchedules } = usePublishSchedules();
+  const { schedules, isLoading: isLoadingSchedules } = usePublishSchedules();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
 
-  const isLoading = isLoadingQueue || isLoadingSchedules;
+  const activeSchedules = schedules.filter(s => s.is_active);
 
   // Filter function for queue items by TikTok account and mismatch status
   const filterByAccount = (items: QueueItemWithDetails[]) => {
@@ -111,41 +109,28 @@ const VideoQueue = () => {
           </Card>
         )}
 
-        {/* Schedules Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                Upload Schedules
-              </CardTitle>
-              <CardDescription>
-                Automated TikTok to YouTube publishing schedules
-              </CardDescription>
+        {/* Schedules Quick Link */}
+        <Card className="bg-muted/30">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <CalendarClock className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-medium">Upload Schedules</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {activeSchedules.length} active schedule{activeSchedules.length !== 1 ? 's' : ''} • {schedules.length} total
+                  </p>
+                </div>
+              </div>
+              <Button variant="outline" asChild>
+                <Link to="/dashboard/schedules">
+                  Manage Schedules
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </Link>
+              </Button>
             </div>
-            <CreateScheduleDialog />
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : schedules.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                <h3 className="font-medium mb-1">No schedules yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create a schedule to automatically upload videos
-                </p>
-                <CreateScheduleDialog />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {schedules.map((schedule) => (
-                  <ScheduleCard key={schedule.id} schedule={schedule} />
-                ))}
-              </div>
-            )}
           </CardContent>
         </Card>
 

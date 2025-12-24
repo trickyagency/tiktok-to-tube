@@ -15,6 +15,7 @@ import Dashboard from "./pages/dashboard/Dashboard";
 import YouTubeChannels from "./pages/dashboard/YouTubeChannels";
 import TikTokAccounts from "./pages/dashboard/TikTokAccounts";
 import VideoQueue from "./pages/dashboard/VideoQueue";
+import Schedules from "./pages/dashboard/Schedules";
 import UploadHistory from "./pages/dashboard/UploadHistory";
 import UploadAnalytics from "./pages/dashboard/UploadAnalytics";
 import Analytics from "./pages/dashboard/Analytics";
@@ -95,6 +96,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <VideoQueue />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/schedules"
+          element={
+            <ProtectedRoute>
+              <Schedules />
             </ProtectedRoute>
           }
         />

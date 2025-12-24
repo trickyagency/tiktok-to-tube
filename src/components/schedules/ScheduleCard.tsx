@@ -7,7 +7,8 @@ import {
   Trash2, 
   ArrowRight,
   Calendar,
-  Video
+  Video,
+  Pencil
 } from 'lucide-react';
 import { PublishSchedule, usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
@@ -27,9 +28,10 @@ import { ScheduleHistoryDialog } from './ScheduleHistoryDialog';
 
 interface ScheduleCardProps {
   schedule: PublishSchedule;
+  onEdit?: () => void;
 }
 
-export function ScheduleCard({ schedule }: ScheduleCardProps) {
+export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
   const { toggleSchedule, deleteSchedule, isDeleting } = usePublishSchedules();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youtubeChannels } = useYouTubeChannels();
@@ -95,6 +97,12 @@ export function ScheduleCard({ schedule }: ScheduleCardProps) {
           {/* Actions */}
           <div className="flex items-center gap-2">
             <ScheduleHistoryDialog schedule={schedule} />
+            
+            {onEdit && (
+              <Button size="icon" variant="ghost" onClick={onEdit}>
+                <Pencil className="h-4 w-4" />
+              </Button>
+            )}
             
             <Switch
               checked={schedule.is_active}

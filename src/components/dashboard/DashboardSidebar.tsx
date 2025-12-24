@@ -22,6 +22,7 @@ import {
   Youtube,
   Video,
   Calendar,
+  CalendarClock,
   History,
   Settings,
   LogOut,
@@ -65,6 +66,7 @@ const DashboardSidebar = () => {
   // Build menu items with dynamic badge
   const mainMenuItems: MenuItem[] = [
     { title: 'Dashboard', url: '/dashboard', icon: LayoutDashboard },
+    { title: 'Schedules', url: '/dashboard/schedules', icon: CalendarClock },
     { 
       title: 'Video Queue', 
       url: '/dashboard/queue', 
