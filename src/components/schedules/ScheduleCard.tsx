@@ -2,17 +2,20 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { useQuery } from '@tanstack/react-query';
 import { 
   Clock, 
   Trash2, 
   ArrowRight,
   Calendar,
   Video,
-  Pencil
+  Pencil,
+  Film
 } from 'lucide-react';
 import { PublishSchedule, usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +28,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ScheduleHistoryDialog } from './ScheduleHistoryDialog';
+import { SchedulePreviewDialog } from './SchedulePreviewDialog';
 
 interface ScheduleCardProps {
   schedule: PublishSchedule;
@@ -38,6 +42,21 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
 
   const tiktokAccount = tikTokAccounts.find(a => a.id === schedule.tiktok_account_id);
   const youtubeChannel = youtubeChannels.find(c => c.id === schedule.youtube_channel_id);
+
+  // Fetch count of remaining unpublished videos
+  const { data: remainingCount = 0 } = useQuery({
+    queryKey: ['schedule-remaining', schedule.tiktok_account_id],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('scraped_videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('tiktok_account_id', schedule.tiktok_account_id)
+        .eq('is_published', false);
+
+      if (error) throw error;
+      return count || 0;
+    },
+  });
 
   const handleToggle = async () => {
     await toggleSchedule({ id: schedule.id, is_active: !schedule.is_active });
@@ -91,11 +110,16 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
                 <Calendar className="h-3.5 w-3.5" />
                 {schedule.timezone}
               </span>
+              <span className="flex items-center gap-1">
+                <Film className="h-3.5 w-3.5" />
+                {remainingCount} remaining
+              </span>
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            <SchedulePreviewDialog schedule={schedule} />
             <ScheduleHistoryDialog schedule={schedule} />
             
             {onEdit && (
