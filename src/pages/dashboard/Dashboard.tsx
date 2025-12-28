@@ -6,6 +6,7 @@ import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons';
 import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
 import { UploadLogDetails } from '@/components/history/UploadLogDetails';
+import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminderBanner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -145,6 +146,9 @@ const Dashboard = () => {
         tiktokCount={tikTokAccounts.length}
         hasSchedule={queueItems.length > 0}
       />
+
+      {/* Subscription Renewal Reminder Banner */}
+      <RenewalReminderBanner />
 
       {/* Reconnection Warning Banner */}
       {channelsNeedingReconnect.length > 0 && (
