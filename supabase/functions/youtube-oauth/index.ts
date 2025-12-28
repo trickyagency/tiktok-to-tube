@@ -258,11 +258,14 @@ serve(async (req) => {
       let youtubeChannelId: string | null = null;
       let authStatus = 'connected';
 
+      let channelHandle: string | null = null;
+
       if (channelInfo.items && channelInfo.items.length > 0) {
         const ytChannel = channelInfo.items[0];
         youtubeChannelId = ytChannel.id;
         channelTitle = ytChannel.snippet?.title || 'Unknown Channel';
         channelThumbnail = ytChannel.snippet?.thumbnails?.default?.url || null;
+        channelHandle = ytChannel.snippet?.customUrl || null;
         subscriberCount = parseInt(ytChannel.statistics?.subscriberCount || '0', 10);
         videoCount = parseInt(ytChannel.statistics?.videoCount || '0', 10);
       } else {
@@ -282,6 +285,7 @@ serve(async (req) => {
           channel_id: youtubeChannelId,
           channel_title: channelTitle,
           channel_thumbnail: channelThumbnail,
+          channel_handle: channelHandle,
           subscriber_count: subscriberCount,
           video_count: videoCount,
           access_token: tokenData.access_token,
