@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_subscriptions: {
+        Row: {
+          activated_at: string | null
+          activated_by: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          payment_confirmed_at: string | null
+          payment_notes: string | null
+          plan_id: string
+          starts_at: string | null
+          status: string
+          tiktok_account_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          payment_confirmed_at?: string | null
+          payment_notes?: string | null
+          plan_id: string
+          starts_at?: string | null
+          status?: string
+          tiktok_account_id: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          payment_confirmed_at?: string | null
+          payment_notes?: string | null
+          plan_id?: string
+          starts_at?: string | null
+          status?: string
+          tiktok_account_id?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "subscription_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "account_subscriptions_tiktok_account_id_fkey"
+            columns: ["tiktok_account_id"]
+            isOneToOne: true
+            referencedRelation: "tiktok_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apify_runs: {
         Row: {
           completed_at: string | null
@@ -523,6 +586,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      subscription_plans: {
+        Row: {
+          created_at: string | null
+          features: Json
+          id: string
+          is_active: boolean | null
+          max_videos_per_day: number
+          name: string
+          price_monthly: number
+        }
+        Insert: {
+          created_at?: string | null
+          features?: Json
+          id: string
+          is_active?: boolean | null
+          max_videos_per_day: number
+          name: string
+          price_monthly: number
+        }
+        Update: {
+          created_at?: string | null
+          features?: Json
+          id?: string
+          is_active?: boolean | null
+          max_videos_per_day?: number
+          name?: string
+          price_monthly?: number
+        }
+        Relationships: []
       }
       tiktok_accounts: {
         Row: {

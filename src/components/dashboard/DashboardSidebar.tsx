@@ -86,6 +86,7 @@ const DashboardSidebar = () => {
   const adminMenuItems: MenuItem[] = [
     { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
     { title: 'Users', url: '/dashboard/users', icon: Users, ownerOnly: true },
+    { title: 'Subscriptions', url: '/dashboard/subscriptions', icon: Zap, ownerOnly: true },
     { title: 'Platform Stats', url: '/dashboard/analytics', icon: Activity, ownerOnly: true },
     { title: 'Settings', url: '/dashboard/settings', icon: Settings },
   ];
