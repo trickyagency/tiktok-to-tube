@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Video, Users, Loader2, Info, AlertTriangle, Settings, RefreshCw } from 'lucide-react';
-import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
+import { useTikTokAccounts, useBulkSyncProfiles, TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useTikTokAccountsRealtime } from '@/hooks/useTikTokAccountsRealtime';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
 import { useApifyStatus } from '@/hooks/useApifyStatus';
@@ -20,6 +20,7 @@ const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
   const { data: totalVideos } = useScrapedVideosCount();
   const { data: isApifyConfigured, isLoading: isApifyLoading } = useApifyStatus();
+  const bulkSync = useBulkSyncProfiles();
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
 
@@ -111,6 +112,19 @@ const TikTokAccounts = () => {
         <div className="flex flex-wrap justify-between items-center gap-2">
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
           <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => accounts && bulkSync.mutate(accounts)}
+              disabled={!accounts || accounts.length === 0 || bulkSync.isPending}
+            >
+              {bulkSync.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Sync All Profiles
+            </Button>
             <ChromeExtensionGuide />
             <BulkVideoImport />
             <ManualVideoImport />
