@@ -11,6 +11,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Pricing from "./pages/Pricing";
 import Dashboard from "./pages/dashboard/Dashboard";
 import YouTubeChannels from "./pages/dashboard/YouTubeChannels";
 import TikTokAccounts from "./pages/dashboard/TikTokAccounts";
@@ -22,6 +23,7 @@ import Analytics from "./pages/dashboard/Analytics";
 import Settings from "./pages/dashboard/Settings";
 import CronMonitor from "./pages/dashboard/CronMonitor";
 import UserManagement from "./pages/dashboard/UserManagement";
+import SubscriptionManagement from "./pages/dashboard/SubscriptionManagement";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import CommandPalette from "@/components/dashboard/CommandPalette";
 import KeyboardShortcutsHelp from "@/components/dashboard/KeyboardShortcutsHelp";
@@ -65,7 +67,8 @@ const AppContent = () => {
       <Toaster />
       <Sonner />
       <Routes>
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/pricing" replace />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route path="/auth" element={<Auth />} />
         <Route
           path="/dashboard"
@@ -152,6 +155,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <Analytics />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/subscriptions"
+          element={
+            <ProtectedRoute>
+              <SubscriptionManagement />
             </ProtectedRoute>
           }
         />
