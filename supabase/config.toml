@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.schedule-processor]
 verify_jwt = false
+
+[functions.scrape-queue-processor]
+verify_jwt = false
