@@ -132,14 +132,21 @@ export function ScheduleHistoryDialog({ schedule }: ScheduleHistoryDialogProps) 
                     </Badge>
 
                     {item.youtube_video_url && (
-                      <a
-                        href={item.youtube_video_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-muted-foreground hover:text-primary transition-colors"
-                      >
-                        <ExternalLink className="h-4 w-4" />
-                      </a>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <a
+                            href={item.youtube_video_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-muted-foreground hover:text-primary transition-colors"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{item.youtube_video_url.includes('/shorts/') ? 'Watch Short' : 'Watch Video'}</p>
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </div>
                 </div>
