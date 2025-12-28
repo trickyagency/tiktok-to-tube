@@ -36,6 +36,56 @@ function isTimeToPublish(publishTimes: string[], timezone: string): boolean {
   return publishTimes.some(time => time === timeString);
 }
 
+// Validate that schedule, video, and channel all belong to the same user
+async function validateScheduleOwnership(
+  supabase: any,
+  schedule: any,
+  video: any
+): Promise<{ valid: boolean; error?: string }> {
+  const scheduleUserId = schedule.user_id;
+  
+  // Verify video belongs to schedule owner
+  if (video.user_id !== scheduleUserId) {
+    console.error(`SECURITY: User mismatch! Schedule user_id=${scheduleUserId}, Video user_id=${video.user_id}`);
+    return { valid: false, error: 'Security violation: Video does not belong to schedule owner' };
+  }
+  
+  // Fetch and verify YouTube channel belongs to schedule owner
+  const { data: channel, error: channelError } = await supabase
+    .from('youtube_channels')
+    .select('user_id')
+    .eq('id', schedule.youtube_channel_id)
+    .single();
+  
+  if (channelError || !channel) {
+    return { valid: false, error: `Channel not found: ${channelError?.message}` };
+  }
+  
+  if (channel.user_id !== scheduleUserId) {
+    console.error(`SECURITY: User mismatch! Schedule user_id=${scheduleUserId}, Channel user_id=${channel.user_id}`);
+    return { valid: false, error: 'Security violation: Channel does not belong to schedule owner' };
+  }
+  
+  // Verify TikTok account belongs to schedule owner
+  const { data: tiktokAccount, error: accountError } = await supabase
+    .from('tiktok_accounts')
+    .select('user_id')
+    .eq('id', schedule.tiktok_account_id)
+    .single();
+  
+  if (accountError || !tiktokAccount) {
+    return { valid: false, error: `TikTok account not found: ${accountError?.message}` };
+  }
+  
+  if (tiktokAccount.user_id !== scheduleUserId) {
+    console.error(`SECURITY: User mismatch! Schedule user_id=${scheduleUserId}, TikTok account user_id=${tiktokAccount.user_id}`);
+    return { valid: false, error: 'Security violation: TikTok account does not belong to schedule owner' };
+  }
+  
+  console.log(`Ownership validated for schedule "${schedule.schedule_name}" (user: ${scheduleUserId})`);
+  return { valid: true };
+}
+
 // Fetch video from TikWM to get watermark-free download URL
 async function fetchTikWMDownloadUrl(videoUrl: string): Promise<string> {
   console.log(`Fetching TikWM download URL for: ${videoUrl}`);
@@ -167,6 +217,13 @@ serve(async (req) => {
       }
 
       const video = selectedVideo;
+
+      // SECURITY: Validate that schedule, video, and channel all belong to the same user
+      const ownershipCheck = await validateScheduleOwnership(supabase, schedule, video);
+      if (!ownershipCheck.valid) {
+        console.error(`SECURITY: Ownership validation failed for schedule "${schedule.schedule_name}": ${ownershipCheck.error}`);
+        continue;
+      }
 
       // Fetch the watermark-free download URL from TikWM
       let downloadUrl = video.download_url;
