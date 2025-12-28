@@ -11,7 +11,7 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Eye, Heart, MessageCircle, Share2, ExternalLink } from 'lucide-react';
+import { Eye, Heart, MessageCircle, Share2, ExternalLink, Youtube } from 'lucide-react';
 import { useScrapedVideos, ScrapedVideo } from '@/hooks/useScrapedVideos';
 import { TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { QueueVideoToYouTube } from '@/components/queue/QueueVideoToYouTube';
@@ -51,9 +51,24 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
           </div>
         )}
         {video.is_published && (
-          <Badge className="absolute top-1 right-1 text-xs" variant="secondary">
-            Published
-          </Badge>
+          video.youtube_video_url ? (
+            <a
+              href={video.youtube_video_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="absolute top-1 right-1"
+            >
+              <Badge className="text-xs bg-red-600 hover:bg-red-700 text-white cursor-pointer flex items-center gap-1">
+                <Youtube className="h-3 w-3" />
+                YouTube
+              </Badge>
+            </a>
+          ) : (
+            <Badge className="absolute top-1 right-1 text-xs" variant="secondary">
+              Published
+            </Badge>
+          )
         )}
       </a>
 

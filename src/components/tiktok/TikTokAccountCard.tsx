@@ -5,8 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube } from 'lucide-react';
 import { TikTokAccount, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
+import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { formatDistanceToNow } from 'date-fns';
 
 interface TikTokAccountCardProps {
@@ -20,6 +21,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
   const resetAccount = useResetTikTokAccount();
+  const { data: publishedCount = 0 } = usePublishedVideosCount(account.id);
 
   const isScraping = account.scrape_status === 'scraping' || scrapeVideos.isPending;
   const isRefreshing = refreshAccount.isPending;
@@ -116,6 +118,13 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                   <span className="text-xs text-primary ml-1">(updating...)</span>
                 )}
               </div>
+              {publishedCount > 0 && (
+                <div className="flex items-center gap-1">
+                  <Youtube className="h-4 w-4 text-red-500" />
+                  <span className="font-medium text-foreground">{publishedCount}</span>
+                  <span>uploaded</span>
+                </div>
+              )}
               <div className="flex items-center gap-1">
                 <Users className="h-4 w-4" />
                 <span>{formatNumber(account.follower_count)}</span>
