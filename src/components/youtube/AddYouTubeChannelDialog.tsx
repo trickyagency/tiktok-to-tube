@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ExternalLink, AlertTriangle } from 'lucide-react';
+import { Plus, ExternalLink, AlertTriangle, AlertCircle } from 'lucide-react';
 import { useYouTubeChannels, CreateChannelInput } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
+import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CopyableUrl } from '@/components/ui/copyable-url';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AddYouTubeChannelDialogProps {
   onSuccess?: () => void;
@@ -27,11 +29,15 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
 
   const { createChannel, isCreating } = useYouTubeChannels();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
+  const { data: limits, isLoading: limitsLoading } = useUserAccountLimits();
+
+  const canAdd = limits?.canAddYouTubeChannel ?? true;
+  const remainingSlots = limits?.remainingYouTubeSlots ?? 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!channelName || !clientId || !clientSecret) {
+    if (!channelName || !clientId || !clientSecret || !canAdd) {
       return;
     }
 
@@ -61,6 +67,22 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
     setSelectedTikTokAccount('');
   };
 
+  if (!canAdd && !limitsLoading) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button disabled className="opacity-60">
+            <Plus className="h-4 w-4 mr-2" />
+            Add YouTube Channel
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <p>You've reached your YouTube channel limit ({limits?.maxYouTubeChannels})</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -76,6 +98,15 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
             Enter your Google Cloud OAuth credentials for this channel
           </DialogDescription>
         </DialogHeader>
+
+        {remainingSlots <= 2 && remainingSlots > 0 && (
+          <Alert className="border-amber-500/30 bg-amber-500/10">
+            <AlertCircle className="h-4 w-4 text-amber-500" />
+            <AlertDescription className="text-sm text-amber-600 dark:text-amber-400">
+              You have {remainingSlots} YouTube channel slot{remainingSlots !== 1 ? 's' : ''} remaining.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* Required URLs Section */}
         <Alert className="border-amber-500/30 bg-amber-500/10">
