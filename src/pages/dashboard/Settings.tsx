@@ -7,11 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw, Loader2, AlertTriangle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useEmailPreferences } from '@/hooks/useEmailPreferences';
 import { useOnboardingTour } from '@/hooks/useOnboardingTour';
+import { useTestApifyKey, ApifyStatus } from '@/hooks/useApifyStatus';
+import { toast } from 'sonner';
 import EmailPreview from '@/components/settings/EmailPreview';
 
 const Settings = () => {
@@ -22,6 +24,9 @@ const Settings = () => {
   
   const [apifyApiKey, setApifyApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
+  const [isTestingKey, setIsTestingKey] = useState(false);
+  const [keyTestResult, setKeyTestResult] = useState<{ status: ApifyStatus; message: string } | null>(null);
+  const { testKey } = useTestApifyKey();
   
   // Email branding state
   const [platformName, setPlatformName] = useState('TrickyHub');
@@ -51,6 +56,30 @@ const Settings = () => {
   const handleSaveApiKey = () => {
     if (apifyApiKey.trim()) {
       updateSetting('apify_api_key', apifyApiKey.trim());
+      setKeyTestResult(null); // Clear test result after save
+      toast.success('API key saved');
+    }
+  };
+
+  const handleTestApiKey = async () => {
+    setIsTestingKey(true);
+    setKeyTestResult(null);
+    try {
+      // Test the key currently in the input field
+      const result = await testKey(apifyApiKey.trim() || undefined);
+      setKeyTestResult({ status: result.status, message: result.message });
+      
+      if (result.valid) {
+        toast.success(result.message);
+      } else {
+        toast.error(result.message, { description: result.details });
+      }
+    } catch (error) {
+      const message = 'Failed to test API key';
+      setKeyTestResult({ status: 'error', message });
+      toast.error(message);
+    } finally {
+      setIsTestingKey(false);
     }
   };
 
@@ -112,7 +141,7 @@ const Settings = () => {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-3">
                   <Label htmlFor="apify-key">Apify API Key</Label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
@@ -120,7 +149,10 @@ const Settings = () => {
                         id="apify-key" 
                         type={showApiKey ? 'text' : 'password'}
                         value={apifyApiKey}
-                        onChange={(e) => setApifyApiKey(e.target.value)}
+                        onChange={(e) => {
+                          setApifyApiKey(e.target.value);
+                          setKeyTestResult(null); // Clear result when key changes
+                        }}
                         placeholder="Enter your Apify API key"
                         className="pr-10"
                       />
@@ -132,10 +164,41 @@ const Settings = () => {
                         {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
                     </div>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleTestApiKey} 
+                      disabled={isTestingKey || !apifyApiKey.trim()}
+                    >
+                      {isTestingKey ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Testing...
+                        </>
+                      ) : (
+                        'Test'
+                      )}
+                    </Button>
                     <Button onClick={handleSaveApiKey} disabled={isUpdating || !apifyApiKey.trim()}>
                       {isUpdating ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
+                  
+                  {/* Test Result Display */}
+                  {keyTestResult && (
+                    <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${
+                      keyTestResult.status === 'valid' 
+                        ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
+                        : 'bg-destructive/10 text-destructive'
+                    }`}>
+                      {keyTestResult.status === 'valid' ? (
+                        <CheckCircle2 className="h-4 w-4" />
+                      ) : (
+                        <AlertTriangle className="h-4 w-4" />
+                      )}
+                      {keyTestResult.message}
+                    </div>
+                  )}
+                  
                   <p className="text-xs text-muted-foreground">
                     Get your API key from{' '}
                     <a 

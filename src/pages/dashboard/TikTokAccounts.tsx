@@ -4,11 +4,11 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Video, Users, Loader2, AlertTriangle, Settings } from 'lucide-react';
+import { Video, Users, Loader2, AlertTriangle, Settings, XCircle, CheckCircle2 } from 'lucide-react';
 import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useTikTokAccountsRealtime } from '@/hooks/useTikTokAccountsRealtime';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
-import { useApifyStatus } from '@/hooks/useApifyStatus';
+import { useApifyStatus, useApifyValidation } from '@/hooks/useApifyStatus';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
@@ -20,8 +20,12 @@ const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
   const { data: totalVideos } = useScrapedVideosCount();
   const { data: isApifyConfigured, isLoading: isApifyLoading } = useApifyStatus();
+  const { data: apifyValidation, isLoading: isValidationLoading } = useApifyValidation();
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
+
+  // Determine the effective Apify status for disabling actions
+  const isApifyUsable = isApifyConfigured && apifyValidation?.valid;
 
   // Enable realtime updates
   useTikTokAccountsRealtime();
@@ -77,23 +81,63 @@ const TikTokAccounts = () => {
           </Card>
         </div>
 
-        {/* Apify Warning Banner */}
-        {!isApifyLoading && !isApifyConfigured && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="flex items-center justify-between gap-4">
-              <span>
-                <strong>Apify API key not configured.</strong> Video scraping is disabled. 
-                The platform owner must configure the API key in Settings.
-              </span>
-              <Button variant="outline" size="sm" asChild className="shrink-0">
-                <Link to="/dashboard/settings">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Go to Settings
-                </Link>
-              </Button>
-            </AlertDescription>
-          </Alert>
+        {/* Apify Status Banner */}
+        {!isApifyLoading && !isValidationLoading && (
+          <>
+            {/* Not Configured */}
+            {!isApifyConfigured && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between gap-4">
+                  <span>
+                    <strong>Apify API key not configured.</strong> Video scraping is disabled. 
+                    The platform owner must configure the API key in Settings.
+                  </span>
+                  <Button variant="outline" size="sm" asChild className="shrink-0">
+                    <Link to="/dashboard/settings">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Go to Settings
+                    </Link>
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Configured but Invalid/Expired */}
+            {isApifyConfigured && apifyValidation && !apifyValidation.valid && (
+              <Alert variant="destructive">
+                <XCircle className="h-4 w-4" />
+                <AlertDescription className="flex items-center justify-between gap-4">
+                  <span>
+                    <strong>
+                      {apifyValidation.status === 'expired' 
+                        ? 'Apify subscription expired.' 
+                        : apifyValidation.status === 'invalid'
+                        ? 'Invalid Apify API key.'
+                        : 'Apify API key error.'}
+                    </strong>{' '}
+                    {apifyValidation.message}. Video scraping is disabled.
+                  </span>
+                  <Button variant="outline" size="sm" asChild className="shrink-0">
+                    <Link to="/dashboard/settings">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Update API Key
+                    </Link>
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {/* Valid - show success indicator */}
+            {isApifyConfigured && apifyValidation?.valid && (
+              <Alert className="border-green-500/50 bg-green-500/10">
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertDescription className="text-green-700 dark:text-green-300">
+                  <strong>Apify connected.</strong> Video scraping is ready to use.
+                </AlertDescription>
+              </Alert>
+            )}
+          </>
         )}
 
 
@@ -104,7 +148,7 @@ const TikTokAccounts = () => {
         <div className="flex flex-wrap justify-between items-center gap-2">
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
           <div className="flex flex-wrap gap-2">
-            <ScrapeAllAccountsButton disabled={!isApifyConfigured} />
+            <ScrapeAllAccountsButton disabled={!isApifyUsable} />
             <BulkAccountImport />
             <AddTikTokAccountDialog />
           </div>
@@ -122,7 +166,7 @@ const TikTokAccounts = () => {
                 key={account.id}
                 account={account}
                 onViewVideos={handleViewVideos}
-                isApifyConfigured={isApifyConfigured ?? false}
+                isApifyConfigured={isApifyUsable ?? false}
               />
             ))}
           </div>

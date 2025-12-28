@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.scrape-queue-processor]
 verify_jwt = false
+
+[functions.apify-validate]
+verify_jwt = false
