@@ -109,6 +109,18 @@ Deno.serve(async (req) => {
     const userInfo = await fetchUserInfo(cleanUsername);
     
     if (!userInfo) {
+      // If we have an accountId, update the account status to indicate it's private/deleted
+      if (accountId) {
+        await supabase
+          .from('tiktok_accounts')
+          .update({ 
+            account_status: 'not_found',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', accountId);
+        console.log(`Updated account ${accountId} status to not_found`);
+      }
+      
       return new Response(
         JSON.stringify({ error: 'TikTok user not found or account is private' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -143,6 +155,7 @@ Deno.serve(async (req) => {
       video_count: userInfo.videoCount,
       updated_at: new Date().toISOString(),
       last_profile_synced_at: new Date().toISOString(),
+      account_status: 'active', // Reset to active when profile is successfully fetched
     };
 
     let savedAccount;

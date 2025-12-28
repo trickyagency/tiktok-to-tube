@@ -526,6 +526,7 @@ export type Database = {
       }
       tiktok_accounts: {
         Row: {
+          account_status: string
           avatar_url: string | null
           created_at: string
           display_name: string | null
@@ -544,6 +545,7 @@ export type Database = {
           video_count: number | null
         }
         Insert: {
+          account_status?: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null
@@ -562,6 +564,7 @@ export type Database = {
           video_count?: number | null
         }
         Update: {
+          account_status?: string
           avatar_url?: string | null
           created_at?: string
           display_name?: string | null

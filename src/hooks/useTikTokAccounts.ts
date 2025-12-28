@@ -20,6 +20,7 @@ export interface TikTokAccount {
   updated_at: string;
   scrape_progress_current?: number;
   scrape_progress_total?: number;
+  account_status: 'active' | 'private' | 'deleted' | 'not_found';
 }
 
 export function useTikTokAccounts() {
