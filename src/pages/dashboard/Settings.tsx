@@ -15,6 +15,7 @@ import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useTestApifyKey, ApifyStatus } from '@/hooks/useApifyStatus';
 import { toast } from 'sonner';
 import EmailPreview from '@/components/settings/EmailPreview';
+import SecuritySettings from '@/components/settings/SecuritySettings';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -146,6 +147,9 @@ const Settings = () => {
             <Button>Update Profile</Button>
           </CardContent>
         </Card>
+
+        {/* Security Settings */}
+        <SecuritySettings />
 
         {isOwner && (
           <>

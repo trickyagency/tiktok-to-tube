@@ -1,13 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Youtube, Sparkles, CheckCircle2, Zap, Shield, Clock } from 'lucide-react';
+import { Sparkles, Zap, Shield, Clock, CheckCircle2 } from 'lucide-react';
+import ForgotPasswordDialog from '@/components/auth/ForgotPasswordDialog';
+import MFAVerification from '@/components/auth/MFAVerification';
 
 const features = [
   { icon: Zap, title: 'Automated Repurposing', description: 'Turn TikTok videos into YouTube Shorts automatically' },
@@ -21,20 +23,61 @@ const Auth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  
+  // MFA state
+  const [mfaRequired, setMfaRequired] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     
     if (error) {
+      // Check if MFA is required
+      if (error.message.includes('MFA') || error.message.includes('second factor')) {
+        // Get MFA factors
+        const { data: factorsData } = await supabase.auth.mfa.listFactors();
+        const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
+        
+        if (verifiedFactor) {
+          setMfaFactorId(verifiedFactor.id);
+          setMfaRequired(true);
+          setLoading(false);
+          return;
+        }
+      }
       toast.error(error.message);
-    } else {
+    } else if (data.session) {
+      // Check if user has MFA enabled
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
+      const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
+      
+      if (verifiedFactor) {
+        // User has MFA, need to verify
+        setMfaFactorId(verifiedFactor.id);
+        setMfaRequired(true);
+        setLoading(false);
+        return;
+      }
+      
       toast.success('Welcome back!');
       navigate('/dashboard');
     }
     setLoading(false);
+  };
+
+  const handleMFASuccess = () => {
+    toast.success('Welcome back!');
+    navigate('/dashboard');
+  };
+
+  const handleMFACancel = async () => {
+    await supabase.auth.signOut();
+    setMfaRequired(false);
+    setMfaFactorId(null);
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -45,7 +88,8 @@ const Auth = () => {
       email,
       password,
       options: {
-        data: { full_name: fullName }
+        data: { full_name: fullName },
+        emailRedirectTo: `${window.location.origin}/dashboard`
       }
     });
     
@@ -56,6 +100,19 @@ const Auth = () => {
     }
     setLoading(false);
   };
+
+  // If MFA is required, show the MFA verification screen
+  if (mfaRequired && mfaFactorId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-background">
+        <MFAVerification 
+          factorId={mfaFactorId}
+          onSuccess={handleMFASuccess}
+          onCancel={handleMFACancel}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex">
@@ -146,7 +203,16 @@ const Auth = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="password">Password</Label>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password">Password</Label>
+                        <button
+                          type="button"
+                          onClick={() => setForgotPasswordOpen(true)}
+                          className="text-sm text-primary hover:underline"
+                        >
+                          Forgot Password?
+                        </button>
+                      </div>
                       <Input
                         id="password"
                         type="password"
@@ -215,6 +281,11 @@ const Auth = () => {
           </p>
         </div>
       </div>
+
+      <ForgotPasswordDialog 
+        open={forgotPasswordOpen} 
+        onOpenChange={setForgotPasswordOpen} 
+      />
     </div>
   );
 };

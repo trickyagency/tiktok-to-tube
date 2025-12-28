@@ -10,6 +10,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Pricing from "./pages/Pricing";
 import Dashboard from "./pages/dashboard/Dashboard";
@@ -70,6 +71,7 @@ const AppContent = () => {
         <Route path="/" element={<Navigate to="/pricing" replace />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/auth" element={<Auth />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route
           path="/dashboard"
           element={
