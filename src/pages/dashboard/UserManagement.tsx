@@ -74,7 +74,7 @@ export default function UserManagement() {
 
   const [inviteEmail, setInviteEmail] = useState('');
   const [editingLimitsUser, setEditingLimitsUser] = useState<UserWithLimitsAndUsage | null>(null);
-  const [limitsForm, setLimitsForm] = useState({ maxTikTok: 5, maxYouTube: 3 });
+  const [limitsForm, setLimitsForm] = useState({ maxTikTok: 1, maxYouTube: 1 });
 
   // Redirect non-owners
   if (!authLoading && !isOwner) {
@@ -92,8 +92,8 @@ export default function UserManagement() {
   const handleEditLimits = (user: UserWithLimitsAndUsage) => {
     setEditingLimitsUser(user);
     setLimitsForm({
-      maxTikTok: user.limits?.max_tiktok_accounts ?? 5,
-      maxYouTube: user.limits?.max_youtube_channels ?? 3,
+      maxTikTok: user.limits?.max_tiktok_accounts ?? 1,
+      maxYouTube: user.limits?.max_youtube_channels ?? 1,
     });
   };
 
@@ -356,16 +356,24 @@ export default function UserManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <UsageProgressBar 
-                            current={user.tiktok_count} 
-                            max={user.limits?.max_tiktok_accounts ?? 5}
-                          />
+                          {user.role === 'owner' ? (
+                            <span className="text-sm text-muted-foreground">Unlimited</span>
+                          ) : (
+                            <UsageProgressBar 
+                              current={user.tiktok_count} 
+                              max={user.limits?.max_tiktok_accounts ?? 1}
+                            />
+                          )}
                         </TableCell>
                         <TableCell>
-                          <UsageProgressBar 
-                            current={user.youtube_count} 
-                            max={user.limits?.max_youtube_channels ?? 3}
-                          />
+                          {user.role === 'owner' ? (
+                            <span className="text-sm text-muted-foreground">Unlimited</span>
+                          ) : (
+                            <UsageProgressBar 
+                              current={user.youtube_count} 
+                              max={user.limits?.max_youtube_channels ?? 1}
+                            />
+                          )}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(new Date(user.created_at), 'MMM d, yyyy')}
