@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle } from 'lucide-react';
 import { TikTokAccount, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -88,6 +88,12 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               {!isScraping && account.scrape_status === 'failed' && (
                 <Badge variant="destructive" className="shrink-0">
                   Failed
+                </Badge>
+              )}
+              {!isScraping && !account.avatar_url && account.follower_count === 0 && account.scrape_status !== 'pending' && (
+                <Badge variant="outline" className="shrink-0 text-amber-600 border-amber-600/30">
+                  <AlertCircle className="h-3 w-3 mr-1" />
+                  Profile not synced
                 </Badge>
               )}
             </div>
