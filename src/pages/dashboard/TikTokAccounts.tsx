@@ -14,6 +14,7 @@ import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 import { ManualVideoImport } from '@/components/tiktok/ManualVideoImport';
 import { BulkVideoImport } from '@/components/tiktok/BulkVideoImport';
+import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
 import { ChromeExtensionGuide } from '@/components/tiktok/ChromeExtensionGuide';
 
 const TikTokAccounts = () => {
@@ -128,6 +129,7 @@ const TikTokAccounts = () => {
             <ChromeExtensionGuide />
             <BulkVideoImport />
             <ManualVideoImport />
+            <BulkAccountImport />
             <AddTikTokAccountDialog />
           </div>
         </div>
