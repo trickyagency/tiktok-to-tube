@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Shield, Lock, Smartphone, Eye, EyeOff, CheckCircle2, Loader2, QrCode, X } from 'lucide-react';
+import { Shield, Lock, Smartphone, Eye, EyeOff, CheckCircle2, Loader2, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 import { useMFA } from '@/hooks/useMFA';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter';
 import {
   Dialog,
   DialogContent,
@@ -154,6 +155,7 @@ const SecuritySettings = () => {
                   {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
+              <PasswordStrengthMeter password={newPassword} />
             </div>
             
             <div className="space-y-2">
