@@ -39,6 +39,7 @@ export function useTikTokAccounts() {
   });
 }
 
+// Add account using TikWM (profile data only, no video scraping)
 export function useAddTikTokAccount() {
   const queryClient = useQueryClient();
 
@@ -47,12 +48,12 @@ export function useAddTikTokAccount() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const response = await supabase.functions.invoke('apify-scraper', {
+      const response = await supabase.functions.invoke('tikwm-profile', {
         body: { username },
       });
 
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to scrape account');
+        throw new Error(response.error.message || 'Failed to fetch profile');
       }
 
       if (response.data?.error) {
@@ -63,14 +64,9 @@ export function useAddTikTokAccount() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
-      queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
-      if (data.background) {
-        toast.info(`Scraping @${data.account?.username || 'account'}...`, {
-          description: 'Videos will appear as they are imported',
-        });
-      } else {
-        toast.success(`Added @${data.account.username} with ${data.account.new_videos} new videos`);
-      }
+      toast.success(`Added @${data.account.username}`, {
+        description: 'Click "Scrape Now" to import videos',
+      });
     },
     onError: (error: Error) => {
       toast.error(error.message);
@@ -78,7 +74,8 @@ export function useAddTikTokAccount() {
   });
 }
 
-export function useRefreshTikTokAccount() {
+// Scrape videos using Apify
+export function useScrapeVideos() {
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -97,7 +94,7 @@ export function useRefreshTikTokAccount() {
       });
 
       if (response.error) {
-        throw new Error(response.error.message || 'Failed to refresh account');
+        throw new Error(response.error.message || 'Failed to start scraper');
       }
 
       if (response.data?.error) {
@@ -110,12 +107,45 @@ export function useRefreshTikTokAccount() {
       queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
       queryClient.invalidateQueries({ queryKey: ['scraped-videos'] });
       if (data.background) {
-        toast.info(`Syncing @${data.account?.username || 'account'}...`, {
+        toast.info(`Scraping @${data.account?.username || 'account'}...`, {
           description: 'Videos will appear as they are imported',
         });
       } else {
-        toast.success(`Synced @${data.account.username} - ${data.account.new_videos} new videos`);
+        toast.success(`Scraped @${data.account.username} - ${data.account.new_videos} new videos`);
       }
+    },
+    onError: (error: Error) => {
+      toast.error(error.message);
+    },
+  });
+}
+
+// Refresh profile data using TikWM (no video scraping)
+export function useRefreshTikTokAccount() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ accountId, username }: { accountId: string; username: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await supabase.functions.invoke('tikwm-profile', {
+        body: { username, accountId },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to refresh profile');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      return response.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
+      toast.success(`Synced @${data.account.username}`);
     },
     onError: (error: Error) => {
       toast.error(error.message);
