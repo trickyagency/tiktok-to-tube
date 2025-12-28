@@ -216,16 +216,11 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
     }
   };
 
-  const isTokenExpired = channel.token_expires_at 
-    ? new Date(channel.token_expires_at) < new Date() 
-    : false;
-
-  // Determine if channel needs reconnection
+  // Determine if channel needs reconnection (only when refresh token is revoked, not when access token expires)
   const needsReconnect = 
     channel.auth_status === 'failed' || 
     channel.auth_status === 'token_revoked' ||
-    (channel.auth_status === 'connected' && !channel.refresh_token) ||
-    (channel.auth_status === 'connected' && isTokenExpired);
+    (channel.auth_status === 'connected' && !channel.refresh_token);
 
   return (
     <Card className="overflow-hidden">
@@ -369,9 +364,9 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
               </DropdownMenu>
             )}
 
-            {needsReconnect && channel.auth_status === 'connected' && (
+            {channel.auth_status === 'token_revoked' && (
               <p className="text-xs text-amber-500 mt-1">
-                Connection issue detected - please reconnect your channel
+                Refresh token revoked - please reconnect your channel
               </p>
             )}
 

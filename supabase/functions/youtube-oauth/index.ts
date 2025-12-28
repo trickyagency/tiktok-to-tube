@@ -396,7 +396,23 @@ serve(async (req) => {
 
       if (tokenData.error) {
         console.error('Token refresh error:', tokenData);
-        return new Response(JSON.stringify({ error: tokenData.error_description || tokenData.error }), {
+        
+        // Check if this is a revoked token error (refresh token is invalid)
+        const revokedErrors = ['invalid_grant', 'unauthorized_client', 'access_denied'];
+        const isRevoked = revokedErrors.includes(tokenData.error);
+        
+        if (isRevoked) {
+          console.log(`Refresh token revoked for channel ${channelId}, marking as token_revoked`);
+          await supabase
+            .from('youtube_channels')
+            .update({ auth_status: 'token_revoked', is_connected: false })
+            .eq('id', channelId);
+        }
+        
+        return new Response(JSON.stringify({ 
+          error: tokenData.error_description || tokenData.error,
+          revoked: isRevoked
+        }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
