@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw, Loader2, AlertTriangle } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw, Loader2, AlertTriangle, Trash2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useEmailPreferences } from '@/hooks/useEmailPreferences';
@@ -15,10 +15,21 @@ import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useTestApifyKey, ApifyStatus } from '@/hooks/useApifyStatus';
 import { toast } from 'sonner';
 import EmailPreview from '@/components/settings/EmailPreview';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 const Settings = () => {
   const { user, isOwner } = useAuth();
-  const { getSetting, updateSetting, isUpdating, isLoading } = usePlatformSettings();
+  const { getSetting, updateSetting, deleteSetting, isUpdating, isDeleting, isLoading } = usePlatformSettings();
   const { preferences, updatePreference, isLoading: preferencesLoading } = useEmailPreferences();
   const { resetTour, hasCompleted: tourCompleted, startTour } = useOnboardingTour();
   
@@ -27,6 +38,7 @@ const Settings = () => {
   const [isTestingKey, setIsTestingKey] = useState(false);
   const [keyTestResult, setKeyTestResult] = useState<{ status: ApifyStatus; message: string } | null>(null);
   const { testKey } = useTestApifyKey();
+  const [hasSavedKey, setHasSavedKey] = useState(false);
   
   // Email branding state
   const [platformName, setPlatformName] = useState('TrickyHub');
@@ -41,6 +53,9 @@ const Settings = () => {
       const savedKey = getSetting('apify_api_key');
       if (savedKey) {
         setApifyApiKey(savedKey);
+        setHasSavedKey(true);
+      } else {
+        setHasSavedKey(false);
       }
       
       // Load email branding settings
@@ -56,9 +71,16 @@ const Settings = () => {
   const handleSaveApiKey = () => {
     if (apifyApiKey.trim()) {
       updateSetting('apify_api_key', apifyApiKey.trim());
-      setKeyTestResult(null); // Clear test result after save
-      toast.success('API key saved');
+      setKeyTestResult(null);
+      setHasSavedKey(true);
     }
+  };
+
+  const handleDeleteApiKey = () => {
+    deleteSetting('apify_api_key');
+    setApifyApiKey('');
+    setKeyTestResult(null);
+    setHasSavedKey(false);
   };
 
   const handleTestApiKey = async () => {
@@ -181,6 +203,29 @@ const Settings = () => {
                     <Button onClick={handleSaveApiKey} disabled={isUpdating || !apifyApiKey.trim()}>
                       {isUpdating ? 'Saving...' : 'Save'}
                     </Button>
+                    {hasSavedKey && (
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="destructive" size="icon" disabled={isDeleting}>
+                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete API Key?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will remove the Apify API key. Video scraping features will be disabled until a new key is configured.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDeleteApiKey} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    )}
                   </div>
                   
                   {/* Test Result Display */}

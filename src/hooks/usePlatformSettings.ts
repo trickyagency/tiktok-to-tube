@@ -61,6 +61,7 @@ export const usePlatformSettings = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['platform-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['apify-validation'] });
       toast.success('Setting saved successfully');
     },
     onError: (error) => {
@@ -68,8 +69,31 @@ export const usePlatformSettings = () => {
     },
   });
 
+  const deleteSettingMutation = useMutation({
+    mutationFn: async (key: string) => {
+      const { error } = await supabase
+        .from('platform_settings')
+        .update({ value: null, updated_at: new Date().toISOString(), updated_by: user?.id })
+        .eq('key', key);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['platform-settings'] });
+      queryClient.invalidateQueries({ queryKey: ['apify-validation'] });
+      toast.success('Setting deleted successfully');
+    },
+    onError: (error) => {
+      toast.error('Failed to delete setting: ' + error.message);
+    },
+  });
+
   const updateSetting = (key: string, value: string) => {
     updateSettingMutation.mutate({ key, value });
+  };
+
+  const deleteSetting = (key: string) => {
+    deleteSettingMutation.mutate(key);
   };
 
   return {
@@ -77,6 +101,8 @@ export const usePlatformSettings = () => {
     isLoading,
     getSetting,
     updateSetting,
+    deleteSetting,
     isUpdating: updateSettingMutation.isPending,
+    isDeleting: deleteSettingMutation.isPending,
   };
 };
