@@ -1,11 +1,10 @@
 import { format, formatDistanceToNow } from 'date-fns';
-import { ExternalLink, FileText, Play, Youtube } from 'lucide-react';
+import { ExternalLink, FileText, Youtube } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QueueItemWithDetails } from '@/hooks/usePublishQueue';
 import { UploadLogDetails } from './UploadLogDetails';
-import { cn } from '@/lib/utils';
 
 interface UploadHistoryCardProps {
   item: QueueItemWithDetails;
@@ -15,7 +14,6 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
   const uploadedAt = item.processed_at ? new Date(item.processed_at) : new Date(item.updated_at);
   const timeAgo = formatDistanceToNow(uploadedAt, { addSuffix: true });
   const formattedDate = format(uploadedAt, 'MMM d, yyyy \'at\' h:mm a');
-  const isShort = item.youtube_video_url?.includes('/shorts/') ?? false;
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
@@ -28,19 +26,6 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
                 <h4 className="font-medium text-sm line-clamp-2">
                   {item.scraped_video?.title || 'Untitled Video'}
                 </h4>
-                {item.youtube_video_url && (
-                  <Badge 
-                    variant="outline" 
-                    className={cn(
-                      "text-[10px] px-1.5 py-0 h-4 shrink-0",
-                      isShort 
-                        ? "border-pink-500/50 text-pink-600 bg-pink-500/10" 
-                        : "border-blue-500/50 text-blue-600 bg-blue-500/10"
-                    )}
-                  >
-                    {isShort ? 'Short' : 'Video'}
-                  </Badge>
-                )}
               </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 {item.youtube_channel?.channel_thumbnail && (
@@ -74,7 +59,7 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
                     </Button>
                   }
                 />
-                {item.youtube_video_url && (
+                {item.youtube_channel?.channel_id && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -82,12 +67,12 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
                     asChild
                   >
                     <a
-                      href={item.youtube_video_url}
+                      href={`https://www.youtube.com/channel/${item.youtube_channel.channel_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
                       <Youtube className="h-3.5 w-3.5 text-red-500" />
-                      {item.youtube_video_url.includes('/shorts/') ? 'Watch Short' : 'Watch Video'}
+                      View Channel
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </Button>
