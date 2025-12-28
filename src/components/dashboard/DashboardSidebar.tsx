@@ -81,6 +81,7 @@ const DashboardSidebar = () => {
   const platformMenuItems: MenuItem[] = [
     { title: 'YouTube Channels', url: '/dashboard/youtube', icon: Youtube },
     { title: 'TikTok Accounts', url: '/dashboard/tiktok', icon: Video },
+    { title: 'My Subscriptions', url: '/dashboard/my-subscriptions', icon: Zap },
   ];
 
   const adminMenuItems: MenuItem[] = [

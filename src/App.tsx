@@ -25,6 +25,7 @@ import Settings from "./pages/dashboard/Settings";
 import CronMonitor from "./pages/dashboard/CronMonitor";
 import UserManagement from "./pages/dashboard/UserManagement";
 import SubscriptionManagement from "./pages/dashboard/SubscriptionManagement";
+import MySubscriptions from "./pages/dashboard/MySubscriptions";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import CommandPalette from "@/components/dashboard/CommandPalette";
 import KeyboardShortcutsHelp from "@/components/dashboard/KeyboardShortcutsHelp";
@@ -165,6 +166,14 @@ const AppContent = () => {
           element={
             <ProtectedRoute>
               <SubscriptionManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/my-subscriptions"
+          element={
+            <ProtectedRoute>
+              <MySubscriptions />
             </ProtectedRoute>
           }
         />
