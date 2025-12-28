@@ -10,8 +10,9 @@ import { SubscriptionDialog } from '@/components/subscriptions/SubscriptionDialo
 import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminderBanner';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useUserSubscriptions, AccountSubscription } from '@/hooks/useSubscriptions';
-import { CreditCard, Calendar, Users, Zap, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { CreditCard, Calendar, Users, Zap, Clock, CheckCircle, AlertCircle, MessageCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { generateGeneralWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
 
 export default function MySubscriptions() {
   const { data: accounts, isLoading: accountsLoading } = useTikTokAccounts();
@@ -48,9 +49,40 @@ export default function MySubscriptions() {
     }
   };
 
+  const handleWhatsAppContact = () => {
+    window.open(generateGeneralWhatsAppLink(), '_blank');
+  };
+
   return (
     <DashboardLayout title="My Subscriptions" description="Manage subscriptions for your TikTok accounts">
       <div className="space-y-6">
+        {/* WhatsApp Payment Info Card */}
+        <Card className="border-green-500/30 bg-green-500/5">
+          <CardContent className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pt-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/10 shrink-0">
+                <MessageCircle className="h-5 w-5 text-green-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">Payment via WhatsApp</h3>
+                <p className="text-sm text-muted-foreground">
+                  To subscribe or renew, contact us on WhatsApp. Your subscription will be activated after payment confirmation.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  WhatsApp: <span className="font-medium text-foreground">{WHATSAPP_DISPLAY}</span>
+                </p>
+              </div>
+            </div>
+            <Button 
+              onClick={handleWhatsAppContact}
+              className="bg-green-600 hover:bg-green-700 text-white shrink-0"
+            >
+              <MessageCircle className="h-4 w-4 mr-2" />
+              Contact WhatsApp
+            </Button>
+          </CardContent>
+        </Card>
+
         {/* Expiring Subscriptions Banner */}
         <RenewalReminderBanner 
           variant="detailed" 
