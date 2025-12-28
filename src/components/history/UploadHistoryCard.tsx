@@ -90,7 +90,7 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
                       rel="noopener noreferrer"
                     >
                       <Youtube className="h-3.5 w-3.5 text-red-500" />
-                      Watch
+                      Watch Short
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   </Button>
