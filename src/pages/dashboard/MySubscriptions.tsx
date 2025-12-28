@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SubscriptionBadge } from '@/components/subscriptions/SubscriptionBadge';
 import { SubscriptionDialog } from '@/components/subscriptions/SubscriptionDialog';
+import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminderBanner';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useUserSubscriptions, AccountSubscription } from '@/hooks/useSubscriptions';
 import { CreditCard, Calendar, Users, Zap, Clock, CheckCircle, AlertCircle } from 'lucide-react';
@@ -40,9 +41,23 @@ export default function MySubscriptions() {
     return subscriptionMap.get(accountId);
   };
 
+  const handleRenewClick = (accountId: string) => {
+    const account = accounts?.find(a => a.id === accountId);
+    if (account) {
+      handleOpenDialog(account.id, account.username);
+    }
+  };
+
   return (
     <DashboardLayout title="My Subscriptions" description="Manage subscriptions for your TikTok accounts">
       <div className="space-y-6">
+        {/* Expiring Subscriptions Banner */}
+        <RenewalReminderBanner 
+          variant="detailed" 
+          showDismiss={false}
+          onRenewClick={handleRenewClick}
+        />
+
         {/* Stats Cards */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
