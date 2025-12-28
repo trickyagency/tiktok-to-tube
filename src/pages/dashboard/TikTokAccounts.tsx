@@ -1,25 +1,23 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Video, Users, Loader2, Info, AlertTriangle, Settings, RefreshCw } from 'lucide-react';
-import { useTikTokAccounts, useBulkSyncProfiles, TikTokAccount } from '@/hooks/useTikTokAccounts';
+import { Video, Users, Loader2, AlertTriangle, Settings } from 'lucide-react';
+import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useTikTokAccountsRealtime } from '@/hooks/useTikTokAccountsRealtime';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
 import { useApifyStatus } from '@/hooks/useApifyStatus';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
-import { ManualVideoImport } from '@/components/tiktok/ManualVideoImport';
 import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
 
 const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
   const { data: totalVideos } = useScrapedVideosCount();
   const { data: isApifyConfigured, isLoading: isApifyLoading } = useApifyStatus();
-  const bulkSync = useBulkSyncProfiles();
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
 
@@ -101,20 +99,6 @@ const TikTokAccounts = () => {
         <div className="flex flex-wrap justify-between items-center gap-2">
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
           <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => accounts && bulkSync.mutate(accounts)}
-              disabled={!accounts || accounts.length === 0 || bulkSync.isPending}
-            >
-              {bulkSync.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Sync All Profiles
-            </Button>
-            <ManualVideoImport />
             <BulkAccountImport />
             <AddTikTokAccountDialog />
           </div>
