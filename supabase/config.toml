@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.delete-user]
 verify_jwt = false
+
+[functions.subscription-expiry]
+verify_jwt = false

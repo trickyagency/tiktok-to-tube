@@ -63,8 +63,10 @@ import {
   Loader2,
   Trash2,
   RefreshCw,
+  AlertTriangle,
+  CalendarClock,
 } from 'lucide-react';
-import { format, addDays, addMonths } from 'date-fns';
+import { format, addDays, addMonths, differenceInDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 export default function SubscriptionManagement() {
@@ -79,11 +81,15 @@ export default function SubscriptionManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
+  const [expiryDialogOpen, setExpiryDialogOpen] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<AccountSubscription | null>(null);
   const [activateForm, setActivateForm] = useState({
     startsAt: format(new Date(), 'yyyy-MM-dd'),
     expiresAt: format(addMonths(new Date(), 1), 'yyyy-MM-dd'),
     paymentNotes: '',
+  });
+  const [expiryForm, setExpiryForm] = useState({
+    expiresAt: '',
   });
 
   // Redirect non-owners
@@ -108,7 +114,7 @@ export default function SubscriptionManagement() {
 
   // Stats
   const stats = useMemo(() => {
-    if (!subscriptions) return { pending: 0, active: 0, revenue: 0, total: 0 };
+    if (!subscriptions) return { pending: 0, active: 0, revenue: 0, total: 0, expiringSoon: 0 };
 
     const pending = subscriptions.filter((s) => s.status === 'pending').length;
     const active = subscriptions.filter((s) => s.status === 'active').length;
@@ -118,8 +124,15 @@ export default function SubscriptionManagement() {
         const plan = plans?.find((p) => p.id === s.plan_id);
         return sum + (plan?.price_monthly || 0);
       }, 0);
+    
+    // Count subscriptions expiring within 7 days
+    const expiringSoon = subscriptions.filter((s) => {
+      if (s.status !== 'active' || !s.expires_at) return false;
+      const daysUntilExpiry = differenceInDays(new Date(s.expires_at), new Date());
+      return daysUntilExpiry >= 0 && daysUntilExpiry <= 7;
+    }).length;
 
-    return { pending, active, revenue, total: subscriptions.length };
+    return { pending, active, revenue, total: subscriptions.length, expiringSoon };
   }, [subscriptions, plans]);
 
   const handleActivate = (subscription: AccountSubscription) => {
@@ -166,6 +179,33 @@ export default function SubscriptionManagement() {
     });
   };
 
+  const handleSetExpiry = (subscription: AccountSubscription) => {
+    setSelectedSubscription(subscription);
+    setExpiryForm({
+      expiresAt: subscription.expires_at 
+        ? format(new Date(subscription.expires_at), 'yyyy-MM-dd') 
+        : format(addMonths(new Date(), 1), 'yyyy-MM-dd'),
+    });
+    setExpiryDialogOpen(true);
+  };
+
+  const confirmSetExpiry = async () => {
+    if (!selectedSubscription) return;
+
+    await updateSubscription.mutateAsync({
+      subscriptionId: selectedSubscription.id,
+      expiresAt: new Date(expiryForm.expiresAt),
+    });
+
+    setExpiryDialogOpen(false);
+    setSelectedSubscription(null);
+  };
+
+  const handleFilterExpiringSoon = () => {
+    setStatusFilter('active');
+    // The filter will show active ones, user can visually identify expiring soon ones
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -184,7 +224,7 @@ export default function SubscriptionManagement() {
   return (
     <DashboardLayout title="Subscription Management" description="Manage user subscription requests and payments">
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 mb-6">
+      <div className="grid gap-4 md:grid-cols-5 mb-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Pending Requests</CardTitle>
@@ -201,6 +241,22 @@ export default function SubscriptionManagement() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats.active}</div>
+          </CardContent>
+        </Card>
+        <Card 
+          className={cn(
+            "cursor-pointer transition-colors hover:bg-accent/50",
+            stats.expiringSoon > 0 && "border-amber-500/50"
+          )}
+          onClick={handleFilterExpiringSoon}
+        >
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Expiring Soon</CardTitle>
+            <AlertTriangle className={cn("h-4 w-4", stats.expiringSoon > 0 ? "text-amber-500" : "text-muted-foreground")} />
+          </CardHeader>
+          <CardContent>
+            <div className={cn("text-2xl font-bold", stats.expiringSoon > 0 && "text-amber-600")}>{stats.expiringSoon}</div>
+            <p className="text-xs text-muted-foreground">Within 7 days</p>
           </CardContent>
         </Card>
         <Card>
@@ -352,6 +408,10 @@ export default function SubscriptionManagement() {
                             )}
                             {subscription.status === 'active' && (
                               <>
+                                <DropdownMenuItem onClick={() => handleSetExpiry(subscription)}>
+                                  <CalendarClock className="mr-2 h-4 w-4" />
+                                  Set Expiry Date
+                                </DropdownMenuItem>
                                 <DropdownMenuItem onClick={() => handleExtend(subscription)}>
                                   <RefreshCw className="mr-2 h-4 w-4" />
                                   Extend 1 Month
@@ -441,6 +501,55 @@ export default function SubscriptionManagement() {
             <Button onClick={confirmActivate} disabled={activateSubscription.isPending}>
               {activateSubscription.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Confirm & Activate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Set Custom Expiry Dialog */}
+      <Dialog open={expiryDialogOpen} onOpenChange={setExpiryDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Expiry Date</DialogTitle>
+            <DialogDescription>
+              Set a custom expiry date for @{selectedSubscription?.tiktok_account?.username}'s subscription
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-4 p-4 bg-muted rounded-lg">
+              <SubscriptionBadge planId={selectedSubscription?.plan_id} status="active" />
+              <div>
+                <div className="font-medium">{selectedSubscription?.plan?.name} Plan</div>
+                <div className="text-sm text-muted-foreground">
+                  Current expiry: {selectedSubscription?.expires_at 
+                    ? format(new Date(selectedSubscription.expires_at), 'MMM d, yyyy') 
+                    : 'Not set'}
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="newExpiresAt">New Expiry Date</Label>
+              <Input
+                id="newExpiresAt"
+                type="date"
+                value={expiryForm.expiresAt}
+                onChange={(e) => setExpiryForm((f) => ({ ...f, expiresAt: e.target.value }))}
+              />
+              <p className="text-sm text-muted-foreground">
+                The subscription will automatically expire on this date if not renewed.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExpiryDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSetExpiry} disabled={updateSubscription.isPending}>
+              {updateSubscription.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Update Expiry Date
             </Button>
           </DialogFooter>
         </DialogContent>
