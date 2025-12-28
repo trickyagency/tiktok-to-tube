@@ -11,13 +11,14 @@ interface UserAccountLimits {
   canAddYouTubeChannel: boolean;
   remainingTikTokSlots: number;
   remainingYouTubeSlots: number;
+  isUnlimited: boolean;
 }
 
 export function useUserAccountLimits() {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
 
   return useQuery({
-    queryKey: ['user-account-limits', user?.id],
+    queryKey: ['user-account-limits', user?.id, isOwner],
     queryFn: async (): Promise<UserAccountLimits> => {
       if (!user) {
         return {
@@ -29,19 +30,9 @@ export function useUserAccountLimits() {
           canAddYouTubeChannel: false,
           remainingTikTokSlots: 0,
           remainingYouTubeSlots: 0,
+          isUnlimited: false,
         };
       }
-
-      // Fetch user limits
-      const { data: limits } = await supabase
-        .from('user_limits')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      // Use defaults if no limits record exists
-      const maxTikTokAccounts = limits?.max_tiktok_accounts ?? 5;
-      const maxYouTubeChannels = limits?.max_youtube_channels ?? 3;
 
       // Count current TikTok accounts
       const { count: tikTokCount } = await supabase
@@ -58,6 +49,32 @@ export function useUserAccountLimits() {
       const currentTikTokAccounts = tikTokCount ?? 0;
       const currentYouTubeChannels = youTubeCount ?? 0;
 
+      // Owner has unlimited access
+      if (isOwner) {
+        return {
+          maxTikTokAccounts: 999999,
+          maxYouTubeChannels: 999999,
+          currentTikTokAccounts,
+          currentYouTubeChannels,
+          canAddTikTokAccount: true,
+          canAddYouTubeChannel: true,
+          remainingTikTokSlots: 999999,
+          remainingYouTubeSlots: 999999,
+          isUnlimited: true,
+        };
+      }
+
+      // Fetch user limits for regular users
+      const { data: limits } = await supabase
+        .from('user_limits')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      // Use defaults if no limits record exists (default is 1)
+      const maxTikTokAccounts = limits?.max_tiktok_accounts ?? 1;
+      const maxYouTubeChannels = limits?.max_youtube_channels ?? 1;
+
       return {
         maxTikTokAccounts,
         maxYouTubeChannels,
@@ -67,6 +84,7 @@ export function useUserAccountLimits() {
         canAddYouTubeChannel: currentYouTubeChannels < maxYouTubeChannels,
         remainingTikTokSlots: Math.max(0, maxTikTokAccounts - currentTikTokAccounts),
         remainingYouTubeSlots: Math.max(0, maxYouTubeChannels - currentYouTubeChannels),
+        isUnlimited: false,
       };
     },
     enabled: !!user,
