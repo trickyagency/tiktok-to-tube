@@ -171,10 +171,21 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               </div>
             )}
 
-            {account.last_scraped_at && !isScraping && (
-              <p className="text-xs text-muted-foreground mt-2">
-                Last synced {formatDistanceToNow(new Date(account.last_scraped_at))} ago
-              </p>
+            {!isScraping && (account.last_profile_synced_at || account.last_scraped_at) && (
+              <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
+                {account.last_profile_synced_at && (
+                  <p className="flex items-center gap-1">
+                    <RefreshCw className="h-3 w-3" />
+                    Profile synced {formatDistanceToNow(new Date(account.last_profile_synced_at))} ago
+                  </p>
+                )}
+                {account.last_scraped_at && (
+                  <p className="flex items-center gap-1">
+                    <Video className="h-3 w-3" />
+                    Videos scraped {formatDistanceToNow(new Date(account.last_scraped_at))} ago
+                  </p>
+                )}
+              </div>
             )}
           </div>
 

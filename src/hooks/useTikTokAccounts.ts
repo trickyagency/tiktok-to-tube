@@ -14,6 +14,7 @@ export interface TikTokAccount {
   video_count: number;
   scrape_status: string;
   last_scraped_at: string | null;
+  last_profile_synced_at: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

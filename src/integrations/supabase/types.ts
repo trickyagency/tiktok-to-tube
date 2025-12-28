@@ -471,6 +471,7 @@ export type Database = {
           following_count: number | null
           id: string
           is_active: boolean | null
+          last_profile_synced_at: string | null
           last_scraped_at: string | null
           scrape_progress_current: number | null
           scrape_progress_total: number | null
@@ -488,6 +489,7 @@ export type Database = {
           following_count?: number | null
           id?: string
           is_active?: boolean | null
+          last_profile_synced_at?: string | null
           last_scraped_at?: string | null
           scrape_progress_current?: number | null
           scrape_progress_total?: number | null
@@ -505,6 +507,7 @@ export type Database = {
           following_count?: number | null
           id?: string
           is_active?: boolean | null
+          last_profile_synced_at?: string | null
           last_scraped_at?: string | null
           scrape_progress_current?: number | null
           scrape_progress_total?: number | null
