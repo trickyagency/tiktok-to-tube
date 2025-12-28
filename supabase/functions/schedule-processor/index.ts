@@ -108,43 +108,65 @@ serve(async (req) => {
 
       console.log(`Schedule "${schedule.schedule_name}" - TIME TO PUBLISH!`);
 
-      // Get the oldest unpublished video from the linked TikTok account
-      const { data: video, error: videoError } = await supabase
+      // Get unpublished videos from the linked TikTok account, try to find one that hasn't been uploaded
+      let selectedVideo = null;
+      const { data: unpublishedVideos, error: videosError } = await supabase
         .from('scraped_videos')
         .select('*')
         .eq('tiktok_account_id', schedule.tiktok_account_id)
         .eq('is_published', false)
         .order('scraped_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .limit(10); // Get more to find a valid one
 
-      if (videoError) {
-        console.error(`Error fetching video for schedule "${schedule.schedule_name}":`, videoError);
+      if (videosError) {
+        console.error(`Error fetching videos for schedule "${schedule.schedule_name}":`, videosError);
         continue;
       }
 
-      if (!video) {
+      if (!unpublishedVideos || unpublishedVideos.length === 0) {
         console.log(`No unpublished videos for schedule "${schedule.schedule_name}"`);
         continue;
       }
 
-      // Check if this video is already in the queue
-      const { data: existingQueue, error: queueCheckError } = await supabase
-        .from('publish_queue')
-        .select('id')
-        .eq('scraped_video_id', video.id)
-        .in('status', ['queued', 'processing'])
-        .maybeSingle();
+      // Find a video that isn't already queued/processing/published
+      for (const video of unpublishedVideos) {
+        // Check if video is already in queue (queued, processing, OR published)
+        const { data: existingQueue, error: queueCheckError } = await supabase
+          .from('publish_queue')
+          .select('id, status')
+          .eq('scraped_video_id', video.id)
+          .in('status', ['queued', 'processing', 'published'])
+          .maybeSingle();
 
-      if (queueCheckError) {
-        console.error(`Error checking queue for video:`, queueCheckError);
+        if (queueCheckError) {
+          console.error(`Error checking queue for video ${video.id}:`, queueCheckError);
+          continue;
+        }
+
+        if (existingQueue) {
+          console.log(`Video ${video.id} already ${existingQueue.status}, skipping`);
+          
+          // If it was published, sync the scraped_videos table
+          if (existingQueue.status === 'published') {
+            await supabase
+              .from('scraped_videos')
+              .update({ is_published: true })
+              .eq('id', video.id);
+          }
+          continue;
+        }
+
+        // Found a valid video
+        selectedVideo = video;
+        break;
+      }
+
+      if (!selectedVideo) {
+        console.log(`No available videos for schedule "${schedule.schedule_name}" (all already queued/published)`);
         continue;
       }
 
-      if (existingQueue) {
-        console.log(`Video ${video.id} already in queue, skipping`);
-        continue;
-      }
+      const video = selectedVideo;
 
       // Fetch the watermark-free download URL from TikWM
       let downloadUrl = video.download_url;
