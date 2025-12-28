@@ -219,7 +219,8 @@ async function uploadToYouTube(
   videoBlob: Blob,
   title: string,
   description: string,
-  privacyStatus: string
+  privacyStatus: string,
+  videoDuration: number
 ): Promise<{ videoId: string; videoUrl: string; duration: number }> {
   const startTime = Date.now();
   
@@ -273,9 +274,16 @@ async function uploadToYouTube(
   }
 
   const result = await uploadResponse.json();
+  
+  // Use Shorts URL for videos <= 60 seconds, otherwise regular watch URL
+  const isShort = videoDuration > 0 && videoDuration <= 60;
+  const videoUrl = isShort
+    ? `https://www.youtube.com/shorts/${result.id}`
+    : `https://www.youtube.com/watch?v=${result.id}`;
+
   return {
     videoId: result.id,
-    videoUrl: `https://www.youtube.com/watch?v=${result.id}`,
+    videoUrl,
     duration: Date.now() - startTime,
   };
 }
@@ -490,7 +498,8 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       downloadResult.blob,
       currentVideo.title || 'TikTok Video',
       currentVideo.description || '',
-      'public'
+      'public',
+      currentVideo.duration || 0
     );
     uploadDuration = uploadResult.duration;
 
