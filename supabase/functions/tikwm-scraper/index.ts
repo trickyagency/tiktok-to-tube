@@ -231,6 +231,23 @@ async function scrapeVideosInBackground(
     const videos = await fetchAllVideos(userInfo.secUid, cleanUsername, updateProgress);
     console.log(`[Background] Fetched ${videos.length} videos`);
 
+    // Detect private accounts: API returns profile info but no videos when account claims to have videos
+    if (videos.length === 0 && userInfo.videoCount > 0) {
+      console.log(`[Background] Account ${cleanUsername} appears to be private - claims ${userInfo.videoCount} videos but fetched 0`);
+      await supabase
+        .from('tiktok_accounts')
+        .update({
+          scrape_status: 'completed',
+          account_status: 'private',
+          last_scraped_at: new Date().toISOString(),
+          scrape_progress_current: 0,
+          scrape_progress_total: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', accountId);
+      return;
+    }
+
     if (videos.length > 0) {
       // Get existing video IDs
       const { data: existingVideos } = await supabase
@@ -277,11 +294,12 @@ async function scrapeVideosInBackground(
       }
     }
 
-    // Mark as completed
+    // Mark as completed with active status (we successfully fetched videos)
     await supabase
       .from('tiktok_accounts')
       .update({
         scrape_status: 'completed',
+        account_status: 'active',
         last_scraped_at: new Date().toISOString(),
         scrape_progress_current: videos.length,
         scrape_progress_total: videos.length,
