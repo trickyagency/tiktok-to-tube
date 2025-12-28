@@ -7,11 +7,12 @@ import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons
 import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useUploadHistory } from '@/hooks/useUploadHistory';
-import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle } from 'lucide-react';
+import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const Dashboard = () => {
@@ -33,6 +34,20 @@ const Dashboard = () => {
 
   const pendingCount = queueItems.filter(item => item.status === 'queued').length;
   const completedCount = uploadHistory.length;
+
+  // Check for YouTube channels that need reconnection
+  const channelsNeedingReconnect = youtubeChannels.filter(channel => {
+    const isTokenExpired = channel.token_expires_at 
+      ? new Date(channel.token_expires_at) < new Date() 
+      : false;
+      
+    return (
+      channel.auth_status === 'failed' || 
+      channel.auth_status === 'token_revoked' ||
+      (channel.auth_status === 'connected' && !channel.refresh_token) ||
+      (channel.auth_status === 'connected' && isTokenExpired)
+    );
+  });
 
   const stats = [
     { 
@@ -128,6 +143,29 @@ const Dashboard = () => {
         tiktokCount={tikTokAccounts.length}
         hasSchedule={queueItems.length > 0}
       />
+
+      {/* Reconnection Warning Banner */}
+      {channelsNeedingReconnect.length > 0 && (
+        <Alert className="mb-6 border-amber-500/50 bg-amber-500/10">
+          <AlertCircle className="h-4 w-4 text-amber-500" />
+          <AlertTitle className="text-amber-600 dark:text-amber-400">
+            YouTube Channel{channelsNeedingReconnect.length > 1 ? 's' : ''} Need Reconnection
+          </AlertTitle>
+          <AlertDescription className="flex items-center justify-between flex-wrap gap-2">
+            <span className="text-muted-foreground">
+              {channelsNeedingReconnect.length === 1 
+                ? `"${channelsNeedingReconnect[0].channel_title || 'Unnamed Channel'}" needs to be reconnected to continue uploading.`
+                : `${channelsNeedingReconnect.length} channels need to be reconnected to continue uploading.`
+              }
+            </span>
+            <Button variant="outline" size="sm" asChild className="shrink-0 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10">
+              <Link to="/dashboard/youtube">
+                Reconnect Now
+              </Link>
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
