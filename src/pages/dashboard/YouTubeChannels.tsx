@@ -1,18 +1,15 @@
 import { useEffect } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Youtube, Loader2, Gauge } from 'lucide-react';
+import { Youtube, Loader2 } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuide';
-import { QuotaIndicator } from '@/components/quota/QuotaIndicator';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
-import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
 import { toast } from 'sonner';
 
 const YouTubeChannels = () => {
   const { channels, isLoading, refetch } = useYouTubeChannels();
-  const { data: quotaData, isLoading: isLoadingQuota } = useYouTubeQuota();
 
   // Listen for OAuth completion messages from popup
   useEffect(() => {
@@ -45,28 +42,6 @@ const YouTubeChannels = () => {
       description="Connect and manage your YouTube channels with per-channel OAuth credentials"
     >
       <div className="space-y-6">
-        {/* Quota Overview */}
-        {!isLoadingQuota && quotaData && quotaData.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gauge className="h-5 w-5" />
-                Daily API Quota
-              </CardTitle>
-              <CardDescription>
-                YouTube API quota usage across all channels (resets at midnight UTC)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {quotaData.map((quota) => (
-                  <QuotaIndicator key={quota.youtube_channel_id} quota={quota} />
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
         {/* Setup Guide */}
         <GoogleCloudSetupGuide />
 

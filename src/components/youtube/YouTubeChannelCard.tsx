@@ -20,6 +20,8 @@ import {
 import { YouTubeChannel, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useScrapedVideos } from '@/hooks/useScrapedVideos';
+import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
+import { QuotaIndicator } from '@/components/quota/QuotaIndicator';
 import { toast } from 'sonner';
 import {
   AlertDialog,
@@ -63,6 +65,10 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   
   // Fetch video count for the linked TikTok account
   const { data: linkedAccountVideos = [] } = useScrapedVideos(channel.tiktok_account_id);
+  
+  // Fetch quota for this specific channel
+  const { data: quotaData } = useYouTubeQuota(channel.id);
+  const channelQuota = quotaData?.[0];
 
   // Countdown timer effect
   useEffect(() => {
@@ -360,6 +366,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
               <p className="text-xs text-amber-500 mt-1">
                 Token expired - click refresh to renew
               </p>
+            )}
+
+            {/* Quota Indicator for connected channels */}
+            {channel.auth_status === 'connected' && channelQuota && (
+              <div className="mt-3 pt-3 border-t">
+                <QuotaIndicator quota={channelQuota} />
+              </div>
             )}
           </div>
 
