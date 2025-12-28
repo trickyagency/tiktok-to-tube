@@ -220,6 +220,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
     ? new Date(channel.token_expires_at) < new Date() 
     : false;
 
+  // Determine if channel needs reconnection
+  const needsReconnect = 
+    channel.auth_status === 'failed' || 
+    channel.auth_status === 'token_revoked' ||
+    (channel.auth_status === 'connected' && !channel.refresh_token) ||
+    (channel.auth_status === 'connected' && isTokenExpired);
+
   return (
     <Card className="overflow-hidden">
       <CardContent className="p-4">
@@ -362,9 +369,9 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
               </DropdownMenu>
             )}
 
-            {isTokenExpired && channel.auth_status === 'connected' && (
+            {needsReconnect && channel.auth_status === 'connected' && (
               <p className="text-xs text-amber-500 mt-1">
-                Token expired - click refresh to renew
+                Connection issue detected - please reconnect your channel
               </p>
             )}
 
@@ -398,12 +405,12 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                   <><ExternalLink className="h-4 w-4 mr-2" />Authorize</>
                 )}
               </Button>
-            ) : (
-              <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isRefreshing}>
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? 'Refreshing...' : 'Refresh Token'}
+            ) : needsReconnect ? (
+              <Button size="sm" variant="outline" onClick={handleAuthorize} disabled={isAuthorizing}>
+                <RotateCcw className={`h-4 w-4 mr-2 ${isAuthorizing ? 'animate-spin' : ''}`} />
+                {isAuthorizing ? 'Reconnecting...' : 'Reconnect Channel'}
               </Button>
-            )}
+            ) : null}
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
