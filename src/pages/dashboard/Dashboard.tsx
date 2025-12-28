@@ -237,17 +237,6 @@ const Dashboard = () => {
               <div className="space-y-4">
                 {recentActivity.map((item) => (
                   <div key={item.id} className="flex items-start gap-4 p-3 rounded-lg bg-muted/30">
-                    {item.scraped_video?.thumbnail_url ? (
-                      <img 
-                        src={item.scraped_video.thumbnail_url} 
-                        alt="" 
-                        className="w-16 h-10 rounded object-cover bg-muted"
-                      />
-                    ) : (
-                      <div className="w-16 h-10 rounded bg-muted flex items-center justify-center">
-                        <Video className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    )}
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">
                         {item.scraped_video?.title || 'Untitled Video'}
