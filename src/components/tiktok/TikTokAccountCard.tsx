@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX } from 'lucide-react';
 import { TikTokAccount, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { formatDistanceToNow } from 'date-fns';
@@ -63,17 +63,28 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
     return num.toString();
   };
 
+  const isAccountUnavailable = account.account_status === 'private' || account.account_status === 'deleted' || account.account_status === 'not_found';
+
   return (
-    <Card className={`overflow-hidden transition-all ${isScraping ? 'ring-2 ring-primary/20' : ''}`}>
+    <Card className={`overflow-hidden transition-all ${isScraping ? 'ring-2 ring-primary/20' : ''} ${isAccountUnavailable ? 'opacity-75' : ''}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <div className="relative">
-            <Avatar className="h-16 w-16">
+            <Avatar className={`h-16 w-16 ${isAccountUnavailable ? 'grayscale' : ''}`}>
               <AvatarImage src={account.avatar_url || undefined} alt={account.username} />
               <AvatarFallback>{account.username[0]?.toUpperCase()}</AvatarFallback>
             </Avatar>
             {isScraping && (
               <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+            )}
+            {isAccountUnavailable && !isScraping && (
+              <div className="absolute -bottom-1 -right-1 bg-background rounded-full p-0.5">
+                {account.account_status === 'private' ? (
+                  <Lock className="h-4 w-4 text-amber-500" />
+                ) : (
+                  <UserX className="h-4 w-4 text-destructive" />
+                )}
+              </div>
             )}
           </div>
 
@@ -98,11 +109,41 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                   Failed
                 </Badge>
               )}
-              {!isScraping && account.scrape_status === 'pending' && (
+              {!isScraping && account.scrape_status === 'pending' && !isAccountUnavailable && (
                 <Badge variant="outline" className="shrink-0 text-amber-600 border-amber-600/30">
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Videos not scraped
                 </Badge>
+              )}
+              {account.account_status === 'private' && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="outline" className="shrink-0 text-amber-500 border-amber-500/30 bg-amber-500/10">
+                        <Lock className="h-3 w-3 mr-1" />
+                        Private Account
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>This TikTok account is private. Videos cannot be scraped.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {(account.account_status === 'deleted' || account.account_status === 'not_found') && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Badge variant="destructive" className="shrink-0">
+                        <UserX className="h-3 w-3 mr-1" />
+                        Account Deleted
+                      </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>This TikTok account no longer exists or has been deleted.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
             <p className="text-sm text-muted-foreground">@{account.username}</p>
