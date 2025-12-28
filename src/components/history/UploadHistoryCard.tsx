@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { QueueItemWithDetails } from '@/hooks/usePublishQueue';
 import { UploadLogDetails } from './UploadLogDetails';
+import { cn } from '@/lib/utils';
 
 interface UploadHistoryCardProps {
   item: QueueItemWithDetails;
@@ -14,13 +15,17 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
   const uploadedAt = item.processed_at ? new Date(item.processed_at) : new Date(item.updated_at);
   const timeAgo = formatDistanceToNow(uploadedAt, { addSuffix: true });
   const formattedDate = format(uploadedAt, 'MMM d, yyyy \'at\' h:mm a');
+  const isShort = item.youtube_video_url?.includes('/shorts/') ?? false;
 
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <CardContent className="p-0">
         <div className="flex gap-4 p-4">
           {/* Thumbnail */}
-          <div className="relative flex-shrink-0 w-32 h-20 rounded-md overflow-hidden bg-muted">
+          <div className={cn(
+            "relative flex-shrink-0 rounded-md overflow-hidden bg-muted",
+            isShort ? "w-14 h-24" : "w-32 h-20"
+          )}>
             {item.scraped_video?.thumbnail_url ? (
               <>
                 <img
@@ -42,9 +47,24 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
           {/* Content */}
           <div className="flex-1 min-w-0 flex flex-col justify-between">
             <div>
-              <h4 className="font-medium text-sm line-clamp-2 mb-1">
-                {item.scraped_video?.title || 'Untitled Video'}
-              </h4>
+              <div className="flex items-center gap-2 mb-1">
+                <h4 className="font-medium text-sm line-clamp-2">
+                  {item.scraped_video?.title || 'Untitled Video'}
+                </h4>
+                {item.youtube_video_url && (
+                  <Badge 
+                    variant="outline" 
+                    className={cn(
+                      "text-[10px] px-1.5 py-0 h-4 shrink-0",
+                      isShort 
+                        ? "border-pink-500/50 text-pink-600 bg-pink-500/10" 
+                        : "border-blue-500/50 text-blue-600 bg-blue-500/10"
+                    )}
+                  >
+                    {isShort ? 'Short' : 'Video'}
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 {item.youtube_channel?.channel_thumbnail && (
                   <img
