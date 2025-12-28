@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Sparkles, Lock, Eye, EyeOff, Loader2, CheckCircle2 } from 'lucide-react';
+import { PasswordStrengthMeter } from '@/components/ui/password-strength-meter';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -157,6 +158,7 @@ const ResetPassword = () => {
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
+                <PasswordStrengthMeter password={password} />
               </div>
               
               <div className="space-y-2">
