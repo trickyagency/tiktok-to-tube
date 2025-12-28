@@ -110,7 +110,7 @@ export default function Pricing() {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
               <Sparkles className="h-4 w-4 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-lg">TikTok to YouTube</span>
+            <span className="font-semibold text-lg">RepostFlow</span>
           </div>
           <div className="flex items-center gap-4">
             <Button 
@@ -361,7 +361,7 @@ export default function Pricing() {
       {/* Footer */}
       <footer className="border-t border-border/40 py-8">
         <div className="container text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} TikTok to YouTube. All rights reserved.
+          © {new Date().getFullYear()} RepostFlow. All rights reserved.
         </div>
       </footer>
     </div>

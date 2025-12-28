@@ -135,8 +135,8 @@ serve(async (req) => {
     };
 
     const branding: BrandingSettings = {
-      platformName: getBrandingSetting("EMAIL_PLATFORM_NAME", "TrickyHub"),
-      senderName: getBrandingSetting("EMAIL_SENDER_NAME", "TrickyHub"),
+      platformName: getBrandingSetting("EMAIL_PLATFORM_NAME", "RepostFlow"),
+      senderName: getBrandingSetting("EMAIL_SENDER_NAME", "RepostFlow"),
       senderAddress: getBrandingSetting("EMAIL_SENDER_ADDRESS", "onboarding@resend.dev"),
       logoUrl: getBrandingSetting("EMAIL_LOGO_URL", ""),
       primaryColor: getBrandingSetting("EMAIL_PRIMARY_COLOR", "#18181b"),
