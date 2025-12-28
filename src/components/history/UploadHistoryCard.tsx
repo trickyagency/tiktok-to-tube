@@ -20,30 +20,7 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
   return (
     <Card className="overflow-hidden hover:shadow-md transition-shadow">
       <CardContent className="p-0">
-        <div className="flex gap-4 p-4">
-          {/* Thumbnail */}
-          <div className={cn(
-            "relative flex-shrink-0 rounded-md overflow-hidden bg-muted",
-            isShort ? "w-14 h-24" : "w-32 h-20"
-          )}>
-            {item.scraped_video?.thumbnail_url ? (
-              <>
-                <img
-                  src={item.scraped_video.thumbnail_url}
-                  alt={item.scraped_video.title || 'Video thumbnail'}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 hover:opacity-100 transition-opacity">
-                  <Play className="h-8 w-8 text-white" />
-                </div>
-              </>
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <Youtube className="h-8 w-8 text-muted-foreground/50" />
-              </div>
-            )}
-          </div>
-
+        <div className="p-4">
           {/* Content */}
           <div className="flex-1 min-w-0 flex flex-col justify-between">
             <div>
