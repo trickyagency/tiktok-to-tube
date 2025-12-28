@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 import { 
   useAllUsers, 
   usePendingInvitations,
@@ -121,6 +122,32 @@ export default function UserManagement() {
         <User className="h-3 w-3 mr-1" />
         User
       </Badge>
+    );
+  };
+
+  const UsageProgressBar = ({ current, max }: { current: number; max: number }) => {
+    const percentage = max > 0 ? (current / max) * 100 : 0;
+    
+    const getProgressColor = () => {
+      if (percentage >= 100) return 'bg-destructive';
+      if (percentage >= 80) return 'bg-amber-500';
+      return 'bg-emerald-500';
+    };
+    
+    return (
+      <div className="w-20 space-y-1">
+        <div className="flex justify-between text-xs">
+          <span className={cn(percentage >= 100 && 'text-destructive font-medium')}>
+            {current}/{max}
+          </span>
+        </div>
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-secondary">
+          <div 
+            className={cn("h-full transition-all", getProgressColor())}
+            style={{ width: `${Math.min(percentage, 100)}%` }}
+          />
+        </div>
+      </div>
     );
   };
 
@@ -329,14 +356,16 @@ export default function UserManagement() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <span className={user.tiktok_count >= (user.limits?.max_tiktok_accounts ?? 5) ? 'text-destructive' : ''}>
-                            {user.tiktok_count}/{user.limits?.max_tiktok_accounts ?? 5}
-                          </span>
+                          <UsageProgressBar 
+                            current={user.tiktok_count} 
+                            max={user.limits?.max_tiktok_accounts ?? 5}
+                          />
                         </TableCell>
                         <TableCell>
-                          <span className={user.youtube_count >= (user.limits?.max_youtube_channels ?? 3) ? 'text-destructive' : ''}>
-                            {user.youtube_count}/{user.limits?.max_youtube_channels ?? 3}
-                          </span>
+                          <UsageProgressBar 
+                            current={user.youtube_count} 
+                            max={user.limits?.max_youtube_channels ?? 3}
+                          />
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {format(new Date(user.created_at), 'MMM d, yyyy')}
