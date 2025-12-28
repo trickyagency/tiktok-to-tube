@@ -14,6 +14,7 @@ import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useUploadHistory } from '@/hooks/useUploadHistory';
 import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle, AlertCircle, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
 
 const Dashboard = () => {
@@ -235,48 +236,57 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             {recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {recentActivity.map((item) => (
-                  <UploadLogDetails
-                    key={item.id}
-                    queueItemId={item.id}
-                    trigger={
-                      <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
-                        <div className="mt-0.5">
-                          {item.status === 'published' ? (
-                            <CheckCircle2 className="h-5 w-5 text-green-500" />
-                          ) : item.status === 'failed' ? (
-                            <XCircle className="h-5 w-5 text-destructive" />
-                          ) : item.status === 'processing' ? (
-                            <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
-                          ) : (
-                            <Clock className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {item.scraped_video?.title || 'Untitled Video'}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${
-                              item.status === 'published' 
-                                ? 'bg-success/10 text-success'
-                                : item.status === 'failed'
-                                  ? 'bg-destructive/10 text-destructive'
-                                  : 'bg-muted text-muted-foreground'
-                            }`}>
-                              {item.status}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(item.created_at), 'MMM d, h:mm a')}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    }
-                  />
-                ))}
-              </div>
+              <TooltipProvider>
+                <div className="space-y-4">
+                  {recentActivity.map((item) => (
+                    <UploadLogDetails
+                      key={item.id}
+                      queueItemId={item.id}
+                      trigger={
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                              <div className="mt-0.5">
+                                {item.status === 'published' ? (
+                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                ) : item.status === 'failed' ? (
+                                  <XCircle className="h-5 w-5 text-destructive" />
+                                ) : item.status === 'processing' ? (
+                                  <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
+                                ) : (
+                                  <Clock className="h-5 w-5 text-muted-foreground" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm truncate">
+                                  {item.scraped_video?.title || 'Untitled Video'}
+                                </p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                    item.status === 'published' 
+                                      ? 'bg-success/10 text-success'
+                                      : item.status === 'failed'
+                                        ? 'bg-destructive/10 text-destructive'
+                                        : 'bg-muted text-muted-foreground'
+                                  }`}>
+                                    {item.status}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {format(new Date(item.created_at), 'MMM d, h:mm a')}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top">
+                            <p>Uploaded to: {item.youtube_channel?.channel_title || 'Unknown Channel'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      }
+                    />
+                  ))}
+                </div>
+              </TooltipProvider>
             ) : (
               <div className="text-center py-8">
                 <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-3">
