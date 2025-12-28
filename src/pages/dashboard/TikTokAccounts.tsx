@@ -98,16 +98,6 @@ const TikTokAccounts = () => {
           </Alert>
         )}
 
-        {/* Info Alert - only show when Apify is configured */}
-        {isApifyConfigured && (
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              Videos are scraped using <strong>Apify</strong>. 
-              Images and 0-duration content are automatically filtered. Already-published videos won't be re-imported.
-            </AlertDescription>
-          </Alert>
-        )}
 
         {/* Header with Add Button */}
         <div className="flex flex-wrap justify-between items-center gap-2">
