@@ -12,7 +12,7 @@ export interface TourStep {
 export const TOUR_STEPS: TourStep[] = [
   {
     id: 'welcome',
-    title: 'Welcome to TrickyHub!',
+    title: 'Welcome to RepostFlow!',
     description: 'Let us show you around. This quick tour will help you get started with automating your TikTok to YouTube workflow.',
   },
   {

@@ -42,8 +42,8 @@ const Settings = () => {
   const [hasSavedKey, setHasSavedKey] = useState(false);
   
   // Email branding state
-  const [platformName, setPlatformName] = useState('TrickyHub');
-  const [senderName, setSenderName] = useState('TrickyHub');
+  const [platformName, setPlatformName] = useState('RepostFlow');
+  const [senderName, setSenderName] = useState('RepostFlow');
   const [senderEmail, setSenderEmail] = useState('onboarding@resend.dev');
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#18181b');
@@ -60,8 +60,8 @@ const Settings = () => {
       }
       
       // Load email branding settings
-      setPlatformName(getSetting('EMAIL_PLATFORM_NAME') || 'TrickyHub');
-      setSenderName(getSetting('EMAIL_SENDER_NAME') || 'TrickyHub');
+      setPlatformName(getSetting('EMAIL_PLATFORM_NAME') || 'RepostFlow');
+      setSenderName(getSetting('EMAIL_SENDER_NAME') || 'RepostFlow');
       setSenderEmail(getSetting('EMAIL_SENDER_ADDRESS') || 'onboarding@resend.dev');
       setLogoUrl(getSetting('EMAIL_LOGO_URL') || '');
       setPrimaryColor(getSetting('EMAIL_PRIMARY_COLOR') || '#18181b');
@@ -107,8 +107,8 @@ const Settings = () => {
   };
 
   const handleSaveBranding = () => {
-    updateSetting('EMAIL_PLATFORM_NAME', platformName.trim() || 'TrickyHub');
-    updateSetting('EMAIL_SENDER_NAME', senderName.trim() || 'TrickyHub');
+    updateSetting('EMAIL_PLATFORM_NAME', platformName.trim() || 'RepostFlow');
+    updateSetting('EMAIL_SENDER_NAME', senderName.trim() || 'RepostFlow');
     updateSetting('EMAIL_SENDER_ADDRESS', senderEmail.trim() || 'onboarding@resend.dev');
     updateSetting('EMAIL_LOGO_URL', logoUrl.trim());
     updateSetting('EMAIL_PRIMARY_COLOR', primaryColor);
@@ -284,7 +284,7 @@ const Settings = () => {
                       id="platform-name" 
                       value={platformName}
                       onChange={(e) => setPlatformName(e.target.value)}
-                      placeholder="TrickyHub"
+                      placeholder="RepostFlow"
                     />
                   </div>
                   <div className="space-y-2">
@@ -293,7 +293,7 @@ const Settings = () => {
                       id="sender-name" 
                       value={senderName}
                       onChange={(e) => setSenderName(e.target.value)}
-                      placeholder="TrickyHub"
+                      placeholder="RepostFlow"
                     />
                   </div>
                 </div>
@@ -376,7 +376,7 @@ const Settings = () => {
                 </div>
 
                 <EmailPreview 
-                  platformName={platformName || 'TrickyHub'}
+                  platformName={platformName || 'RepostFlow'}
                   logoUrl={logoUrl}
                   primaryColor={isValidHex(primaryColor) ? primaryColor : '#18181b'}
                   accentColor={isValidHex(accentColor) ? accentColor : '#3b82f6'}
