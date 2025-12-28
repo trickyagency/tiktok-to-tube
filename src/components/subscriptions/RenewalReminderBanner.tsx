@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { Clock, X, Package } from 'lucide-react';
+import { Clock, X, Package, MessageCircle } from 'lucide-react';
 import { useExpiringSubscriptions, ExpiringSubscription } from '@/hooks/useExpiringSubscriptions';
 import { differenceInHours, differenceInDays, format } from 'date-fns';
+import { generateWhatsAppLink } from '@/lib/whatsapp';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DISMISSAL_KEY = 'subscription-renewal-banner-dismissed';
 const DISMISSAL_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -22,6 +24,7 @@ export function RenewalReminderBanner({
 }: RenewalReminderBannerProps) {
   const { expiringSubscriptions, hasExpiringSubscriptions, isLoading } = useExpiringSubscriptions();
   const [isDismissed, setIsDismissed] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!showDismiss) return;
@@ -65,6 +68,18 @@ export function RenewalReminderBanner({
       return `${daysRemaining} days, ${remainingHours} hours remaining`;
     }
     return `${daysRemaining} days remaining`;
+  };
+
+  const handleRenewViaWhatsApp = (sub: ExpiringSubscription) => {
+    const whatsappLink = generateWhatsAppLink({
+      type: 'renew',
+      username: sub.tiktok_account?.username || 'unknown',
+      planName: sub.plan?.name || 'Plan',
+      planPrice: (sub.plan?.price_monthly || 0) / 100,
+      userEmail: user?.email,
+      expiryDate: sub.expires_at ? format(new Date(sub.expires_at), 'MMMM d, yyyy') : undefined,
+    });
+    window.open(whatsappLink, '_blank');
   };
 
   const isSingle = expiringSubscriptions.length === 1;
@@ -162,16 +177,27 @@ export function RenewalReminderBanner({
                   </p>
                 </div>
               </div>
-              {onRenewClick && (
+              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
                 <Button
                   size="sm"
                   variant="outline"
-                  className="shrink-0 border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
-                  onClick={() => onRenewClick(sub.tiktok_account_id)}
+                  className="border-green-500/50 text-green-600 hover:bg-green-500/10"
+                  onClick={() => handleRenewViaWhatsApp(sub)}
                 >
-                  Renew Now
+                  <MessageCircle className="h-4 w-4 mr-1" />
+                  WhatsApp
                 </Button>
-              )}
+                {onRenewClick && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-amber-500/50 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+                    onClick={() => onRenewClick(sub.tiktok_account_id)}
+                  >
+                    Renew Now
+                  </Button>
+                )}
+              </div>
             </div>
           ))}
         </div>

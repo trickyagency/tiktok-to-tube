@@ -13,7 +13,9 @@ import {
   Shield,
   Clock,
   TrendingUp,
+  MessageCircle,
 } from 'lucide-react';
+import { generateGeneralWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
 
 const plans = [
   {
@@ -95,6 +97,10 @@ const benefits = [
 export default function Pricing() {
   const navigate = useNavigate();
 
+  const handleWhatsAppContact = () => {
+    window.open(generateGeneralWhatsAppLink(), '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -107,6 +113,15 @@ export default function Pricing() {
             <span className="font-semibold text-lg">TikTok to YouTube</span>
           </div>
           <div className="flex items-center gap-4">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleWhatsAppContact}
+              className="hidden sm:flex gap-2 border-green-500/50 text-green-600 hover:bg-green-500/10"
+            >
+              <MessageCircle className="h-4 w-4" />
+              WhatsApp
+            </Button>
             <Button variant="ghost" onClick={() => navigate('/auth')}>
               Sign In
             </Button>
@@ -223,6 +238,32 @@ export default function Pricing() {
         </div>
       </section>
 
+      {/* WhatsApp Contact Section */}
+      <section className="py-12 border-t border-border/40 bg-green-500/5">
+        <div className="container">
+          <Card className="max-w-2xl mx-auto p-8 text-center border-green-500/30 bg-green-500/5">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-green-500/10 mb-4">
+              <MessageCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-2xl font-bold mb-2">Ready to Subscribe?</h2>
+            <p className="text-muted-foreground mb-6">
+              Contact us on WhatsApp to get started with your subscription!
+            </p>
+            <Button 
+              size="lg" 
+              onClick={handleWhatsAppContact}
+              className="bg-green-600 hover:bg-green-700 text-white"
+            >
+              <MessageCircle className="mr-2 h-5 w-5" />
+              Contact on WhatsApp
+            </Button>
+            <p className="text-sm text-muted-foreground mt-4">
+              {WHATSAPP_DISPLAY}
+            </p>
+          </Card>
+        </div>
+      </section>
+
       {/* Benefits */}
       <section className="py-20 border-t border-border/40 bg-muted/30">
         <div className="container">
@@ -262,15 +303,23 @@ export default function Pricing() {
               <h3 className="font-semibold mb-2">How does billing work?</h3>
               <p className="text-muted-foreground">
                 You pay a monthly subscription for each TikTok account you want to manage. 
-                After signing up, request a plan for your account and the owner will activate it 
-                after confirming your payment.
+                After signing up, request a plan for your account and complete payment via WhatsApp. 
+                Your subscription will be activated after payment confirmation.
+              </p>
+            </Card>
+            <Card className="p-6">
+              <h3 className="font-semibold mb-2">How do I pay?</h3>
+              <p className="text-muted-foreground">
+                Payment is handled via WhatsApp. When you subscribe or renew, you'll be redirected to 
+                WhatsApp with a pre-filled message containing your subscription details. Complete the 
+                payment as instructed, and your subscription will be activated within 24 hours.
               </p>
             </Card>
             <Card className="p-6">
               <h3 className="font-semibold mb-2">Can I change plans later?</h3>
               <p className="text-muted-foreground">
                 Yes! You can upgrade or downgrade your plan at any time. 
-                Simply request a plan change and it will be activated after payment confirmation.
+                Simply request a plan change via WhatsApp and it will be activated after payment confirmation.
               </p>
             </Card>
             <Card className="p-6">
@@ -278,14 +327,6 @@ export default function Pricing() {
               <p className="text-muted-foreground">
                 This is the maximum number of videos that can be uploaded from one TikTok account 
                 to YouTube per day. Basic allows 2, Pro allows 4, and Scale allows 6 videos daily.
-              </p>
-            </Card>
-            <Card className="p-6">
-              <h3 className="font-semibold mb-2">How do I pay?</h3>
-              <p className="text-muted-foreground">
-                Payment is handled directly with the platform owner. After submitting a subscription 
-                request, you'll receive payment instructions. Once payment is confirmed, your 
-                subscription will be activated.
               </p>
             </Card>
           </div>
@@ -299,10 +340,21 @@ export default function Pricing() {
           <p className="text-muted-foreground mb-8 max-w-xl mx-auto">
             Start repurposing your TikTok content to YouTube today and reach a whole new audience.
           </p>
-          <Button size="lg" onClick={() => navigate('/auth')}>
-            Get Started Free
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Button size="lg" onClick={() => navigate('/auth')}>
+              Get Started Free
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              onClick={handleWhatsAppContact}
+              className="border-green-500/50 text-green-600 hover:bg-green-500/10"
+            >
+              <MessageCircle className="mr-2 h-4 w-4" />
+              Contact WhatsApp
+            </Button>
+          </div>
         </div>
       </section>
 
