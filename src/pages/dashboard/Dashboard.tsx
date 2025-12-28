@@ -5,6 +5,7 @@ import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons';
 import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
+import { UploadLogDetails } from '@/components/history/UploadLogDetails';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -12,7 +13,7 @@ import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useUploadHistory } from '@/hooks/useUploadHistory';
-import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle, AlertCircle, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 
 const Dashboard = () => {
@@ -236,27 +237,44 @@ const Dashboard = () => {
             {recentActivity.length > 0 ? (
               <div className="space-y-4">
                 {recentActivity.map((item) => (
-                  <div key={item.id} className="flex items-start gap-4 p-3 rounded-lg bg-muted/30">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">
-                        {item.scraped_video?.title || 'Untitled Video'}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          item.status === 'published' 
-                            ? 'bg-success/10 text-success'
-                            : item.status === 'failed'
-                              ? 'bg-destructive/10 text-destructive'
-                              : 'bg-muted text-muted-foreground'
-                        }`}>
-                          {item.status}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(item.created_at), 'MMM d, h:mm a')}
-                        </span>
+                  <UploadLogDetails
+                    key={item.id}
+                    queueItemId={item.id}
+                    trigger={
+                      <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
+                        <div className="mt-0.5">
+                          {item.status === 'published' ? (
+                            <CheckCircle2 className="h-5 w-5 text-green-500" />
+                          ) : item.status === 'failed' ? (
+                            <XCircle className="h-5 w-5 text-destructive" />
+                          ) : item.status === 'processing' ? (
+                            <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {item.scraped_video?.title || 'Untitled Video'}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${
+                              item.status === 'published' 
+                                ? 'bg-success/10 text-success'
+                                : item.status === 'failed'
+                                  ? 'bg-destructive/10 text-destructive'
+                                  : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {item.status}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(item.created_at), 'MMM d, h:mm a')}
+                            </span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    }
+                  />
                 ))}
               </div>
             ) : (
