@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
       following_count: userInfo.followingCount,
       video_count: userInfo.videoCount,
       updated_at: new Date().toISOString(),
+      last_profile_synced_at: new Date().toISOString(),
     };
 
     let savedAccount;
