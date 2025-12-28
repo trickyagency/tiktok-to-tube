@@ -19,7 +19,7 @@ export function useUploadHistory(selectedChannelId?: string) {
         .select(`
           *,
           scraped_video:scraped_videos(id, title, thumbnail_url, video_url, download_url, tiktok_account_id),
-          youtube_channel:youtube_channels(id, channel_id, channel_title, channel_thumbnail, tiktok_account_id)
+          youtube_channel:youtube_channels(id, channel_id, channel_handle, channel_title, channel_thumbnail, tiktok_account_id)
         `)
         .eq('user_id', user.id)
         .eq('status', 'published')

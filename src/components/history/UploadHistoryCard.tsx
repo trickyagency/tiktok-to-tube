@@ -59,7 +59,7 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
                     </Button>
                   }
                 />
-                {item.youtube_channel?.channel_id && (
+                {(item.youtube_channel?.channel_handle || item.youtube_channel?.channel_id) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -67,7 +67,9 @@ const UploadHistoryCard = ({ item }: UploadHistoryCardProps) => {
                     asChild
                   >
                     <a
-                      href={`https://www.youtube.com/channel/${item.youtube_channel.channel_id}`}
+                      href={item.youtube_channel.channel_handle 
+                        ? `https://www.youtube.com/${item.youtube_channel.channel_handle}`
+                        : `https://www.youtube.com/channel/${item.youtube_channel.channel_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
