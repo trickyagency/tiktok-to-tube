@@ -316,6 +316,50 @@ async function updateWithRetry(
   return false;
 }
 
+// ============= User Validation =============
+
+async function validateUserOwnership(
+  supabase: any, 
+  queueItem: any
+): Promise<{ valid: boolean; error?: string }> {
+  const queueUserId = queueItem.user_id;
+  
+  // Fetch video and verify user ownership
+  const { data: video, error: videoError } = await supabase
+    .from('scraped_videos')
+    .select('user_id')
+    .eq('id', queueItem.scraped_video_id)
+    .single();
+  
+  if (videoError || !video) {
+    return { valid: false, error: `Video not found: ${videoError?.message}` };
+  }
+  
+  if (video.user_id !== queueUserId) {
+    console.error(`SECURITY: User mismatch! Queue user_id=${queueUserId}, Video user_id=${video.user_id}`);
+    return { valid: false, error: 'Security violation: Video does not belong to queue owner' };
+  }
+  
+  // Fetch channel and verify user ownership
+  const { data: channel, error: channelError } = await supabase
+    .from('youtube_channels')
+    .select('user_id')
+    .eq('id', queueItem.youtube_channel_id)
+    .single();
+  
+  if (channelError || !channel) {
+    return { valid: false, error: `Channel not found: ${channelError?.message}` };
+  }
+  
+  if (channel.user_id !== queueUserId) {
+    console.error(`SECURITY: User mismatch! Queue user_id=${queueUserId}, Channel user_id=${channel.user_id}`);
+    return { valid: false, error: 'Security violation: Channel does not belong to queue owner' };
+  }
+  
+  console.log(`User ownership validated for queue item ${queueItem.id} (user: ${queueUserId})`);
+  return { valid: true };
+}
+
 // ============= Main Processing =============
 
 async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
@@ -324,6 +368,21 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
   const attemptNumber = (queueItem.retry_count || 0) + 1;
   
   console.log(`Processing queue item: ${queueId} (attempt ${attemptNumber})`);
+
+  // SECURITY: Validate that video, channel, and queue item all belong to the same user
+  const ownershipCheck = await validateUserOwnership(supabase, queueItem);
+  if (!ownershipCheck.valid) {
+    console.error(`Ownership validation failed for queue item ${queueId}: ${ownershipCheck.error}`);
+    await supabase
+      .from('publish_queue')
+      .update({
+        status: 'failed',
+        error_message: ownershipCheck.error,
+        progress_phase: 'validation_failed',
+      })
+      .eq('id', queueId);
+    return;
+  }
 
   // Check quota availability BEFORE processing
   const quotaCheck = await checkQuotaAvailable(supabase, queueItem.youtube_channel_id);
