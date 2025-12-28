@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle } from 'lucide-react';
-import { TikTokAccount, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
+import { TikTokAccount, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { formatDistanceToNow } from 'date-fns';
 
 interface TikTokAccountCardProps {
@@ -16,18 +16,24 @@ interface TikTokAccountCardProps {
 }
 
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
+  const scrapeVideos = useScrapeVideos();
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
   const resetAccount = useResetTikTokAccount();
 
-  const isScraping = account.scrape_status === 'scraping' || refreshAccount.isPending;
+  const isScraping = account.scrape_status === 'scraping' || scrapeVideos.isPending;
+  const isRefreshing = refreshAccount.isPending;
   
   // Progress tracking
   const progressCurrent = account.scrape_progress_current || 0;
   const progressTotal = account.scrape_progress_total || 0;
   const progressPercentage = progressTotal > 0 ? Math.round((progressCurrent / progressTotal) * 100) : 0;
 
-  const handleRefresh = () => {
+  const handleScrapeVideos = () => {
+    scrapeVideos.mutate({ accountId: account.id, username: account.username });
+  };
+
+  const handleSyncProfile = () => {
     refreshAccount.mutate({ accountId: account.id, username: account.username });
   };
 
@@ -90,10 +96,10 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                   Failed
                 </Badge>
               )}
-              {!isScraping && !account.avatar_url && account.follower_count === 0 && account.scrape_status !== 'pending' && (
+              {!isScraping && account.scrape_status === 'pending' && (
                 <Badge variant="outline" className="shrink-0 text-amber-600 border-amber-600/30">
                   <AlertCircle className="h-3 w-3 mr-1" />
-                  Profile not synced
+                  Videos not scraped
                 </Badge>
               )}
             </div>
@@ -173,14 +179,14 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Scrape Now Button */}
+            {/* Scrape Now Button - uses Apify */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="default"
                     size="sm"
-                    onClick={handleRefresh}
+                    onClick={handleScrapeVideos}
                     disabled={isScraping || !isApifyConfigured}
                     className="shrink-0"
                   >
@@ -216,8 +222,12 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                 Open TikTok Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleRefresh} disabled={isScraping}>
-                <RefreshCw className="h-4 w-4 mr-2" />
+              <DropdownMenuItem onClick={handleSyncProfile} disabled={isRefreshing || isScraping}>
+                {isRefreshing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
                 Sync Profile
               </DropdownMenuItem>
               {isScraping && (

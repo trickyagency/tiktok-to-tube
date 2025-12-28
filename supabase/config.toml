@@ -1,5 +1,8 @@
 project_id = "qpufyeeqosvgipslwday"
 
+[functions.tikwm-profile]
+verify_jwt = false
+
 [functions.tikwm-scraper]
 verify_jwt = false
 
