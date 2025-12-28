@@ -44,6 +44,23 @@ async function refreshAccessToken(supabase: any, channel: any): Promise<string> 
     const tokenData = await tokenResponse.json();
 
     if (tokenData.error) {
+      console.error('Token refresh error:', tokenData);
+      
+      // Check if this is a revoked token error
+      const revokedErrors = ['invalid_grant', 'unauthorized_client', 'access_denied'];
+      if (revokedErrors.includes(tokenData.error)) {
+        console.log('Token appears to be revoked, updating channel auth_status to token_revoked...');
+        
+        // Update channel auth_status to 'token_revoked'
+        await supabase
+          .from('youtube_channels')
+          .update({
+            auth_status: 'token_revoked',
+            is_connected: false,
+          })
+          .eq('id', channel.id);
+      }
+      
       throw new Error(`Token refresh failed: ${tokenData.error_description || tokenData.error}`);
     }
 
