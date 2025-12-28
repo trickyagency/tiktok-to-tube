@@ -107,7 +107,8 @@ async function uploadToYouTube(
   videoBlob: Blob,
   title: string,
   description: string,
-  privacyStatus: string
+  privacyStatus: string,
+  videoDuration: number
 ): Promise<{ videoId: string; videoUrl: string }> {
   console.log('Starting YouTube upload...');
 
@@ -171,9 +172,15 @@ async function uploadToYouTube(
   const uploadResult = await uploadResponse.json();
   console.log('Video uploaded successfully:', uploadResult.id);
 
+  // Use Shorts URL for videos <= 60 seconds, otherwise regular watch URL
+  const isShort = videoDuration > 0 && videoDuration <= 60;
+  const videoUrl = isShort
+    ? `https://www.youtube.com/shorts/${uploadResult.id}`
+    : `https://www.youtube.com/watch?v=${uploadResult.id}`;
+
   return {
     videoId: uploadResult.id,
-    videoUrl: `https://www.youtube.com/watch?v=${uploadResult.id}`,
+    videoUrl,
   };
 }
 
@@ -268,7 +275,8 @@ serve(async (req) => {
       videoBlob,
       title,
       description,
-      privacyStatus
+      privacyStatus,
+      video.duration || 0
     );
 
     // Update scraped_videos to mark as published
