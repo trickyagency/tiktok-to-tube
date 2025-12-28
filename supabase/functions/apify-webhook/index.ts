@@ -21,6 +21,20 @@ interface ApifyVideoData {
   videoUrlNoWaterMark?: string;
   videoPlayUrl?: string;
   downloadAddr?: string;
+  // Author/profile metadata
+  authorMeta?: {
+    avatar?: string;
+    fans?: number;
+    following?: number;
+    nickname?: string;
+    name?: string;
+  };
+  // Alternative profile fields from different scraper versions
+  authorAvatar?: string;
+  authorName?: string;
+  authorNickname?: string;
+  authorFans?: number;
+  authorFollowing?: number;
 }
 
 // Extract video ID from TikTok URL
@@ -303,6 +317,25 @@ Deno.serve(async (req) => {
       completed_at: new Date().toISOString(),
     }).eq('id', runRecord.id);
 
+    // Extract profile data from the first video item (contains author metadata)
+    const profileData = validVideos[0];
+    const avatarUrl = profileData?.authorMeta?.avatar 
+      || profileData?.authorAvatar 
+      || null;
+    const followerCount = profileData?.authorMeta?.fans 
+      || profileData?.authorFans 
+      || 0;
+    const followingCount = profileData?.authorMeta?.following 
+      || profileData?.authorFollowing 
+      || 0;
+    const displayName = profileData?.authorMeta?.nickname 
+      || profileData?.authorMeta?.name
+      || profileData?.authorNickname
+      || profileData?.authorName
+      || null;
+
+    console.log(`[Webhook] Profile data - avatar: ${!!avatarUrl}, followers: ${followerCount}, name: ${displayName}`);
+
     await supabase.from('tiktok_accounts').update({
       scrape_status: 'completed',
       last_scraped_at: new Date().toISOString(),
@@ -310,6 +343,11 @@ Deno.serve(async (req) => {
       scrape_progress_current: newVideos.length,
       scrape_progress_total: newVideos.length,
       updated_at: new Date().toISOString(),
+      // Profile data from scraped videos
+      ...(avatarUrl && { avatar_url: avatarUrl }),
+      ...(followerCount > 0 && { follower_count: followerCount }),
+      ...(followingCount > 0 && { following_count: followingCount }),
+      ...(displayName && { display_name: displayName }),
     }).eq('id', accountId);
 
     console.log(`[Webhook] Completed! Imported ${importedCount} videos`);
