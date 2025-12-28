@@ -165,14 +165,14 @@ serve(async (req) => {
       throw new Error("An invitation is already pending for this email");
     }
 
-    // Get the origin for redirect URL
-    const origin = req.headers.get("origin") || "https://qpufyeeqosvgipslwday.lovableproject.com";
+    // Use production domain for redirect URL (configurable via SITE_URL env var)
+    const PRODUCTION_URL = Deno.env.get("SITE_URL") || "https://repostflow.digitalautomators.com";
 
     // Generate invite using Supabase Auth Admin API
     const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       email,
       {
-        redirectTo: `${origin}/auth?type=invite`,
+        redirectTo: `${PRODUCTION_URL}/auth?type=invite`,
       }
     );
 
