@@ -39,18 +39,12 @@ const Dashboard = () => {
   const completedCount = uploadHistory.length;
 
   // Check for YouTube channels that need reconnection
-  const channelsNeedingReconnect = youtubeChannels.filter(channel => {
-    const isTokenExpired = channel.token_expires_at 
-      ? new Date(channel.token_expires_at) < new Date() 
-      : false;
-      
-    return (
-      channel.auth_status === 'failed' || 
-      channel.auth_status === 'token_revoked' ||
-      (channel.auth_status === 'connected' && !channel.refresh_token) ||
-      (channel.auth_status === 'connected' && isTokenExpired)
-    );
-  });
+  // Check for YouTube channels that need reconnection (only when refresh token is revoked, not when access token expires)
+  const channelsNeedingReconnect = youtubeChannels.filter(channel => 
+    channel.auth_status === 'failed' || 
+    channel.auth_status === 'token_revoked' ||
+    (channel.auth_status === 'connected' && !channel.refresh_token)
+  );
 
   const stats = [
     { 
