@@ -13,6 +13,8 @@ import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDial
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
+import { ScrapeQueueProgress } from '@/components/tiktok/ScrapeQueueProgress';
+import { ScrapeAllAccountsButton } from '@/components/tiktok/ScrapeAllAccountsButton';
 
 const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
@@ -95,10 +97,14 @@ const TikTokAccounts = () => {
         )}
 
 
+        {/* Scrape Queue Progress */}
+        <ScrapeQueueProgress />
+
         {/* Header with Add Button */}
         <div className="flex flex-wrap justify-between items-center gap-2">
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
           <div className="flex flex-wrap gap-2">
+            <ScrapeAllAccountsButton disabled={!isApifyConfigured} />
             <BulkAccountImport />
             <AddTikTokAccountDialog />
           </div>

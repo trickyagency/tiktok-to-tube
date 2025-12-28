@@ -382,6 +382,68 @@ export type Database = {
           },
         ]
       }
+      scrape_queue: {
+        Row: {
+          attempts: number | null
+          completed_at: string | null
+          created_at: string
+          error_message: string | null
+          id: string
+          max_attempts: number | null
+          priority: number | null
+          scheduled_at: string
+          started_at: string | null
+          status: string
+          tiktok_account_id: string
+          updated_at: string
+          user_id: string
+          videos_found: number | null
+          videos_imported: number | null
+        }
+        Insert: {
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          max_attempts?: number | null
+          priority?: number | null
+          scheduled_at?: string
+          started_at?: string | null
+          status?: string
+          tiktok_account_id: string
+          updated_at?: string
+          user_id: string
+          videos_found?: number | null
+          videos_imported?: number | null
+        }
+        Update: {
+          attempts?: number | null
+          completed_at?: string | null
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          max_attempts?: number | null
+          priority?: number | null
+          scheduled_at?: string
+          started_at?: string | null
+          status?: string
+          tiktok_account_id?: string
+          updated_at?: string
+          user_id?: string
+          videos_found?: number | null
+          videos_imported?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scrape_queue_tiktok_account_id_fkey"
+            columns: ["tiktok_account_id"]
+            isOneToOne: false
+            referencedRelation: "tiktok_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       scraped_videos: {
         Row: {
           comment_count: number | null
