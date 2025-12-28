@@ -32,3 +32,6 @@ verify_jwt = false
 
 [functions.apify-validate]
 verify_jwt = false
+
+[functions.delete-user]
+verify_jwt = false
