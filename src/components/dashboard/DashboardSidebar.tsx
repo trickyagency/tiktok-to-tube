@@ -27,7 +27,6 @@ import {
   Settings,
   LogOut,
   Sparkles,
-  Clock,
   Users,
   BarChart3,
   ChevronRight,
@@ -85,7 +84,6 @@ const DashboardSidebar = () => {
   ];
 
   const adminMenuItems: MenuItem[] = [
-    { title: 'Cron Monitor', url: '/dashboard/cron', icon: Clock },
     { title: 'Users', url: '/dashboard/users', icon: Users, ownerOnly: true },
     { title: 'Subscriptions', url: '/dashboard/subscriptions', icon: Zap, ownerOnly: true },
     { title: 'Platform Stats', url: '/dashboard/analytics', icon: Activity, ownerOnly: true },
