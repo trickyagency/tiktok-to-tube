@@ -37,7 +37,24 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const action = url.searchParams.get('action');
+  
+  // Support both GET query params and POST JSON body
+  let action = url.searchParams.get('action');
+  let channelId = url.searchParams.get('channel_id');
+  let redirectUrl = url.searchParams.get('redirect_url');
+  
+  // If POST request, parse JSON body and use those values
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json();
+      action = body.action || action;
+      channelId = body.channel_id || channelId;
+      redirectUrl = body.redirect_url || redirectUrl;
+      console.log('POST request received:', { action, channelId });
+    } catch (e) {
+      console.error('Failed to parse POST body:', e);
+    }
+  }
 
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -47,8 +64,7 @@ serve(async (req) => {
     // Initiates OAuth flow for a specific channel
     // ============================================
     if (action === 'start-auth') {
-      const channelId = url.searchParams.get('channel_id');
-      const redirectUrl = url.searchParams.get('redirect_url'); // Where to redirect after success
+      // channelId and redirectUrl already parsed from query params or POST body above
 
       if (!channelId) {
         return new Response(JSON.stringify({ error: 'channel_id is required' }), {
@@ -353,7 +369,7 @@ serve(async (req) => {
     // Refreshes access token for a channel
     // ============================================
     if (action === 'refresh-token') {
-      const channelId = url.searchParams.get('channel_id');
+      // channelId already parsed from query params or POST body above
 
       if (!channelId) {
         return new Response(JSON.stringify({ error: 'channel_id is required' }), {
@@ -452,7 +468,7 @@ serve(async (req) => {
     // Polls to check if a YouTube channel now exists
     // ============================================
     if (action === 'check-channel') {
-      const channelId = url.searchParams.get('channel_id');
+      // channelId already parsed from query params or POST body above
 
       if (!channelId) {
         return new Response(JSON.stringify({ error: 'channel_id is required' }), {
