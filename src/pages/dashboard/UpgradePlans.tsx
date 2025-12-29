@@ -14,7 +14,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ArrowLeft, Check, ChevronDown, MessageCircle } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { ArrowLeft, Check, ChevronDown, MessageCircle, HelpCircle } from 'lucide-react';
 
 export default function UpgradePlans() {
   const { data: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
@@ -375,6 +376,72 @@ export default function UpgradePlans() {
             </CollapsibleContent>
           </Card>
         </Collapsible>
+
+        {/* FAQ Section */}
+        <Card className="mt-8">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <HelpCircle className="h-5 w-5" />
+              Frequently Asked Questions
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="billing">
+                <AccordionTrigger className="text-left">How does billing work?</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  You're billed per TikTok account. Each account requires its own subscription. 
+                  Billing occurs monthly on the date you subscribed. You can choose between monthly 
+                  or annual billing, with annual plans saving you 20%.
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="cancel">
+                <AccordionTrigger className="text-left">Can I cancel anytime?</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  Yes, you can cancel your subscription at any time. There's no long-term commitment 
+                  required. When you cancel, you'll continue to have access until the end of your 
+                  current billing period.
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="upgrade">
+                <AccordionTrigger className="text-left">What happens when I upgrade?</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  Your new plan takes effect immediately. You'll be charged the prorated difference 
+                  for the remainder of your current billing period. All the new features will be 
+                  available right away.
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="refunds">
+                <AccordionTrigger className="text-left">Do you offer refunds?</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  We offer refunds within 7 days of purchase if you're not satisfied with the service. 
+                  Contact us via WhatsApp to request a refund, and we'll process it promptly.
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="volume">
+                <AccordionTrigger className="text-left">How do volume discounts work?</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  Add more accounts to automatically unlock bigger discounts. With 3-5 accounts you 
+                  save 10%, with 6-10 accounts you save 25%, and with 11+ accounts you can save up 
+                  to 50% off the regular price. Use the slider above to see your potential savings.
+                </AccordionContent>
+              </AccordionItem>
+              
+              <AccordionItem value="payment">
+                <AccordionTrigger className="text-left">What payment methods do you accept?</AccordionTrigger>
+                <AccordionContent className="text-muted-foreground">
+                  We process payments through WhatsApp checkout for a personalized experience. We 
+                  accept all major payment methods including credit cards, debit cards, and bank 
+                  transfers depending on your region.
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </CardContent>
+        </Card>
 
         {/* Footer */}
         <div className="text-center mt-12 space-y-4">
