@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -6,14 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Zap, Calendar } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX } from 'lucide-react';
 import { TikTokAccount, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
-import { useAccountSubscription } from '@/hooks/useSubscriptions';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
-import { SubscriptionBadge } from '@/components/subscriptions/SubscriptionBadge';
-import { SubscriptionDialog } from '@/components/subscriptions/SubscriptionDialog';
-import { formatDistanceToNow, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 
 interface TikTokAccountCardProps {
   account: TikTokAccount;
@@ -22,13 +18,11 @@ interface TikTokAccountCardProps {
 }
 
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
-  const [subscriptionDialogOpen, setSubscriptionDialogOpen] = useState(false);
   const scrapeVideos = useScrapeVideos();
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
   const resetAccount = useResetTikTokAccount();
   const { data: publishedCount = 0 } = usePublishedVideosCount(account.id);
-  const { data: subscription } = useAccountSubscription(account.id);
   const { data: limits } = useUserAccountLimits();
   
   const subscriptionStatus = limits?.subscriptionStatus ?? 'none';
@@ -104,26 +98,6 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               <h3 className="font-semibold truncate">
                 {account.display_name || account.username}
               </h3>
-              <SubscriptionBadge
-                planId={subscription?.plan_id}
-                status={subscription?.status}
-                size="sm"
-              />
-              {subscription?.status === 'active' && subscription?.expires_at && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Badge variant="outline" className="shrink-0 text-muted-foreground text-xs">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {format(new Date(subscription.expires_at), 'MMM d')}
-                      </Badge>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Subscription expires {format(new Date(subscription.expires_at), 'MMM d, yyyy')}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
               {isScraping && (
                 <Badge variant="secondary" className="shrink-0 animate-pulse">
                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -298,25 +272,6 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               </Tooltip>
             </TooltipProvider>
 
-            {/* Subscribe Button */}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={subscription ? 'outline' : 'secondary'}
-                    size="sm"
-                    onClick={() => setSubscriptionDialogOpen(true)}
-                    className="shrink-0"
-                  >
-                    <Zap className="h-4 w-4 mr-1" />
-                    {subscription?.status === 'active' ? 'Plan' : subscription?.status === 'pending' ? 'Pending' : 'Subscribe'}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{subscription ? 'Manage subscription' : 'Subscribe to a plan'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -362,14 +317,6 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
         </div>
       </CardContent>
 
-      {/* Subscription Dialog */}
-      <SubscriptionDialog
-        open={subscriptionDialogOpen}
-        onOpenChange={setSubscriptionDialogOpen}
-        tiktokAccountId={account.id}
-        tiktokUsername={account.username}
-        currentSubscription={subscription}
-      />
     </Card>
   );
 }
