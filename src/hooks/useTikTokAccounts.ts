@@ -21,6 +21,8 @@ export interface TikTokAccount {
   scrape_progress_current?: number;
   scrape_progress_total?: number;
   account_status: 'active' | 'private' | 'deleted' | 'not_found';
+  youtube_description: string | null;
+  youtube_tags: string | null;
 }
 
 export function useTikTokAccounts() {

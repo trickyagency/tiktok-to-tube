@@ -437,6 +437,17 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       throw new Error('Video has no download URL');
     }
 
+    // Fetch TikTok account for YouTube description settings
+    const { data: tiktokAccount, error: tiktokAccountError } = await supabase
+      .from('tiktok_accounts')
+      .select('youtube_description, youtube_tags')
+      .eq('id', video.tiktok_account_id)
+      .single();
+
+    if (tiktokAccountError) {
+      console.warn(`Could not fetch TikTok account settings: ${tiktokAccountError.message}`);
+    }
+
     // Fetch channel with credentials
     currentPhase = 'fetching_channel';
     const { data: channel, error: channelError } = await supabase
@@ -550,13 +561,27 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       .update({ progress_phase: 'uploading', progress_percentage: 40 })
       .eq('id', queueId);
 
+    // Build video description with account settings
+    // Format: Title (3 times) + Account Description + Account Tags
+    const videoTitle = currentVideo.title || 'TikTok Video';
+    const accountDescription = tiktokAccount?.youtube_description || '';
+    const accountTags = tiktokAccount?.youtube_tags || '';
+    
+    let finalDescription = `${videoTitle}\n${videoTitle}\n${videoTitle}`;
+    if (accountDescription) {
+      finalDescription += `\n\n${accountDescription}`;
+    }
+    if (accountTags) {
+      finalDescription += `\n\n${accountTags}`;
+    }
+
     // Upload to YouTube
     console.log(`Uploading to YouTube for queue item ${queueId}...`);
     const uploadResult = await uploadToYouTube(
       accessToken,
       downloadResult.blob,
-      currentVideo.title || 'TikTok Video',
-      currentVideo.description || '',
+      videoTitle,
+      finalDescription.trim(),
       'public',
       currentVideo.duration || 0
     );

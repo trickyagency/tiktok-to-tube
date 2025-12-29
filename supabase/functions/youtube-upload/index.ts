@@ -243,6 +243,17 @@ serve(async (req) => {
       throw new Error('Video has no download URL');
     }
 
+    // Fetch TikTok account for YouTube description settings
+    const { data: tiktokAccount, error: tiktokAccountError } = await supabase
+      .from('tiktok_accounts')
+      .select('youtube_description, youtube_tags')
+      .eq('id', video.tiktok_account_id)
+      .single();
+
+    if (tiktokAccountError) {
+      console.warn(`Could not fetch TikTok account settings: ${tiktokAccountError.message}`);
+    }
+
     // Fetch YouTube channel with credentials
     const { data: channel, error: channelError } = await supabase
       .from('youtube_channels')
@@ -264,17 +275,28 @@ serve(async (req) => {
     // Download video from TikWM
     const videoBlob = await downloadVideo(video.download_url);
 
-    // Prepare video metadata
-    const title = body.title || video.title || 'TikTok Video';
-    const description = body.description || video.description || '';
+    // Build video description with account settings
+    // Format: Title (3 times) + Account Description + Account Tags
+    const videoTitle = body.title || video.title || 'TikTok Video';
+    const accountDescription = tiktokAccount?.youtube_description || '';
+    const accountTags = tiktokAccount?.youtube_tags || '';
+    
+    let finalDescription = `${videoTitle}\n${videoTitle}\n${videoTitle}`;
+    if (accountDescription) {
+      finalDescription += `\n\n${accountDescription}`;
+    }
+    if (accountTags) {
+      finalDescription += `\n\n${accountTags}`;
+    }
+
     const privacyStatus = body.privacy_status || 'public';
 
     // Upload to YouTube
     const { videoId, videoUrl } = await uploadToYouTube(
       accessToken,
       videoBlob,
-      title,
-      description,
+      videoTitle,
+      finalDescription.trim(),
       privacyStatus,
       video.duration || 0
     );
