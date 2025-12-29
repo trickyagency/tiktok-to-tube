@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { CopyableUrl } from '@/components/ui/copyable-url';
 import { ChevronDown, ChevronUp, BookOpen, ExternalLink } from 'lucide-react';
 
-const REDIRECT_URI = 'https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=callback';
-const JAVASCRIPT_ORIGIN = 'https://qpufyeeqosvgipslwday.supabase.co';
+const REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
+const JAVASCRIPT_ORIGIN = 'https://repostflow.digitalautomators.com';
 
 export function GoogleCloudSetupGuide() {
   const [isOpen, setIsOpen] = useState(true);
