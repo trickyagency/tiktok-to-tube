@@ -19,12 +19,12 @@ Deno.serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Find all active subscriptions where expires_at has passed
+    // Find all active user subscriptions where expires_at has passed
     const now = new Date().toISOString();
     
     const { data: expiredSubscriptions, error: fetchError } = await supabase
-      .from('account_subscriptions')
-      .select('id, tiktok_account_id, expires_at')
+      .from('user_subscriptions')
+      .select('id, user_id, plan_id, expires_at')
       .eq('status', 'active')
       .lt('expires_at', now);
 
@@ -33,14 +33,14 @@ Deno.serve(async (req) => {
       throw fetchError;
     }
 
-    console.log(`Found ${expiredSubscriptions?.length || 0} expired subscriptions to update`);
+    console.log(`Found ${expiredSubscriptions?.length || 0} expired user subscriptions to update`);
 
     if (expiredSubscriptions && expiredSubscriptions.length > 0) {
       // Update all expired subscriptions to 'expired' status
       const expiredIds = expiredSubscriptions.map(s => s.id);
       
       const { error: updateError } = await supabase
-        .from('account_subscriptions')
+        .from('user_subscriptions')
         .update({ 
           status: 'expired',
           updated_at: now
@@ -52,18 +52,34 @@ Deno.serve(async (req) => {
         throw updateError;
       }
 
-      console.log(`Successfully marked ${expiredIds.length} subscriptions as expired`);
+      console.log(`Successfully marked ${expiredIds.length} user subscriptions as expired`);
 
       // Log each expired subscription
       for (const sub of expiredSubscriptions) {
-        console.log(`Expired: subscription ${sub.id} for account ${sub.tiktok_account_id}, was set to expire at ${sub.expires_at}`);
+        console.log(`Expired: user subscription ${sub.id} for user ${sub.user_id}, was set to expire at ${sub.expires_at}`);
+      }
+
+      // Also update corresponding user_limits to reset account_count
+      const userIds = expiredSubscriptions.map(s => s.user_id);
+      const { error: limitsError } = await supabase
+        .from('user_limits')
+        .update({ 
+          max_accounts: 0,
+          updated_at: now
+        })
+        .in('user_id', userIds);
+
+      if (limitsError) {
+        console.error('Error updating user limits:', limitsError);
+      } else {
+        console.log(`Reset account limits for ${userIds.length} users`);
       }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed ${expiredSubscriptions?.length || 0} expired subscriptions`,
+        message: `Processed ${expiredSubscriptions?.length || 0} expired user subscriptions`,
         expiredCount: expiredSubscriptions?.length || 0,
         timestamp: now
       }),
