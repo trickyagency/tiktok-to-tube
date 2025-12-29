@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw, Loader2, AlertTriangle, Trash2 } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw, Loader2, AlertTriangle, Trash2, Camera, X } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useEmailPreferences } from '@/hooks/useEmailPreferences';
@@ -45,6 +46,8 @@ const Settings = () => {
   // Profile state
   const [fullName, setFullName] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   
   // Email branding state
   const [platformName, setPlatformName] = useState('RepostFlow');
@@ -54,11 +57,24 @@ const Settings = () => {
   const [primaryColor, setPrimaryColor] = useState('#18181b');
   const [accentColor, setAccentColor] = useState('#3b82f6');
   
-  // Sync fullName from user metadata
+  // Sync fullName and avatar from user data
   useEffect(() => {
     if (user?.user_metadata?.full_name) {
       setFullName(user.user_metadata.full_name);
     }
+    // Fetch avatar from profiles table
+    const fetchAvatar = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .single();
+      if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    };
+    fetchAvatar();
   }, [user]);
 
   useEffect(() => {
@@ -144,6 +160,99 @@ const Settings = () => {
     }
   };
 
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user?.id) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a JPEG, PNG, or WebP image');
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image must be less than 2MB');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${user.id}/avatar.${fileExt}`;
+
+      // Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+
+      // Update profiles table
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ avatar_url: publicUrl })
+        .eq('user_id', user.id);
+
+      if (updateError) throw updateError;
+
+      setAvatarUrl(publicUrl);
+      toast.success('Profile picture updated');
+    } catch (error) {
+      console.error('Failed to upload avatar:', error);
+      toast.error('Failed to upload profile picture');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const handleRemoveAvatar = async () => {
+    if (!user?.id) return;
+
+    setIsUploadingAvatar(true);
+    try {
+      // List and delete all files in user's avatar folder
+      const { data: files } = await supabase.storage
+        .from('avatars')
+        .list(user.id);
+
+      if (files && files.length > 0) {
+        const filesToDelete = files.map(f => `${user.id}/${f.name}`);
+        await supabase.storage.from('avatars').remove(filesToDelete);
+      }
+
+      // Clear avatar URL in profiles
+      await supabase
+        .from('profiles')
+        .update({ avatar_url: null })
+        .eq('user_id', user.id);
+
+      setAvatarUrl(null);
+      toast.success('Profile picture removed');
+    } catch (error) {
+      console.error('Failed to remove avatar:', error);
+      toast.error('Failed to remove profile picture');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
+
+  const getUserInitials = () => {
+    if (fullName) {
+      return fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
+
   const isValidHex = (color: string) => /^#[0-9A-Fa-f]{6}$/.test(color);
 
   return (
@@ -160,7 +269,51 @@ const Settings = () => {
             </CardTitle>
             <CardDescription>Your account information</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
+            {/* Avatar Upload */}
+            <div className="flex items-center gap-4">
+              <div className="relative group">
+                <Avatar className="h-20 w-20 border-2 border-border">
+                  <AvatarImage src={avatarUrl || ''} alt="Profile picture" />
+                  <AvatarFallback className="bg-primary/10 text-primary text-lg font-medium">
+                    {getUserInitials()}
+                  </AvatarFallback>
+                </Avatar>
+                <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                  {isUploadingAvatar ? (
+                    <Loader2 className="h-6 w-6 text-white animate-spin" />
+                  ) : (
+                    <Camera className="h-6 w-6 text-white" />
+                  )}
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    accept="image/jpeg,image/png,image/webp" 
+                    onChange={handleAvatarUpload}
+                    disabled={isUploadingAvatar}
+                  />
+                </label>
+              </div>
+              <div>
+                <p className="font-medium">Profile Picture</p>
+                <p className="text-sm text-muted-foreground">Click to upload (max 2MB)</p>
+                {avatarUrl && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-7 px-2 text-destructive hover:text-destructive mt-1"
+                    onClick={handleRemoveAvatar}
+                    disabled={isUploadingAvatar}
+                  >
+                    <X className="h-3 w-3 mr-1" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input id="email" value={user?.email || ''} disabled />

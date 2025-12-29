@@ -1,6 +1,8 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
+import { supabase } from '@/integrations/supabase/client';
 import {
   Sidebar,
   SidebarContent,
@@ -49,6 +51,23 @@ const DashboardSidebar = () => {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const { mismatchedCount } = usePublishQueue();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // Fetch user avatar
+  useEffect(() => {
+    const fetchAvatar = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .single();
+      if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    };
+    fetchAvatar();
+  }, [user?.id]);
 
   const getUserInitials = () => {
     if (user?.email) {
@@ -236,7 +255,7 @@ const DashboardSidebar = () => {
       <SidebarFooter className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9 border-2 border-primary/20">
-            <AvatarImage src="" alt={user?.email || 'User'} />
+            <AvatarImage src={avatarUrl || ''} alt={user?.email || 'User'} />
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
               {getUserInitials()}
             </AvatarFallback>

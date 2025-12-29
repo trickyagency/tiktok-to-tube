@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -50,6 +52,7 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
   const location = useLocation();
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const {
     isActive: tourActive,
     currentTourStep,
@@ -59,6 +62,22 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
     prevStep,
     skipTour,
   } = useOnboardingTour();
+
+  // Fetch user avatar
+  useEffect(() => {
+    const fetchAvatar = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url')
+        .eq('user_id', user.id)
+        .single();
+      if (data?.avatar_url) {
+        setAvatarUrl(data.avatar_url);
+      }
+    };
+    fetchAvatar();
+  }, [user?.id]);
 
   const getBreadcrumbs = () => {
     const path = location.pathname;
@@ -172,7 +191,7 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" className="h-9 gap-2 px-2">
                       <Avatar className="h-7 w-7 border border-border">
-                        <AvatarImage src="" alt={user?.email || 'User'} />
+                        <AvatarImage src={avatarUrl || ''} alt={user?.email || 'User'} />
                         <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
                           {getUserInitials()}
                         </AvatarFallback>
