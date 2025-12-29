@@ -62,6 +62,11 @@ const Footer = () => {
             <h4 className="font-semibold mb-4">Contact</h4>
             <ul className="space-y-2">
               <li>
+                <Link to="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+                  Contact Us
+                </Link>
+              </li>
+              <li>
                 <a
                   href="https://wa.me/1234567890"
                   target="_blank"
