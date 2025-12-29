@@ -187,11 +187,12 @@ const Settings = () => {
 
     setIsChangingEmail(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        email: newEmail.trim()
+      const { data, error } = await supabase.functions.invoke('email-change', {
+        body: { newEmail: newEmail.trim() }
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       
       toast.success('Verification email sent', {
         description: 'Check your new email inbox and click the verification link to confirm the change.'
