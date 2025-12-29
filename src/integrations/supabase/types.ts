@@ -587,6 +587,48 @@ export type Database = {
           },
         ]
       }
+      subscription_history: {
+        Row: {
+          account_count: number | null
+          action: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          notes: string | null
+          performed_by: string | null
+          plan_id: string | null
+          previous_account_count: number | null
+          previous_plan_id: string | null
+          user_id: string
+        }
+        Insert: {
+          account_count?: number | null
+          action: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          plan_id?: string | null
+          previous_account_count?: number | null
+          previous_plan_id?: string | null
+          user_id: string
+        }
+        Update: {
+          account_count?: number | null
+          action?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          notes?: string | null
+          performed_by?: string | null
+          plan_id?: string | null
+          previous_account_count?: number | null
+          previous_plan_id?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       subscription_plans: {
         Row: {
           created_at: string | null

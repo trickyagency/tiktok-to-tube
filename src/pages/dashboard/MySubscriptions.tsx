@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
+import { SubscriptionHistoryCard } from '@/components/subscriptions/SubscriptionHistoryCard';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
@@ -338,6 +339,9 @@ export default function MySubscriptions() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Subscription History */}
+        <SubscriptionHistoryCard />
 
         {/* TikTok Accounts List */}
         <Card>
