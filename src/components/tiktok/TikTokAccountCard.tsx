@@ -266,7 +266,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                 </TooltipTrigger>
                 {(!isApifyConfigured || !canScrape) && (
                   <TooltipContent className="max-w-xs">
-                    <p>{!canScrape ? subscriptionMessage : 'Apify API key not configured'}</p>
+                    <p>{!canScrape ? subscriptionMessage : 'Scraper API key not configured'}</p>
                   </TooltipContent>
                 )}
               </Tooltip>

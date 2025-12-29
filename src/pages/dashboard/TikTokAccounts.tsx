@@ -94,7 +94,7 @@ const TikTokAccounts = () => {
                 <AlertTriangle className="h-4 w-4" />
                 <AlertDescription className="flex items-center justify-between gap-4">
                   <span>
-                    <strong>Apify API key not configured.</strong> Video scraping is disabled. 
+                    <strong>Scraper API key not configured.</strong> Video scraping is disabled. 
                     The platform owner must configure the API key in Settings.
                   </span>
                   <Button variant="outline" size="sm" asChild className="shrink-0">
@@ -115,10 +115,10 @@ const TikTokAccounts = () => {
                   <span>
                     <strong>
                       {apifyValidation.status === 'expired' 
-                        ? 'Apify subscription expired.' 
+                        ? 'Scraper subscription expired.' 
                         : apifyValidation.status === 'invalid'
-                        ? 'Invalid Apify API key.'
-                        : 'Apify API key error.'}
+                        ? 'Invalid scraper API key.'
+                        : 'Scraper API key error.'}
                     </strong>{' '}
                     {apifyValidation.message}. Video scraping is disabled.
                   </span>
@@ -137,7 +137,7 @@ const TikTokAccounts = () => {
               <Alert className="border-green-500/50 bg-green-500/10">
                 <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <AlertDescription className="text-green-700 dark:text-green-300">
-                  <strong>Apify connected.</strong> Video scraping is ready to use.
+                  <strong>Scraper connected.</strong> Video scraping is ready to use.
                 </AlertDescription>
               </Alert>
             )}

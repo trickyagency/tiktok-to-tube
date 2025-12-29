@@ -168,18 +168,18 @@ const Settings = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
-                  <Label htmlFor="apify-key">Apify API Key</Label>
+                  <Label htmlFor="scraper-key">Scraper API Key</Label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <Input 
-                        id="apify-key" 
+                        id="scraper-key" 
                         type={showApiKey ? 'text' : 'password'}
                         value={apifyApiKey}
                         onChange={(e) => {
                           setApifyApiKey(e.target.value);
                           setKeyTestResult(null); // Clear result when key changes
                         }}
-                        placeholder="Enter your Apify API key"
+                        placeholder="Enter your scraper API key"
                         className="pr-10"
                       />
                       <button
@@ -218,7 +218,7 @@ const Settings = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete API Key?</AlertDialogTitle>
                             <AlertDialogDescription>
-                              This will remove the Apify API key. Video scraping features will be disabled until a new key is configured.
+                              This will remove the scraper API key. Video scraping features will be disabled until a new key is configured.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -249,15 +249,7 @@ const Settings = () => {
                   )}
                   
                   <p className="text-xs text-muted-foreground">
-                    Get your API key from{' '}
-                    <a 
-                      href="https://console.apify.com/account/integrations" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-primary hover:underline"
-                    >
-                      Apify Console → Integrations
-                    </a>
+                    Contact the platform administrator for the scraper API key.
                   </p>
                 </div>
               </CardContent>
