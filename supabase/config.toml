@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.subscription-notifications]
 verify_jwt = false
+
+[functions.delete-own-account]
+verify_jwt = false

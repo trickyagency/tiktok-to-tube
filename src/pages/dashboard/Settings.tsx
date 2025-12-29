@@ -54,6 +54,11 @@ const Settings = () => {
   const [isChangingEmail, setIsChangingEmail] = useState(false);
   const [showEmailChange, setShowEmailChange] = useState(false);
   
+  // Account deletion state
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  
   // Email branding state
   const [platformName, setPlatformName] = useState('RepostFlow');
   const [senderName, setSenderName] = useState('RepostFlow');
@@ -197,6 +202,50 @@ const Settings = () => {
       });
     } finally {
       setIsChangingEmail(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      toast.error('Please type DELETE to confirm');
+      return;
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await supabase.functions.invoke('delete-own-account', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'Failed to delete account');
+      }
+
+      if (response.data?.error) {
+        throw new Error(response.data.error);
+      }
+
+      toast.success('Account deleted successfully');
+      
+      // Sign out and redirect
+      await supabase.auth.signOut();
+      window.location.href = '/';
+    } catch (error: any) {
+      console.error('Failed to delete account:', error);
+      toast.error('Failed to delete account', {
+        description: error.message || 'Please try again later'
+      });
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteDialog(false);
+      setDeleteConfirmText('');
     }
   };
 
@@ -821,6 +870,90 @@ const Settings = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Danger Zone - Account Deletion */}
+        {!isOwner && (
+          <Card className="border-destructive/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-destructive">
+                <AlertTriangle className="h-5 w-5" />
+                Danger Zone
+              </CardTitle>
+              <CardDescription>Irreversible actions</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-medium">Delete Account</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Permanently delete your account and all associated data. This action cannot be undone.
+                  </p>
+                </div>
+                <div className="text-sm text-muted-foreground space-y-1">
+                  <p className="font-medium">This will delete:</p>
+                  <ul className="list-disc list-inside space-y-0.5 ml-2">
+                    <li>Your profile and settings</li>
+                    <li>All TikTok accounts</li>
+                    <li>All YouTube channels</li>
+                    <li>All scraped videos</li>
+                    <li>All upload history</li>
+                    <li>All schedules and queue items</li>
+                    <li>All subscription data</li>
+                  </ul>
+                </div>
+                <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" className="gap-2">
+                      <Trash2 className="h-4 w-4" />
+                      Delete Account
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-destructive" />
+                        Are you absolutely sure?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription className="space-y-3">
+                        <span className="block">
+                          This action is permanent and cannot be undone. All your data will be permanently deleted.
+                        </span>
+                        <span className="block font-medium">
+                          Type <span className="font-mono bg-muted px-1 rounded">DELETE</span> to confirm:
+                        </span>
+                        <Input
+                          value={deleteConfirmText}
+                          onChange={(e) => setDeleteConfirmText(e.target.value)}
+                          placeholder="Type DELETE to confirm"
+                          className="mt-2"
+                        />
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setDeleteConfirmText('')}>
+                        Cancel
+                      </AlertDialogCancel>
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteAccount}
+                        disabled={deleteConfirmText !== 'DELETE' || isDeletingAccount}
+                      >
+                        {isDeletingAccount ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Deleting...
+                          </>
+                        ) : (
+                          'Delete Account'
+                        )}
+                      </Button>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </DashboardLayout>
   );
