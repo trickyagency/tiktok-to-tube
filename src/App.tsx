@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import Pricing from "./pages/Pricing";
+import LandingPage from "./pages/LandingPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import Dashboard from "./pages/dashboard/Dashboard";
@@ -75,7 +76,7 @@ const AppContent = () => {
       <Toaster />
       <Sonner />
       <Routes>
-        <Route path="/" element={<Navigate to="/pricing" replace />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />

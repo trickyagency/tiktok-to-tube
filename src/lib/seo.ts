@@ -26,6 +26,10 @@ export const updateCanonicalUrl = (path: string) => {
 
 // Predefined SEO data for each route
 export const pageSEO = {
+  home: {
+    title: 'RepostFlow - Automate TikTok to YouTube Shorts Uploads',
+    description: 'Automatically repurpose your TikTok videos to YouTube Shorts. Watermark-free uploads, smart scheduling, and SEO optimization. Start free today.',
+  },
   pricing: {
     title: 'Pricing - TikTok to YouTube Automation Plans | RepostFlow',
     description: 'Choose your RepostFlow plan. Starting at $7/month per TikTok account. Automate your TikTok to YouTube Shorts workflow with watermark-free uploads.',
