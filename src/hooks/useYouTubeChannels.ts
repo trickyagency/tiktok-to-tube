@@ -2,7 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { API_BASE_URL } from '@/lib/api-config';
 
 export interface YouTubeChannel {
   id: string;
@@ -127,18 +126,23 @@ export function useYouTubeChannels() {
 
   const startOAuth = async (channelId: string) => {
     try {
-      // Build the URL with query params for the OAuth flow
-      const oauthUrl = `${API_BASE_URL}/youtube-oauth?action=start-auth&channel_id=${channelId}`;
-      
-      const res = await fetch(oauthUrl);
-      const data = await res.json();
+      // Use supabase.functions.invoke() for reliable edge function calls
+      const { data, error } = await supabase.functions.invoke('youtube-oauth', {
+        body: { action: 'start-auth', channel_id: channelId }
+      });
 
-      if (data.error) {
+      if (error) {
+        console.error('Edge function error:', error);
+        toast.error(`Failed to start OAuth: ${error.message}`);
+        return;
+      }
+
+      if (data?.error) {
         toast.error(data.error);
         return;
       }
 
-      if (data.oauth_url) {
+      if (data?.oauth_url) {
         // Open OAuth in a popup window
         const width = 600;
         const height = 700;
@@ -152,18 +156,24 @@ export function useYouTubeChannels() {
         );
       }
     } catch (error: any) {
+      console.error('OAuth start error:', error);
       toast.error(`Failed to start OAuth: ${error.message}`);
     }
   };
 
   const refreshToken = async (channelId: string) => {
     try {
-      const refreshUrl = `${API_BASE_URL}/youtube-oauth?action=refresh-token&channel_id=${channelId}`;
-      
-      const res = await fetch(refreshUrl);
-      const data = await res.json();
+      const { data, error } = await supabase.functions.invoke('youtube-oauth', {
+        body: { action: 'refresh-token', channel_id: channelId }
+      });
 
-      if (data.error) {
+      if (error) {
+        console.error('Edge function error:', error);
+        toast.error(`Token refresh failed: ${error.message}`);
+        return false;
+      }
+
+      if (data?.error) {
         toast.error(`Token refresh failed: ${data.error}`);
         return false;
       }
@@ -172,6 +182,7 @@ export function useYouTubeChannels() {
       toast.success('Token refreshed successfully');
       return true;
     } catch (error: any) {
+      console.error('Token refresh error:', error);
       toast.error(`Failed to refresh token: ${error.message}`);
       return false;
     }
@@ -179,12 +190,16 @@ export function useYouTubeChannels() {
 
   const checkForChannel = async (channelId: string): Promise<{ found: boolean; channelTitle?: string }> => {
     try {
-      const checkUrl = `${API_BASE_URL}/youtube-oauth?action=check-channel&channel_id=${channelId}`;
-      
-      const res = await fetch(checkUrl);
-      const data = await res.json();
+      const { data, error } = await supabase.functions.invoke('youtube-oauth', {
+        body: { action: 'check-channel', channel_id: channelId }
+      });
 
-      if (data.found) {
+      if (error) {
+        console.error('Edge function error:', error);
+        return { found: false };
+      }
+
+      if (data?.found) {
         queryClient.invalidateQueries({ queryKey: ['youtube-channels'] });
         return { found: true, channelTitle: data.channelTitle };
       }

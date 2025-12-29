@@ -22,7 +22,7 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
   const [channelName, setChannelName] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
-  const [redirectUri, setRedirectUri] = useState('');
+  const [redirectUri, setRedirectUri] = useState(OAUTH_REDIRECT_URI); // Pre-fill with correct URI
   const [selectedTikTokAccount, setSelectedTikTokAccount] = useState<string>('');
 
   const { createChannel, isCreating } = useYouTubeChannels();
@@ -61,7 +61,7 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
     setChannelName('');
     setClientId('');
     setClientSecret('');
-    setRedirectUri('');
+    setRedirectUri(OAUTH_REDIRECT_URI); // Reset to default URI
     setSelectedTikTokAccount('');
   };
 
