@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscriptionPlans, useUserSubscriptions } from '@/hooks/useSubscriptions';
+import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateGeneralWhatsAppLink, generateSwitchPlanWhatsAppLink, generateVolumeDiscountWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
 import { 
@@ -65,7 +66,54 @@ import {
   Calendar,
   TrendingUp,
   Sparkles,
+  Lightbulb,
+  DollarSign,
+  User,
+  Star,
 } from 'lucide-react';
+
+// Custom hook for animated counting
+function useAnimatedCounter(value: number, duration: number = 500) {
+  const [displayValue, setDisplayValue] = useState(value);
+  const previousValue = useRef(value);
+  
+  useEffect(() => {
+    const startValue = previousValue.current;
+    const difference = value - startValue;
+    
+    if (difference === 0) return;
+    
+    const startTime = performance.now();
+    let animationFrame: number;
+    
+    const animate = (currentTime: number) => {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const current = startValue + difference * eased;
+      
+      setDisplayValue(Math.round(current * 100) / 100);
+      
+      if (progress < 1) {
+        animationFrame = requestAnimationFrame(animate);
+      } else {
+        previousValue.current = value;
+      }
+    };
+    
+    animationFrame = requestAnimationFrame(animate);
+    
+    return () => {
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+      }
+    };
+  }, [value, duration]);
+  
+  return displayValue;
+}
 
 interface UpgradePlansDialogProps {
   open: boolean;
@@ -111,9 +159,42 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   const { user } = useAuth();
   const { data: plans, isLoading } = useSubscriptionPlans();
   const { data: userSubscriptions } = useUserSubscriptions();
+  const { data: tiktokAccounts } = useTikTokAccounts();
   const [showComparison, setShowComparison] = useState(false);
   const [accountCount, setAccountCount] = useState(1);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  
+  // User's actual TikTok account count
+  const userAccountCount = tiktokAccounts?.length || 0;
+  
+  // Get recommendation based on user's current accounts
+  const getRecommendedTier = (currentCount: number) => {
+    const currentTier = VOLUME_DISCOUNTS.find(
+      t => currentCount >= t.minAccounts && currentCount <= t.maxAccounts
+    );
+    const nextTier = VOLUME_DISCOUNTS.find(
+      t => t.minAccounts > currentCount
+    );
+    
+    return {
+      currentTier,
+      nextTier,
+      accountsToNext: nextTier ? nextTier.minAccounts - currentCount : 0,
+      currentDiscount: currentTier?.discount || 0,
+      nextDiscount: nextTier?.discount || 0,
+    };
+  };
+  
+  const recommendation = getRecommendedTier(userAccountCount);
+  
+  // Calculate yearly savings for animated counter (using Pro plan as example)
+  const yearlySavings = useMemo(() => {
+    const proBasePrice = 12; // Pro plan base price
+    const annualData = calculateAnnualWithVolumeDiscount(proBasePrice, accountCount);
+    return billingCycle === 'annual' ? annualData.totalSavingsYear : calculateSavings(proBasePrice, accountCount) * 12;
+  }, [accountCount, billingCycle]);
+  
+  const animatedSavings = useAnimatedCounter(yearlySavings, 400);
 
   // Get unique active plan IDs the user is subscribed to
   const currentPlanIds = new Set(
@@ -458,6 +539,42 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
             )}
           </div>
           
+          {/* Recommendation Banner - Shows if user has accounts */}
+          {userAccountCount > 0 && (
+            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                  Based on your {userAccountCount} TikTok account{userAccountCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+              
+              <p className="text-xs text-muted-foreground mb-2">
+                {recommendation.currentDiscount > 0 
+                  ? `✓ You're in the ${Math.round(recommendation.currentDiscount * 100)}% discount tier`
+                  : `You're at standard pricing`}
+              </p>
+              
+              {recommendation.nextTier && (
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-2">
+                  → Add {recommendation.accountsToNext} more for {Math.round(recommendation.nextTier.discount * 100)}% off!
+                </p>
+              )}
+              
+              {accountCount !== userAccountCount && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-blue-500/30 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10"
+                  onClick={() => setAccountCount(userAccountCount)}
+                >
+                  <User className="h-3 w-3 mr-1" />
+                  Use my account count ({userAccountCount})
+                </Button>
+              )}
+            </div>
+          )}
+
           <p className="text-sm text-muted-foreground mb-4">
             How many TikTok accounts do you want to manage?
           </p>
@@ -531,13 +648,15 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
             <div className="grid grid-cols-4 gap-2 text-xs text-center">
               {VOLUME_DISCOUNTS.map((tier, index) => {
                 const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
+                const isUserTier = userAccountCount >= tier.minAccounts && userAccountCount <= tier.maxAccounts;
+                const isNextTier = recommendation.nextTier && tier.minAccounts === recommendation.nextTier.minAccounts;
                 const priceExample = tier.discount === 0 ? 12 : Math.round(12 * (1 - tier.discount));
                 const tierLabel = tier.maxAccounts === Infinity ? `${tier.minAccounts}+` : `${tier.minAccounts}-${tier.maxAccounts}`;
                 
                 return (
                   <div 
                     key={index}
-                    className={`p-2 rounded transition-all ${
+                    className={`p-2 rounded transition-all relative ${
                       isActive 
                         ? 'bg-primary text-primary-foreground ring-2 ring-primary' 
                         : 'bg-background'
@@ -550,11 +669,47 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
                     <div className={`text-[10px] ${isActive ? 'opacity-80' : 'text-muted-foreground'}`}>
                       {tier.discount === 0 ? '0%' : `${Math.round(tier.discount * 100)}% off`}
                     </div>
+                    {/* User position indicator */}
+                    {userAccountCount > 0 && isUserTier && !isActive && (
+                      <div className="absolute -top-2 left-1/2 -translate-x-1/2">
+                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-background border-blue-500 text-blue-600">
+                          <User className="h-2 w-2 mr-0.5" />You
+                        </Badge>
+                      </div>
+                    )}
+                    {/* Recommended next tier indicator */}
+                    {userAccountCount > 0 && isNextTier && !isActive && (
+                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
+                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-background border-amber-500 text-amber-600">
+                          <Star className="h-2 w-2 mr-0.5" />Next
+                        </Badge>
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
+
+          {/* Animated Yearly Savings Display */}
+          {(currentDiscount > 0 || billingCycle === 'annual') && (
+            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-lg p-4 mb-4 text-center">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                  Total Yearly Savings
+                </span>
+              </div>
+              
+              <div className="text-4xl font-bold text-green-600 dark:text-green-400 transition-all tabular-nums">
+                ${animatedSavings.toFixed(0)}
+              </div>
+              
+              <p className="text-xs text-muted-foreground mt-1">
+                Pro Plan × {accountCount} account{accountCount !== 1 ? 's' : ''} × {billingCycle === 'annual' ? 'Annual' : 'Monthly'} billing
+              </p>
+            </div>
+          )}
 
           {/* Pricing Grid */}
           {sortedPlans && (
