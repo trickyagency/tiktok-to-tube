@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscriptionPlans, useUserSubscriptions } from '@/hooks/useSubscriptions';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +33,20 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ReferenceLine,
+  ResponsiveContainer,
+} from 'recharts';
+import {
   MessageCircle,
   Zap,
   Rocket,
@@ -49,6 +63,8 @@ import {
   Plus,
   TrendingDown,
   Calendar,
+  TrendingUp,
+  Sparkles,
 } from 'lucide-react';
 
 interface UpgradePlansDialogProps {
@@ -168,6 +184,65 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
 
   // Get current discount percentage
   const currentDiscount = getDiscountPercentage(accountCount);
+
+  // Generate savings chart data
+  const savingsChartData = useMemo(() => {
+    return Array.from({ length: 15 }, (_, i) => {
+      const count = i + 1;
+      return {
+        accounts: count,
+        basic: calculateSavings(7, count),
+        pro: calculateSavings(12, count),
+        scale: calculateSavings(18, count),
+      };
+    });
+  }, []);
+
+  const chartConfig = {
+    basic: { label: 'Basic', color: 'hsl(var(--chart-1))' },
+    pro: { label: 'Pro', color: 'hsl(var(--chart-2))' },
+    scale: { label: 'Scale', color: 'hsl(var(--chart-3))' },
+  };
+
+  // Get dynamic badge info based on account count
+  const getDynamicBadge = (basePrice: number) => {
+    const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
+    
+    if (accountCount <= 2) {
+      const accountsNeeded = 3 - accountCount;
+      return {
+        icon: TrendingUp,
+        text: `Add ${accountsNeeded} more for 17% off`,
+        className: 'from-blue-500/10 to-blue-600/10 border-blue-500/20',
+        textClass: 'text-blue-600 dark:text-blue-400',
+        iconClass: 'text-blue-600 dark:text-blue-400',
+      };
+    } else if (accountCount <= 5) {
+      return {
+        icon: Percent,
+        text: `17% off: $${discountedPrice.toFixed(2)}/ea`,
+        className: 'from-green-500/10 to-green-600/10 border-green-500/20',
+        textClass: 'text-green-600 dark:text-green-400',
+        iconClass: 'text-green-600 dark:text-green-400',
+      };
+    } else if (accountCount <= 10) {
+      return {
+        icon: TrendingDown,
+        text: `33% off: $${discountedPrice.toFixed(2)}/ea`,
+        className: 'from-orange-500/10 to-orange-600/10 border-orange-500/20',
+        textClass: 'text-orange-600 dark:text-orange-400',
+        iconClass: 'text-orange-600 dark:text-orange-400',
+      };
+    } else {
+      return {
+        icon: Sparkles,
+        text: `MAX 50% OFF: $${discountedPrice.toFixed(2)}/ea`,
+        className: 'from-purple-500/10 to-amber-500/10 border-purple-500/20',
+        textClass: 'text-purple-600 dark:text-purple-400',
+        iconClass: 'text-purple-600 dark:text-purple-400',
+      };
+    }
+  };
 
   // Get all unique features from all plans
   const getAllFeatures = () => {
@@ -317,13 +392,19 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
                       ))}
                     </ul>
                     
-                    {/* Discount Badge */}
-                    <div className="flex items-center gap-1.5 p-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-md border border-amber-500/20">
-                      <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-                      <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                        Up to 50% off with bulk accounts
-                      </span>
-                    </div>
+                    {/* Dynamic Discount Badge */}
+                    {(() => {
+                      const badge = getDynamicBadge(displayPrice);
+                      const BadgeIcon = badge.icon;
+                      return (
+                        <div className={`flex items-center gap-1.5 p-2 bg-gradient-to-r ${badge.className} rounded-md border transition-all`}>
+                          <BadgeIcon className={`h-3.5 w-3.5 ${badge.iconClass}`} />
+                          <span className={`text-xs font-medium ${badge.textClass}`}>
+                            {badge.text}
+                          </span>
+                        </div>
+                      );
+                    })()}
                     
                     {/* Action Button */}
                     <div className="pt-2">
@@ -552,6 +633,106 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
               </p>
             </div>
           )}
+
+          {/* Savings Growth Chart */}
+          <div className="bg-background rounded-lg p-4 border">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              <h4 className="text-sm font-medium">Savings Growth</h4>
+              <span className="text-xs text-muted-foreground ml-auto">
+                Monthly savings by account count
+              </span>
+            </div>
+            <ChartContainer config={chartConfig} className="h-[180px] w-full">
+              <AreaChart data={savingsChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="basicGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="proGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="scaleGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                <XAxis 
+                  dataKey="accounts" 
+                  tick={{ fontSize: 10 }} 
+                  tickLine={false}
+                  axisLine={false}
+                  className="fill-muted-foreground"
+                />
+                <YAxis 
+                  tick={{ fontSize: 10 }} 
+                  tickFormatter={(v) => `$${v}`}
+                  tickLine={false}
+                  axisLine={false}
+                  className="fill-muted-foreground"
+                  width={40}
+                />
+                <ChartTooltip 
+                  content={<ChartTooltipContent />}
+                  formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
+                />
+                <ReferenceLine 
+                  x={accountCount} 
+                  stroke="hsl(var(--primary))" 
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  label={{ 
+                    value: `${accountCount}`, 
+                    position: 'top',
+                    fill: 'hsl(var(--primary))',
+                    fontSize: 11,
+                    fontWeight: 600
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="basic"
+                  stroke="hsl(var(--chart-1))"
+                  fill="url(#basicGradient)"
+                  strokeWidth={2}
+                  name="Basic"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="pro"
+                  stroke="hsl(var(--chart-2))"
+                  fill="url(#proGradient)"
+                  strokeWidth={2}
+                  name="Pro"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="scale"
+                  stroke="hsl(var(--chart-3))"
+                  fill="url(#scaleGradient)"
+                  strokeWidth={2}
+                  name="Scale"
+                />
+              </AreaChart>
+            </ChartContainer>
+            <div className="flex justify-center gap-4 mt-2">
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-1))]" />
+                <span className="text-muted-foreground">Basic</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-2))]" />
+                <span className="text-muted-foreground">Pro</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-3))]" />
+                <span className="text-muted-foreground">Scale</span>
+              </div>
+            </div>
+          </div>
 
           <p className="text-xs text-muted-foreground text-center font-medium">
             Scale more, pay less — up to 50% off per account
