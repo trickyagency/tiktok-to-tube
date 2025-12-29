@@ -152,6 +152,13 @@ export function useAssignUserSubscription() {
     }) => {
       if (!user?.id) throw new Error('Not authenticated');
 
+      // Fetch plan name for email
+      const { data: plan } = await supabase
+        .from('subscription_plans')
+        .select('name')
+        .eq('id', planId)
+        .single();
+
       // Check if subscription already exists for this user
       const { data: existing } = await supabase
         .from('user_subscriptions')
@@ -169,6 +176,7 @@ export function useAssignUserSubscription() {
         activated_by: user.id,
         activated_at: new Date().toISOString(),
         payment_notes: paymentNotes || null,
+        notification_sent_at: null, // Reset notification when renewing
       };
 
       if (existing) {
@@ -179,15 +187,14 @@ export function useAssignUserSubscription() {
           .eq('id', existing.id);
 
         if (error) throw error;
-        return { updated: true };
+      } else {
+        // Create new subscription
+        const { error } = await supabase
+          .from('user_subscriptions')
+          .insert(subscriptionData);
+
+        if (error) throw error;
       }
-
-      // Create new subscription
-      const { error } = await supabase
-        .from('user_subscriptions')
-        .insert(subscriptionData);
-
-      if (error) throw error;
 
       // Also update user_limits to sync account count
       const { data: existingLimit } = await supabase
@@ -207,7 +214,23 @@ export function useAssignUserSubscription() {
           .insert({ user_id: userId, max_tiktok_accounts: accountCount });
       }
 
-      return { created: true };
+      // Send renewal notification email (fire and forget)
+      try {
+        await supabase.functions.invoke('subscription-notifications', {
+          body: {
+            type: 'renewal',
+            userId,
+            planName: plan?.name || 'Subscription',
+            accountCount,
+            expiresAt: expiresAt?.toISOString() || null,
+          },
+        });
+      } catch (emailError) {
+        console.error('Failed to send renewal notification:', emailError);
+        // Don't fail the mutation if email fails
+      }
+
+      return { updated: !!existing, created: !existing };
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['user-subscription'] });

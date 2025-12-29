@@ -15,6 +15,7 @@ import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
 import { ScrapeQueueProgress } from '@/components/tiktok/ScrapeQueueProgress';
 import { ScrapeAllAccountsButton } from '@/components/tiktok/ScrapeAllAccountsButton';
+import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
 
 const TikTokAccounts = () => {
   const { data: accounts, isLoading } = useTikTokAccounts();
@@ -44,6 +45,9 @@ const TikTokAccounts = () => {
       description="Manage TikTok accounts to scrape content from"
     >
       <div className="space-y-6">
+        {/* Subscription Status Banner */}
+        <SubscriptionStatusBanner />
+
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
