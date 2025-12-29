@@ -83,3 +83,43 @@ Please help me set this up.`;
   
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
+
+interface RequestUpgradeParams {
+  currentPlanName: string;
+  currentAccountCount: number;
+  desiredAccountCount?: number;
+  userEmail?: string;
+}
+
+export function generateUpgradeRequestWhatsAppLink(params: RequestUpgradeParams): string {
+  const { currentPlanName, currentAccountCount, desiredAccountCount, userEmail } = params;
+  
+  const message = `Hi! I want to upgrade my subscription.
+
+Current Plan: ${currentPlanName}
+Current Account Slots: ${currentAccountCount}${desiredAccountCount ? `\nDesired Account Slots: ${desiredAccountCount}` : ''}${userEmail ? `\nEmail: ${userEmail}` : ''}
+
+Please share upgrade options and pricing.`;
+  
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
+
+interface RenewalRequestParams {
+  planName: string;
+  accountCount: number;
+  expiryDate?: string;
+  userEmail?: string;
+}
+
+export function generateRenewalWhatsAppLink(params: RenewalRequestParams): string {
+  const { planName, accountCount, expiryDate, userEmail } = params;
+  
+  const message = `Hi! I want to renew my subscription.
+
+Plan: ${planName}
+Account Slots: ${accountCount}${expiryDate ? `\nExpires: ${expiryDate}` : ''}${userEmail ? `\nEmail: ${userEmail}` : ''}
+
+Please send payment details for renewal.`;
+  
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
