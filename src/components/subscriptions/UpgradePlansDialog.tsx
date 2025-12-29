@@ -3,7 +3,15 @@ import { useNavigate } from 'react-router-dom';
 import { useSubscriptionPlans, useUserSubscriptions } from '@/hooks/useSubscriptions';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateGeneralWhatsAppLink, generateSwitchPlanWhatsAppLink, generateVolumeDiscountWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
-import { getDiscountPercentage, calculateDiscountedPrice, calculateTotalPrice, calculateSavings } from '@/lib/pricing';
+import { 
+  getDiscountPercentage, 
+  calculateDiscountedPrice, 
+  calculateTotalPrice, 
+  calculateSavings,
+  calculateAnnualWithVolumeDiscount,
+  VOLUME_DISCOUNTS,
+  ANNUAL_DISCOUNT
+} from '@/lib/pricing';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +47,8 @@ import {
   Calculator,
   Minus,
   Plus,
+  TrendingDown,
+  Calendar,
 } from 'lucide-react';
 
 interface UpgradePlansDialogProps {
@@ -87,6 +97,7 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   const { data: userSubscriptions } = useUserSubscriptions();
   const [showComparison, setShowComparison] = useState(false);
   const [accountCount, setAccountCount] = useState(1);
+  const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
 
   // Get unique active plan IDs the user is subscribed to
   const currentPlanIds = new Set(
@@ -306,6 +317,14 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
                       ))}
                     </ul>
                     
+                    {/* Discount Badge */}
+                    <div className="flex items-center gap-1.5 p-2 bg-gradient-to-r from-amber-500/10 to-orange-500/10 rounded-md border border-amber-500/20">
+                      <TrendingDown className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                      <span className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                        Up to 50% off with bulk accounts
+                      </span>
+                    </div>
+                    
                     {/* Action Button */}
                     <div className="pt-2">
                       {planAction === 'current' ? (
@@ -379,20 +398,20 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setAccountCount(Math.min(10, accountCount + 1))}
-              disabled={accountCount >= 10}
+              onClick={() => setAccountCount(Math.min(15, accountCount + 1))}
+              disabled={accountCount >= 15}
             >
               <Plus className="h-4 w-4" />
             </Button>
           </div>
 
           {/* Slider */}
-          <div className="mb-6 px-2">
+          <div className="mb-4 px-2">
             <Slider
               value={[accountCount]}
               onValueChange={([value]) => setAccountCount(value)}
               min={1}
-              max={10}
+              max={15}
               step={1}
               className="w-full"
             />
@@ -400,6 +419,59 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
               <span>1</span>
               <span>5</span>
               <span>10</span>
+              <span>15</span>
+            </div>
+          </div>
+
+          {/* Billing Cycle Toggle */}
+          <div className="flex items-center justify-center gap-2 mb-4">
+            <Button
+              variant={billingCycle === 'monthly' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setBillingCycle('monthly')}
+              className="min-w-[100px]"
+            >
+              Monthly
+            </Button>
+            <Button
+              variant={billingCycle === 'annual' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setBillingCycle('annual')}
+              className="min-w-[140px]"
+            >
+              <Calendar className="h-3 w-3 mr-1" />
+              Annual (Save 20%)
+            </Button>
+          </div>
+
+          {/* Discount Tier Breakdown */}
+          <div className="bg-muted/50 rounded-lg p-3 mb-4">
+            <p className="text-xs font-medium mb-2 text-center">Volume Discount Tiers (Pro Plan Example)</p>
+            <div className="grid grid-cols-4 gap-2 text-xs text-center">
+              {VOLUME_DISCOUNTS.map((tier, index) => {
+                const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
+                const priceExample = tier.discount === 0 ? 12 : Math.round(12 * (1 - tier.discount));
+                const tierLabel = tier.maxAccounts === Infinity ? `${tier.minAccounts}+` : `${tier.minAccounts}-${tier.maxAccounts}`;
+                
+                return (
+                  <div 
+                    key={index}
+                    className={`p-2 rounded transition-all ${
+                      isActive 
+                        ? 'bg-primary text-primary-foreground ring-2 ring-primary' 
+                        : 'bg-background'
+                    }`}
+                  >
+                    <div className="font-medium">{tierLabel}</div>
+                    <div className={isActive ? 'font-bold' : 'text-green-600 dark:text-green-400'}>
+                      ${priceExample}/ea
+                    </div>
+                    <div className={`text-[10px] ${isActive ? 'opacity-80' : 'text-muted-foreground'}`}>
+                      {tier.discount === 0 ? '0%' : `${Math.round(tier.discount * 100)}% off`}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -409,10 +481,15 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
               {sortedPlans.map((plan) => {
                 const Icon = planIcons[plan.id] || Zap;
                 const basePrice = Math.round(plan.price_monthly / 100);
+                const annualData = calculateAnnualWithVolumeDiscount(basePrice, accountCount);
                 const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
                 const totalPrice = calculateTotalPrice(basePrice, accountCount);
                 const savings = calculateSavings(basePrice, accountCount);
                 const hasDiscount = currentDiscount > 0;
+
+                const displayPrice = billingCycle === 'monthly' ? discountedPrice : annualData.annualPerAccountPerMonth;
+                const displayTotal = billingCycle === 'monthly' ? totalPrice : annualData.totalAnnualPerMonth;
+                const displaySavings = billingCycle === 'monthly' ? savings : annualData.totalSavingsYear / 12;
 
                 return (
                   <div
@@ -424,20 +501,25 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
                       <span className="font-medium capitalize text-sm">{plan.name}</span>
                     </div>
                     <div className="space-y-1">
-                      {hasDiscount && (
+                      {(hasDiscount || billingCycle === 'annual') && (
                         <div className="text-muted-foreground line-through text-xs">
                           ${basePrice}/each
                         </div>
                       )}
                       <div className="text-lg font-bold text-primary">
-                        ${discountedPrice.toFixed(2)}/each
+                        ${displayPrice.toFixed(2)}/each
                       </div>
                       <div className="text-sm">
-                        Total: <span className="font-semibold">${totalPrice.toFixed(2)}</span>/mo
+                        Total: <span className="font-semibold">${displayTotal.toFixed(2)}</span>/mo
                       </div>
-                      {hasDiscount && (
+                      {(hasDiscount || billingCycle === 'annual') && displaySavings > 0 && (
                         <div className="text-xs text-green-600 font-medium">
-                          Save ${savings.toFixed(2)}/mo
+                          Save ${displaySavings.toFixed(2)}/mo
+                        </div>
+                      )}
+                      {billingCycle === 'annual' && (
+                        <div className="text-[10px] text-muted-foreground">
+                          (${annualData.totalAnnualYear.toFixed(0)}/year)
                         </div>
                       )}
                     </div>
@@ -456,8 +538,23 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground text-center">
-            5% discount per additional account, up to 20% off for 5+ accounts
+          {/* Combined Savings Display for Annual */}
+          {billingCycle === 'annual' && currentDiscount > 0 && sortedPlans && (
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-4">
+              <div className="flex items-center gap-2 justify-center mb-2">
+                <Percent className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium text-green-700 dark:text-green-400">
+                  Combined Discount Applied!
+                </span>
+              </div>
+              <p className="text-xs text-center text-muted-foreground">
+                Volume ({currentDiscount}%) + Annual ({Math.round(ANNUAL_DISCOUNT * 100)}%) = Maximum savings
+              </p>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground text-center font-medium">
+            Scale more, pay less — up to 50% off per account
           </p>
         </div>
 
@@ -537,36 +634,6 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
             </Table>
           </div>
         )}
-
-        {/* Annual Discount Section */}
-        <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Percent className="h-5 w-5 text-green-500" />
-            <h3 className="font-semibold text-green-700 dark:text-green-400">
-              Save 20% with Annual Plans!
-            </h3>
-          </div>
-          <div className="grid grid-cols-3 gap-4 text-sm text-center">
-            <div>
-              <span className="font-medium block">Basic</span>
-              <div className="text-muted-foreground line-through text-xs">$84/year</div>
-              <div className="text-green-600 dark:text-green-400 font-bold">$67/year</div>
-            </div>
-            <div>
-              <span className="font-medium block">Pro</span>
-              <div className="text-muted-foreground line-through text-xs">$144/year</div>
-              <div className="text-green-600 dark:text-green-400 font-bold">$115/year</div>
-            </div>
-            <div>
-              <span className="font-medium block">Scale</span>
-              <div className="text-muted-foreground line-through text-xs">$216/year</div>
-              <div className="text-green-600 dark:text-green-400 font-bold">$173/year</div>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground mt-3 text-center">
-            Contact us on WhatsApp for annual pricing!
-          </p>
-        </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
