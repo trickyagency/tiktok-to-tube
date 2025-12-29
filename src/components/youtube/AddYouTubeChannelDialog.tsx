@@ -16,8 +16,8 @@ interface AddYouTubeChannelDialogProps {
   onSuccess?: () => void;
 }
 
-const REDIRECT_URI = 'https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=callback';
-const JAVASCRIPT_ORIGIN = 'https://qpufyeeqosvgipslwday.supabase.co';
+const REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
+const JAVASCRIPT_ORIGIN = 'https://repostflow.digitalautomators.com';
 
 export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogProps) {
   const [open, setOpen] = useState(false);
