@@ -11,13 +11,11 @@ import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CopyableUrl } from '@/components/ui/copyable-url';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { OAUTH_REDIRECT_URI, JAVASCRIPT_ORIGIN } from '@/lib/api-config';
 
 interface AddYouTubeChannelDialogProps {
   onSuccess?: () => void;
 }
-
-const REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
-const JAVASCRIPT_ORIGIN = 'https://repostflow.digitalautomators.com';
 
 export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogProps) {
   const [open, setOpen] = useState(false);
@@ -130,7 +128,7 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
             label="Authorized JavaScript Origin:"
           />
           <CopyableUrl 
-            url={REDIRECT_URI} 
+            url={OAUTH_REDIRECT_URI} 
             label="Authorized Redirect URI:"
           />
         </div>
