@@ -9,9 +9,10 @@ import {
   useCancelInvitation,
   useResendInvitation,
   useDeleteUser,
-  useUpdateUserLimits,
   UserWithLimitsAndUsage,
 } from '@/hooks/useUserManagement';
+import { useAllUserSubscriptions, UserSubscription } from '@/hooks/useUserSubscription';
+import { AssignSubscriptionDialog } from '@/components/subscriptions/AssignSubscriptionDialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -37,14 +38,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { 
   Users, 
   Crown, 
@@ -57,7 +50,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Trash2,
-  Settings2,
+  CreditCard,
 } from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -66,15 +59,19 @@ export default function UserManagement() {
   const { isOwner, loading: authLoading } = useAuth();
   const { data: users, isLoading } = useAllUsers();
   const { data: pendingInvitations, isLoading: invitationsLoading } = usePendingInvitations();
+  const { data: userSubscriptions } = useAllUserSubscriptions();
   const inviteUser = useInviteUser();
   const cancelInvitation = useCancelInvitation();
   const resendInvitation = useResendInvitation();
   const deleteUser = useDeleteUser();
-  const updateUserLimits = useUpdateUserLimits();
 
   const [inviteEmail, setInviteEmail] = useState('');
-  const [editingLimitsUser, setEditingLimitsUser] = useState<UserWithLimitsAndUsage | null>(null);
-  const [limitsForm, setLimitsForm] = useState({ maxTikTok: 1, maxYouTube: 1 });
+  const [assigningSubscription, setAssigningSubscription] = useState<UserWithLimitsAndUsage | null>(null);
+
+  // Create a map of user subscriptions
+  const subscriptionMap = new Map<string, UserSubscription>(
+    userSubscriptions?.map(s => [s.user_id, s]) || []
+  );
 
   // Redirect non-owners
   if (!authLoading && !isOwner) {
@@ -87,25 +84,6 @@ export default function UserManagement() {
     
     await inviteUser.mutateAsync({ email: inviteEmail.trim() });
     setInviteEmail('');
-  };
-
-  const handleEditLimits = (user: UserWithLimitsAndUsage) => {
-    setEditingLimitsUser(user);
-    setLimitsForm({
-      maxTikTok: user.limits?.max_tiktok_accounts ?? 1,
-      maxYouTube: user.limits?.max_youtube_channels ?? 1,
-    });
-  };
-
-  const handleSaveLimits = async () => {
-    if (!editingLimitsUser) return;
-    
-    await updateUserLimits.mutateAsync({
-      userId: editingLimitsUser.user_id,
-      maxTikTokAccounts: limitsForm.maxTikTok,
-      maxYouTubeChannels: limitsForm.maxYouTube,
-    });
-    setEditingLimitsUser(null);
   };
 
   const getRoleBadge = (role: string) => {
@@ -122,6 +100,36 @@ export default function UserManagement() {
         <User className="h-3 w-3 mr-1" />
         User
       </Badge>
+    );
+  };
+
+  const getSubscriptionBadge = (subscription: UserSubscription | undefined) => {
+    if (!subscription) {
+      return (
+        <Badge variant="outline" className="text-muted-foreground">
+          No Subscription
+        </Badge>
+      );
+    }
+
+    const statusColors: Record<string, string> = {
+      active: 'bg-emerald-500/20 text-emerald-600 border-emerald-500/30',
+      pending: 'bg-amber-500/20 text-amber-600 border-amber-500/30',
+      expired: 'bg-destructive/20 text-destructive border-destructive/30',
+      cancelled: 'bg-muted text-muted-foreground',
+    };
+
+    return (
+      <div className="space-y-1">
+        <Badge className={statusColors[subscription.status] || statusColors.pending}>
+          {subscription.plan?.name || subscription.plan_id} • {subscription.account_count} acc
+        </Badge>
+        {subscription.status === 'active' && subscription.expires_at && (
+          <p className="text-xs text-muted-foreground">
+            Expires {formatDistanceToNow(new Date(subscription.expires_at), { addSuffix: true })}
+          </p>
+        )}
+      </div>
     );
   };
 
@@ -153,9 +161,10 @@ export default function UserManagement() {
 
   const totalUsers = users?.length || 0;
   const ownerCount = users?.filter(u => u.role === 'owner').length || 0;
+  const activeSubscriptions = userSubscriptions?.filter(s => s.status === 'active').length || 0;
 
   return (
-    <DashboardLayout title="User Management" description="Manage platform users and their account limits">
+    <DashboardLayout title="User Management" description="Manage platform users and their subscriptions">
       <div className="space-y-6">
 
         {/* Invite User Form */}
@@ -277,7 +286,7 @@ export default function UserManagement() {
         )}
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -289,6 +298,15 @@ export default function UserManagement() {
               ) : (
                 <div className="text-2xl font-bold">{totalUsers}</div>
               )}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
+              <CreditCard className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeSubscriptions}</div>
             </CardContent>
           </Card>
           <Card>
@@ -311,7 +329,7 @@ export default function UserManagement() {
           <CardHeader>
             <CardTitle>All Users</CardTitle>
             <CardDescription>
-              View and manage users and their account limits.
+              View and manage users and their subscriptions.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -329,102 +347,98 @@ export default function UserManagement() {
                       <TableHead>Email</TableHead>
                       <TableHead>Name</TableHead>
                       <TableHead>Role</TableHead>
+                      <TableHead>Subscription</TableHead>
+                      <TableHead>TikTok Usage</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>TikTok Accounts</TableHead>
-                      <TableHead>YouTube Channels</TableHead>
                       <TableHead>Joined</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {users.map(user => (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.email}</TableCell>
-                        <TableCell>{user.full_name || '-'}</TableCell>
-                        <TableCell>{getRoleBadge(user.role)}</TableCell>
-                        <TableCell>
-                          {user.email_confirmed_at ? (
-                            <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
-                              <CheckCircle2 className="h-3 w-3 mr-1" />
-                              Verified
-                            </Badge>
-                          ) : (
-                            <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
-                              <AlertCircle className="h-3 w-3 mr-1" />
-                              Pending
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {user.role === 'owner' ? (
-                            <span className="text-sm text-muted-foreground">Unlimited</span>
-                          ) : (
-                            <UsageProgressBar 
-                              current={user.tiktok_count} 
-                              max={user.limits?.max_tiktok_accounts ?? 1}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          {user.role === 'owner' ? (
-                            <span className="text-sm text-muted-foreground">Unlimited</span>
-                          ) : (
-                            <UsageProgressBar 
-                              current={user.youtube_count} 
-                              max={user.limits?.max_youtube_channels ?? 1}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {format(new Date(user.created_at), 'MMM d, yyyy')}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {user.role === 'owner' ? (
-                            <span className="text-sm text-muted-foreground">-</span>
-                          ) : (
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEditLimits(user)}
-                              >
-                                <Settings2 className="h-4 w-4 mr-1" />
-                                Limits
-                              </Button>
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-destructive hover:text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    Delete
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete User?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will permanently delete <strong>{user.email}</strong> and all their data including TikTok accounts, YouTube channels, scraped videos, and upload history. This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => deleteUser.mutate(user.user_id)}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    {users.map(user => {
+                      const subscription = subscriptionMap.get(user.user_id);
+                      const maxAccounts = subscription?.account_count || user.limits?.max_tiktok_accounts || 0;
+                      
+                      return (
+                        <TableRow key={user.id}>
+                          <TableCell className="font-medium">{user.email}</TableCell>
+                          <TableCell>{user.full_name || '-'}</TableCell>
+                          <TableCell>{getRoleBadge(user.role)}</TableCell>
+                          <TableCell>{getSubscriptionBadge(subscription)}</TableCell>
+                          <TableCell>
+                            {user.role === 'owner' ? (
+                              <span className="text-sm text-muted-foreground">Unlimited</span>
+                            ) : (
+                              <UsageProgressBar 
+                                current={user.tiktok_count} 
+                                max={maxAccounts}
+                              />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {user.email_confirmed_at ? (
+                              <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
+                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                Verified
+                              </Badge>
+                            ) : (
+                              <Badge className="bg-amber-500/20 text-amber-600 border-amber-500/30">
+                                <AlertCircle className="h-3 w-3 mr-1" />
+                                Pending
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {format(new Date(user.created_at), 'MMM d, yyyy')}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {user.role === 'owner' ? (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            ) : (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setAssigningSubscription(user)}
+                                >
+                                  <CreditCard className="h-4 w-4 mr-1" />
+                                  {subscription ? 'Edit' : 'Assign'}
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="text-destructive hover:text-destructive"
                                     >
-                                      Delete User
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                                      <Trash2 className="h-4 w-4 mr-1" />
+                                      Delete
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete User?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will permanently delete <strong>{user.email}</strong> and all their data including TikTok accounts, YouTube channels, scraped videos, and upload history. This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteUser.mutate(user.user_id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Delete User
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>
@@ -437,62 +451,15 @@ export default function UserManagement() {
         </Card>
       </div>
 
-      {/* Edit Limits Dialog */}
-      <Dialog open={!!editingLimitsUser} onOpenChange={(open) => !open && setEditingLimitsUser(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Account Limits</DialogTitle>
-            <DialogDescription>
-              Set the maximum number of accounts and channels for {editingLimitsUser?.email}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="maxTikTok">Max TikTok Accounts</Label>
-              <Input
-                id="maxTikTok"
-                type="number"
-                min={0}
-                max={100}
-                value={limitsForm.maxTikTok}
-                onChange={(e) => setLimitsForm(prev => ({ ...prev, maxTikTok: parseInt(e.target.value) || 0 }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                Currently using: {editingLimitsUser?.tiktok_count || 0} accounts
-              </p>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxYouTube">Max YouTube Channels</Label>
-              <Input
-                id="maxYouTube"
-                type="number"
-                min={0}
-                max={100}
-                value={limitsForm.maxYouTube}
-                onChange={(e) => setLimitsForm(prev => ({ ...prev, maxYouTube: parseInt(e.target.value) || 0 }))}
-              />
-              <p className="text-xs text-muted-foreground">
-                Currently using: {editingLimitsUser?.youtube_count || 0} channels
-              </p>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditingLimitsUser(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveLimits} disabled={updateUserLimits.isPending}>
-              {updateUserLimits.isPending ? (
-                <>
-                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                'Save Limits'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Assign Subscription Dialog */}
+      {assigningSubscription && (
+        <AssignSubscriptionDialog
+          open={!!assigningSubscription}
+          onOpenChange={(open) => !open && setAssigningSubscription(null)}
+          user={assigningSubscription}
+          currentSubscription={subscriptionMap.get(assigningSubscription.user_id)}
+        />
+      )}
     </DashboardLayout>
   );
 }
