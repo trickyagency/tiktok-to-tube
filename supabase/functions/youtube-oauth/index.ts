@@ -81,9 +81,13 @@ serve(async (req) => {
         });
       }
 
-      // Use channel's custom redirect URI or default callback URL
+      // Use channel's custom redirect URI - this MUST match what's configured in Google Cloud Console
+      // If not set, fallback to default (but user should set custom redirect for custom domains)
       const callbackUrl = channel.google_redirect_uri || 
         `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
+      
+      console.log('Using callback URL:', callbackUrl);
+      console.log('Channel google_redirect_uri from DB:', channel.google_redirect_uri);
 
       // Create state object with channel info (encoded as base64url)
       const stateObj = {
@@ -190,8 +194,11 @@ serve(async (req) => {
         });
       }
 
+      // MUST use the same redirect URI that was used during authorization
       const callbackUrl = channel.google_redirect_uri || 
         `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
+      
+      console.log('Token exchange using callback URL:', callbackUrl);
 
       // Exchange authorization code for tokens using THIS channel's credentials
       console.log('Exchanging code for tokens...');

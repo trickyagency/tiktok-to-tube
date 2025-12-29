@@ -172,15 +172,16 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="redirect-uri">Custom Redirect URI (Optional)</Label>
+            <Label htmlFor="redirect-uri">Redirect URI</Label>
             <Input
               id="redirect-uri"
-              placeholder="Leave empty to use the default URI above"
+              placeholder={OAUTH_REDIRECT_URI}
               value={redirectUri}
               onChange={(e) => setRedirectUri(e.target.value)}
             />
             <p className="text-xs text-muted-foreground">
-              Only change this if you're using a custom domain
+              <strong>Important:</strong> This must exactly match the Authorized Redirect URI in your Google Cloud Console. 
+              Default: <code className="text-xs bg-muted px-1 rounded">{OAUTH_REDIRECT_URI}</code>
             </p>
           </div>
 
