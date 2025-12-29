@@ -78,7 +78,7 @@ const Footer = () => {
               </li>
               <li>
                 <a
-                  href="mailto:support@repostflow.com"
+                  href="mailto:Support@digitalautomators.com"
                   className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                 >
                   Email Support
