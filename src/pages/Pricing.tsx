@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { pageSEO, updateMetaDescription, updateCanonicalUrl } from '@/lib/seo';
+import Footer from '@/components/Footer';
 import {
   Check,
   Crown,
@@ -366,12 +367,7 @@ export default function Pricing() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-border/40 py-8">
-        <div className="container text-center text-sm text-muted-foreground">
-          © {new Date().getFullYear()} RepostFlow. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 }
