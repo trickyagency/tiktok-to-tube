@@ -2,6 +2,8 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
+type SubscriptionStatus = 'active' | 'pending' | 'expired' | 'cancelled' | 'none';
+
 interface UserAccountLimits {
   maxTikTokAccounts: number;
   maxYouTubeChannels: number;
@@ -12,6 +14,8 @@ interface UserAccountLimits {
   remainingTikTokSlots: number;
   remainingYouTubeSlots: number;
   isUnlimited: boolean;
+  subscriptionStatus: SubscriptionStatus;
+  subscriptionMessage: string;
 }
 
 export function useUserAccountLimits() {
@@ -31,6 +35,8 @@ export function useUserAccountLimits() {
           remainingTikTokSlots: 0,
           remainingYouTubeSlots: 0,
           isUnlimited: false,
+          subscriptionStatus: 'none',
+          subscriptionMessage: 'Please sign in to continue.',
         };
       }
 
@@ -61,31 +67,104 @@ export function useUserAccountLimits() {
           remainingTikTokSlots: 999999,
           remainingYouTubeSlots: 999999,
           isUnlimited: true,
+          subscriptionStatus: 'active',
+          subscriptionMessage: 'Owner access - unlimited accounts',
         };
       }
 
-      // Fetch user limits for regular users
-      const { data: limits } = await supabase
-        .from('user_limits')
-        .select('*')
+      // Fetch user subscription for regular users
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('account_count, status')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      // Use defaults if no limits record exists (default is 1)
-      const maxTikTokAccounts = limits?.max_tiktok_accounts ?? 1;
-      const maxYouTubeChannels = limits?.max_youtube_channels ?? 1;
+      // Determine subscription status and limits
+      if (!subscription) {
+        return {
+          maxTikTokAccounts: 0,
+          maxYouTubeChannels: 0,
+          currentTikTokAccounts,
+          currentYouTubeChannels,
+          canAddTikTokAccount: false,
+          canAddYouTubeChannel: false,
+          remainingTikTokSlots: 0,
+          remainingYouTubeSlots: 0,
+          isUnlimited: false,
+          subscriptionStatus: 'none',
+          subscriptionMessage: 'No subscription assigned. Contact administrator.',
+        };
+      }
 
-      return {
-        maxTikTokAccounts,
-        maxYouTubeChannels,
-        currentTikTokAccounts,
-        currentYouTubeChannels,
-        canAddTikTokAccount: currentTikTokAccounts < maxTikTokAccounts,
-        canAddYouTubeChannel: currentYouTubeChannels < maxYouTubeChannels,
-        remainingTikTokSlots: Math.max(0, maxTikTokAccounts - currentTikTokAccounts),
-        remainingYouTubeSlots: Math.max(0, maxYouTubeChannels - currentYouTubeChannels),
-        isUnlimited: false,
-      };
+      const status = subscription.status as SubscriptionStatus;
+      const accountCount = subscription.account_count ?? 0;
+
+      // Handle different subscription statuses
+      switch (status) {
+        case 'pending':
+          return {
+            maxTikTokAccounts: 0,
+            maxYouTubeChannels: 0,
+            currentTikTokAccounts,
+            currentYouTubeChannels,
+            canAddTikTokAccount: false,
+            canAddYouTubeChannel: false,
+            remainingTikTokSlots: 0,
+            remainingYouTubeSlots: 0,
+            isUnlimited: false,
+            subscriptionStatus: 'pending',
+            subscriptionMessage: 'Subscription pending activation.',
+          };
+
+        case 'expired':
+          return {
+            maxTikTokAccounts: accountCount,
+            maxYouTubeChannels: accountCount,
+            currentTikTokAccounts,
+            currentYouTubeChannels,
+            canAddTikTokAccount: false,
+            canAddYouTubeChannel: false,
+            remainingTikTokSlots: 0,
+            remainingYouTubeSlots: 0,
+            isUnlimited: false,
+            subscriptionStatus: 'expired',
+            subscriptionMessage: 'Subscription expired. Contact administrator to renew.',
+          };
+
+        case 'cancelled':
+          return {
+            maxTikTokAccounts: accountCount,
+            maxYouTubeChannels: accountCount,
+            currentTikTokAccounts,
+            currentYouTubeChannels,
+            canAddTikTokAccount: false,
+            canAddYouTubeChannel: false,
+            remainingTikTokSlots: 0,
+            remainingYouTubeSlots: 0,
+            isUnlimited: false,
+            subscriptionStatus: 'cancelled',
+            subscriptionMessage: 'Subscription cancelled. Contact administrator.',
+          };
+
+        case 'active':
+        default:
+          const remainingSlots = Math.max(0, accountCount - currentTikTokAccounts);
+          return {
+            maxTikTokAccounts: accountCount,
+            maxYouTubeChannels: accountCount,
+            currentTikTokAccounts,
+            currentYouTubeChannels,
+            canAddTikTokAccount: currentTikTokAccounts < accountCount,
+            canAddYouTubeChannel: currentYouTubeChannels < accountCount,
+            remainingTikTokSlots: remainingSlots,
+            remainingYouTubeSlots: Math.max(0, accountCount - currentYouTubeChannels),
+            isUnlimited: false,
+            subscriptionStatus: 'active',
+            subscriptionMessage: remainingSlots > 0 
+              ? `${remainingSlots} of ${accountCount} account slots remaining`
+              : `Account limit reached (${accountCount})`,
+          };
+      }
     },
     enabled: !!user,
   });
