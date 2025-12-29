@@ -126,23 +126,32 @@ export function useYouTubeChannels() {
 
   const startOAuth = async (channelId: string) => {
     try {
+      console.log('[YouTube OAuth] Starting OAuth for channel:', channelId);
+      
       // Use supabase.functions.invoke() for reliable edge function calls
       const { data, error } = await supabase.functions.invoke('youtube-oauth', {
         body: { action: 'start-auth', channel_id: channelId }
       });
 
+      console.log('[YouTube OAuth] Response:', { data, error });
+
       if (error) {
-        console.error('Edge function error:', error);
-        toast.error(`Failed to start OAuth: ${error.message}`);
+        // Check if this is a FunctionsHttpError with more details
+        const errorMessage = error.message || 'Unknown error';
+        const errorContext = error.context ? JSON.stringify(error.context) : '';
+        console.error('[YouTube OAuth] Edge function error:', error, errorContext);
+        toast.error(`Failed to start OAuth: ${errorMessage}`);
         return;
       }
 
       if (data?.error) {
+        console.error('[YouTube OAuth] Data error:', data.error);
         toast.error(data.error);
         return;
       }
 
       if (data?.oauth_url) {
+        console.log('[YouTube OAuth] Opening OAuth URL:', data.oauth_url);
         // Open OAuth in a popup window
         const width = 600;
         const height = 700;
@@ -154,10 +163,15 @@ export function useYouTubeChannels() {
           'youtube-oauth',
           `width=${width},height=${height},left=${left},top=${top}`
         );
+      } else {
+        console.error('[YouTube OAuth] No oauth_url in response:', data);
+        toast.error('OAuth URL not received from server');
       }
     } catch (error: any) {
-      console.error('OAuth start error:', error);
-      toast.error(`Failed to start OAuth: ${error.message}`);
+      console.error('[YouTube OAuth] Unexpected error:', error);
+      // Provide detailed error info for debugging
+      const errorDetails = error.message || String(error);
+      toast.error(`Failed to start OAuth: ${errorDetails}`);
     }
   };
 
