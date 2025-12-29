@@ -7,12 +7,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, RotateCcw, Loader2, AlertTriangle, Trash2, Camera, X } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, Loader2, AlertTriangle, Trash2, Camera, X } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useEmailPreferences } from '@/hooks/useEmailPreferences';
-import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useTestApifyKey, ApifyStatus } from '@/hooks/useApifyStatus';
 import { toast } from 'sonner';
 import EmailPreview from '@/components/settings/EmailPreview';
@@ -34,7 +33,7 @@ const Settings = () => {
   const { user, isOwner } = useAuth();
   const { getSetting, updateSetting, deleteSetting, isUpdating, isDeleting, isLoading } = usePlatformSettings();
   const { preferences, updatePreference, isLoading: preferencesLoading } = useEmailPreferences();
-  const { resetTour, hasCompleted: tourCompleted, startTour } = useOnboardingTour();
+  
   
   const [apifyApiKey, setApifyApiKey] = useState('');
   const [showApiKey, setShowApiKey] = useState(false);
@@ -839,38 +838,6 @@ const Settings = () => {
                   <Label htmlFor="digest-weekly" className="cursor-pointer">Weekly digest</Label>
                 </div>
               </RadioGroup>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <SettingsIcon className="h-5 w-5" />
-              Advanced
-            </CardTitle>
-            <CardDescription>Advanced configuration options</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Onboarding Tour</Label>
-                <p className="text-xs text-muted-foreground">
-                  {tourCompleted ? 'You have completed the tour.' : 'Tour will start automatically for new users.'}
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  resetTour();
-                  startTour();
-                }}
-                className="gap-2"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Restart Tour
-              </Button>
             </div>
           </CardContent>
         </Card>
