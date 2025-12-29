@@ -44,7 +44,7 @@ const Settings = () => {
   // Email branding state
   const [platformName, setPlatformName] = useState('RepostFlow');
   const [senderName, setSenderName] = useState('RepostFlow');
-  const [senderEmail, setSenderEmail] = useState('onboarding@resend.dev');
+  const [senderEmail, setSenderEmail] = useState('notifications@repostflow.digitalautomators.com');
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#18181b');
   const [accentColor, setAccentColor] = useState('#3b82f6');
