@@ -25,8 +25,49 @@ interface ExpiringSubscription {
   notification_1day_sent_at: string | null;
 }
 
+interface BrandingConfig {
+  platformName: string;
+  senderName: string;
+  senderEmail: string;
+  logoUrl: string;
+  primaryColor: string;
+  accentColor: string;
+}
+
+// Get branding configuration from platform_settings
+async function getBrandingConfig(supabase: any): Promise<BrandingConfig> {
+  const { data: settings } = await supabase
+    .from('platform_settings')
+    .select('key, value')
+    .in('key', [
+      'EMAIL_PLATFORM_NAME',
+      'EMAIL_SENDER_NAME', 
+      'EMAIL_SENDER_ADDRESS',
+      'EMAIL_LOGO_URL',
+      'EMAIL_PRIMARY_COLOR',
+      'EMAIL_ACCENT_COLOR'
+    ]);
+
+  const settingsMap = new Map<string, string>(
+    settings?.map((s: { key: string; value: string | null }) => [s.key, s.value || '']) || []
+  );
+
+  return {
+    platformName: settingsMap.get('EMAIL_PLATFORM_NAME') || 'RepostFlow',
+    senderName: settingsMap.get('EMAIL_SENDER_NAME') || 'RepostFlow',
+    senderEmail: settingsMap.get('EMAIL_SENDER_ADDRESS') || 'onboarding@resend.dev',
+    logoUrl: settingsMap.get('EMAIL_LOGO_URL') || '',
+    primaryColor: settingsMap.get('EMAIL_PRIMARY_COLOR') || '#18181b',
+    accentColor: settingsMap.get('EMAIL_ACCENT_COLOR') || '#3b82f6',
+  };
+}
+
 // Email templates for different urgency levels
-function get7DayEmailHtml(userName: string, planName: string, expiryDate: string): string {
+function get7DayEmailHtml(userName: string, planName: string, expiryDate: string, branding: BrandingConfig): string {
+  const logoHtml = branding.logoUrl 
+    ? `<img src="${branding.logoUrl}" alt="${branding.platformName}" style="max-height: 40px; margin-bottom: 15px;" />`
+    : '';
+  
   return `
     <!DOCTYPE html>
     <html>
@@ -48,6 +89,7 @@ function get7DayEmailHtml(userName: string, planName: string, expiryDate: string
     <body>
       <div class="container">
         <div class="header">
+          ${logoHtml}
           <h1>⚠️ Subscription Expiring Soon</h1>
         </div>
         <div class="content">
@@ -57,7 +99,7 @@ function get7DayEmailHtml(userName: string, planName: string, expiryDate: string
             <strong>Your subscription will expire in 7 days!</strong>
           </div>
           
-          <p>Your TikTube subscription is about to expire. After expiration, you won't be able to add new accounts or run video scraping.</p>
+          <p>Your ${branding.platformName} subscription is about to expire. After expiration, you won't be able to add new accounts or run video scraping.</p>
           
           <div class="details">
             <div class="detail-row">
@@ -70,12 +112,12 @@ function get7DayEmailHtml(userName: string, planName: string, expiryDate: string
             </div>
           </div>
           
-          <p>To continue using TikTube without interruption, please contact your administrator to renew your subscription.</p>
+          <p>To continue using ${branding.platformName} without interruption, please contact your administrator to renew your subscription.</p>
           
-          <p>Thank you for using TikTube!</p>
+          <p>Thank you for using ${branding.platformName}!</p>
         </div>
         <div class="footer">
-          <p>This is an automated message from TikTube.</p>
+          <p>This is an automated message from ${branding.platformName}.</p>
         </div>
       </div>
     </body>
@@ -83,7 +125,11 @@ function get7DayEmailHtml(userName: string, planName: string, expiryDate: string
   `;
 }
 
-function get3DayEmailHtml(userName: string, planName: string, expiryDate: string): string {
+function get3DayEmailHtml(userName: string, planName: string, expiryDate: string, branding: BrandingConfig): string {
+  const logoHtml = branding.logoUrl 
+    ? `<img src="${branding.logoUrl}" alt="${branding.platformName}" style="max-height: 40px; margin-bottom: 15px;" />`
+    : '';
+
   return `
     <!DOCTYPE html>
     <html>
@@ -108,6 +154,7 @@ function get3DayEmailHtml(userName: string, planName: string, expiryDate: string
     <body>
       <div class="container">
         <div class="header">
+          ${logoHtml}
           <h1>⏰ Only 3 Days Left!</h1>
         </div>
         <div class="content">
@@ -117,7 +164,7 @@ function get3DayEmailHtml(userName: string, planName: string, expiryDate: string
             <strong>⚠️ Your subscription is about to expire in just 3 days!</strong>
           </div>
           
-          <p>Please renew now to continue using TikTube without interruption.</p>
+          <p>Please renew now to continue using ${branding.platformName} without interruption.</p>
           
           <div class="impact-list">
             <p><strong>After expiration, you will lose access to:</strong></p>
@@ -143,7 +190,7 @@ function get3DayEmailHtml(userName: string, planName: string, expiryDate: string
           <p>Contact your administrator or support team immediately to avoid service interruption.</p>
         </div>
         <div class="footer">
-          <p>This is an automated message from TikTube.</p>
+          <p>This is an automated message from ${branding.platformName}.</p>
         </div>
       </div>
     </body>
@@ -151,7 +198,11 @@ function get3DayEmailHtml(userName: string, planName: string, expiryDate: string
   `;
 }
 
-function get1DayEmailHtml(userName: string, planName: string, expiryDate: string): string {
+function get1DayEmailHtml(userName: string, planName: string, expiryDate: string, branding: BrandingConfig): string {
+  const logoHtml = branding.logoUrl 
+    ? `<img src="${branding.logoUrl}" alt="${branding.platformName}" style="max-height: 40px; margin-bottom: 15px;" />`
+    : '';
+
   return `
     <!DOCTYPE html>
     <html>
@@ -175,6 +226,7 @@ function get1DayEmailHtml(userName: string, planName: string, expiryDate: string
     <body>
       <div class="container">
         <div class="header">
+          ${logoHtml}
           <h1>🚨 URGENT: Expires Tomorrow!</h1>
         </div>
         <div class="content">
@@ -202,7 +254,7 @@ function get1DayEmailHtml(userName: string, planName: string, expiryDate: string
           </p>
         </div>
         <div class="footer">
-          <p>This is an automated message from TikTube.</p>
+          <p>This is an automated message from ${branding.platformName}.</p>
         </div>
       </div>
     </body>
@@ -210,7 +262,11 @@ function get1DayEmailHtml(userName: string, planName: string, expiryDate: string
   `;
 }
 
-function getRenewalEmailHtml(userName: string, planName: string, accountCount: number, expiryDate: string): string {
+function getRenewalEmailHtml(userName: string, planName: string, accountCount: number, expiryDate: string, branding: BrandingConfig): string {
+  const logoHtml = branding.logoUrl 
+    ? `<img src="${branding.logoUrl}" alt="${branding.platformName}" style="max-height: 40px; margin-bottom: 15px;" />`
+    : '';
+
   return `
     <!DOCTYPE html>
     <html>
@@ -231,11 +287,12 @@ function getRenewalEmailHtml(userName: string, planName: string, accountCount: n
     <body>
       <div class="container">
         <div class="header">
+          ${logoHtml}
           <h1>✅ Subscription Renewed!</h1>
         </div>
         <div class="content">
           <p>Hi ${userName},</p>
-          <p>Great news! Your subscription has been renewed and you're all set to continue using TikTube.</p>
+          <p>Great news! Your subscription has been renewed and you're all set to continue using ${branding.platformName}.</p>
           
           <div class="details">
             <div class="detail-row">
@@ -256,7 +313,7 @@ function getRenewalEmailHtml(userName: string, planName: string, accountCount: n
           <p>Happy uploading! 🚀</p>
         </div>
         <div class="footer">
-          <p>This is an automated message from TikTube.</p>
+          <p>This is an automated message from ${branding.platformName}.</p>
         </div>
       </div>
     </body>
@@ -267,10 +324,11 @@ function getRenewalEmailHtml(userName: string, planName: string, accountCount: n
 async function sendExpiryNotifications(
   supabase: any,
   resend: Resend,
+  branding: BrandingConfig,
   daysOut: number,
   notificationField: 'notification_sent_at' | 'notification_3day_sent_at' | 'notification_1day_sent_at',
   emailSubject: string,
-  getEmailHtml: (userName: string, planName: string, expiryDate: string) => string
+  getEmailHtml: (userName: string, planName: string, expiryDate: string, branding: BrandingConfig) => string
 ): Promise<number> {
   const targetDate = new Date();
   targetDate.setDate(targetDate.getDate() + daysOut);
@@ -320,6 +378,7 @@ async function sendExpiryNotifications(
   );
 
   let notifiedCount = 0;
+  const fromEmail = `${branding.senderName} <${branding.senderEmail}>`;
 
   for (const sub of expiringSubscriptions as ExpiringSubscription[]) {
     const profile = profileMap.get(sub.user_id);
@@ -336,10 +395,10 @@ async function sendExpiryNotifications(
 
     try {
       const emailResponse = await resend.emails.send({
-        from: "TikTube <onboarding@resend.dev>",
+        from: fromEmail,
         to: [profile.email],
         subject: emailSubject,
-        html: getEmailHtml(userName, planName, expiryDate),
+        html: getEmailHtml(userName, planName, expiryDate, branding),
       });
 
       console.log(`${daysOut}-day warning sent to ${profile.email}:`, emailResponse);
@@ -381,8 +440,14 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Load branding configuration
+    const branding = await getBrandingConfig(supabase);
+    console.log(`Using branding: ${branding.platformName} <${branding.senderEmail}>`);
+
     const { type, userId, planName, accountCount, expiresAt }: NotificationRequest = await req.json();
     console.log(`Processing notification request: type=${type}, userId=${userId}`);
+
+    const fromEmail = `${branding.senderName} <${branding.senderEmail}>`;
 
     // Handle renewal confirmation emails
     if (type === 'renewal') {
@@ -414,10 +479,10 @@ const handler = async (req: Request): Promise<Response> => {
         : 'No expiry date set';
 
       const emailResponse = await resend.emails.send({
-        from: "TikTube <onboarding@resend.dev>",
+        from: fromEmail,
         to: [profile.email],
         subject: "Your subscription has been renewed!",
-        html: getRenewalEmailHtml(userName, planName || 'Active Plan', accountCount || 0, formattedExpiry),
+        html: getRenewalEmailHtml(userName, planName || 'Active Plan', accountCount || 0, formattedExpiry, branding),
       });
 
       console.log("Renewal email sent:", emailResponse);
@@ -448,6 +513,7 @@ const handler = async (req: Request): Promise<Response> => {
       const notified = await sendExpiryNotifications(
         supabase,
         resend,
+        branding,
         7,
         'notification_sent_at',
         "⚠️ Your subscription expires in 7 days",
@@ -460,14 +526,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Handle all interval checks (7-day, 3-day, 1-day)
+    // Handle all interval checks (new comprehensive check)
     if (type === 'check-expiring-all') {
-      console.log("Running full expiry check for all intervals...");
+      console.log("Running comprehensive expiry notification check...");
+      
+      const results = {
+        day7: 0,
+        day3: 0,
+        day1: 0,
+      };
 
       // Check 7-day expiring subscriptions
-      const notified7Day = await sendExpiryNotifications(
+      results.day7 = await sendExpiryNotifications(
         supabase,
         resend,
+        branding,
         7,
         'notification_sent_at',
         "⚠️ Your subscription expires in 7 days",
@@ -475,9 +548,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
 
       // Check 3-day expiring subscriptions
-      const notified3Day = await sendExpiryNotifications(
+      results.day3 = await sendExpiryNotifications(
         supabase,
         resend,
+        branding,
         3,
         'notification_3day_sent_at',
         "⏰ Only 3 days left on your subscription!",
@@ -485,28 +559,21 @@ const handler = async (req: Request): Promise<Response> => {
       );
 
       // Check 1-day expiring subscriptions
-      const notified1Day = await sendExpiryNotifications(
+      results.day1 = await sendExpiryNotifications(
         supabase,
         resend,
+        branding,
         1,
         'notification_1day_sent_at',
         "🚨 URGENT: Your subscription expires tomorrow!",
         get1DayEmailHtml
       );
 
-      const totalNotified = notified7Day + notified3Day + notified1Day;
-      console.log(`Total notifications sent: ${totalNotified} (7-day: ${notified7Day}, 3-day: ${notified3Day}, 1-day: ${notified1Day})`);
+      const totalNotified = results.day7 + results.day3 + results.day1;
+      console.log(`Notification check complete: 7-day=${results.day7}, 3-day=${results.day3}, 1-day=${results.day1}, total=${totalNotified}`);
 
       return new Response(
-        JSON.stringify({
-          success: true,
-          notified: totalNotified,
-          breakdown: {
-            day7: notified7Day,
-            day3: notified3Day,
-            day1: notified1Day
-          }
-        }),
+        JSON.stringify({ success: true, results, totalNotified }),
         { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
       );
     }
@@ -518,12 +585,13 @@ const handler = async (req: Request): Promise<Response> => {
 
   } catch (error: unknown) {
     console.error("Error in subscription-notifications:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
   }
 };
+
 
 serve(handler);
