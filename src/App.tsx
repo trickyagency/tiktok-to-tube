@@ -32,6 +32,7 @@ import CommandPalette from "@/components/dashboard/CommandPalette";
 import KeyboardShortcutsHelp from "@/components/dashboard/KeyboardShortcutsHelp";
 import KeyboardShortcutIndicator from "@/components/dashboard/KeyboardShortcutIndicator";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from "@/components/pwa";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,9 @@ const AppContent = () => {
 
   return (
     <>
+      <OfflineIndicator />
+      <PWAUpdatePrompt />
+      <PWAInstallPrompt />
       <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} />
       <KeyboardShortcutsHelp open={shortcutsHelpOpen} onOpenChange={setShortcutsHelpOpen} />
       <KeyboardShortcutIndicator isVisible={waitingForSecondKey} />
