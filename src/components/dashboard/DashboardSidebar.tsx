@@ -200,7 +200,22 @@ const DashboardSidebar = () => {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Upgrade CTA */}
+        {/* Upgrade CTA - Collapsed version */}
+        {isCollapsed && (
+          <div className="mx-auto mt-4">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 hover:from-primary/20 hover:to-primary/10"
+              onClick={() => setUpgradeOpen(true)}
+              title="Upgrade Now"
+            >
+              <Zap className="h-5 w-5 text-primary" />
+            </Button>
+          </div>
+        )}
+
+        {/* Upgrade CTA - Expanded version */}
         {!isCollapsed && (
           <div className="mx-2 mt-4 p-3 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
             <div className="flex items-center gap-2 mb-2">
