@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
+import { UpgradePlansDialog } from '@/components/subscriptions/UpgradePlansDialog';
 import {
   Sidebar,
   SidebarContent,
@@ -50,6 +52,7 @@ const DashboardSidebar = () => {
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const { mismatchedCount } = usePublishQueue();
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
 
   const getUserInitials = () => {
     if (user?.email) {
@@ -207,11 +210,18 @@ const DashboardSidebar = () => {
             <p className="text-xs text-muted-foreground mb-3">
               Unlock unlimited uploads and advanced analytics
             </p>
-            <Button size="sm" className="w-full gradient-primary text-white border-0">
+            <Button 
+              size="sm" 
+              className="w-full gradient-primary text-white border-0"
+              onClick={() => setUpgradeOpen(true)}
+            >
               Upgrade Now
             </Button>
           </div>
         )}
+
+        {/* Upgrade Plans Dialog */}
+        <UpgradePlansDialog open={upgradeOpen} onOpenChange={setUpgradeOpen} />
       </SidebarContent>
       
       <SidebarFooter className="border-t border-sidebar-border p-4">
