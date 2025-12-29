@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/accordion";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { AnimatedSection } from "@/components/AnimatedSection";
 import { updatePageTitle, updateMetaDescription, updateCanonicalUrl, pageSEO } from "@/lib/seo";
 import {
   Play,
@@ -202,33 +203,35 @@ const LandingPage = () => {
       </section>
 
       {/* Stats Section */}
-      <section className="py-12 border-y border-border bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary">10K+</div>
-              <div className="text-sm text-muted-foreground">Videos Uploaded</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary">500+</div>
-              <div className="text-sm text-muted-foreground">Happy Creators</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary">98%</div>
-              <div className="text-sm text-muted-foreground">Success Rate</div>
-            </div>
-            <div>
-              <div className="text-3xl md:text-4xl font-bold text-primary">5hrs</div>
-              <div className="text-sm text-muted-foreground">Saved Weekly</div>
+      <AnimatedSection>
+        <section className="py-12 border-y border-border bg-muted/30">
+          <div className="container mx-auto px-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+              <div>
+                <div className="text-3xl md:text-4xl font-bold text-primary">10K+</div>
+                <div className="text-sm text-muted-foreground">Videos Uploaded</div>
+              </div>
+              <div>
+                <div className="text-3xl md:text-4xl font-bold text-primary">500+</div>
+                <div className="text-sm text-muted-foreground">Happy Creators</div>
+              </div>
+              <div>
+                <div className="text-3xl md:text-4xl font-bold text-primary">98%</div>
+                <div className="text-sm text-muted-foreground">Success Rate</div>
+              </div>
+              <div>
+                <div className="text-3xl md:text-4xl font-bold text-primary">5hrs</div>
+                <div className="text-sm text-muted-foreground">Saved Weekly</div>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* How It Works */}
       <section id="how-it-works" className="py-20 md:py-32">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <AnimatedSection className="text-center mb-16">
             <Badge variant="outline" className="mb-4">How It Works</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Start Growing in 3 Simple Steps
@@ -236,31 +239,33 @@ const LandingPage = () => {
             <p className="text-muted-foreground max-w-2xl mx-auto">
               No technical knowledge required. Get set up in under 5 minutes.
             </p>
-          </div>
+          </AnimatedSection>
 
           <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {steps.map((step, index) => (
-              <div key={index} className="relative group">
-                <Card className="h-full bg-card/50 border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-                  <CardContent className="p-8">
-                    <div className="mb-6">
-                      <span className="text-6xl font-bold text-primary/20 group-hover:text-primary/30 transition-colors">
-                        {step.number}
-                      </span>
+              <AnimatedSection key={index} delay={index * 100}>
+                <div className="relative group h-full">
+                  <Card className="h-full bg-card/50 border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
+                    <CardContent className="p-8">
+                      <div className="mb-6">
+                        <span className="text-6xl font-bold text-primary/20 group-hover:text-primary/30 transition-colors">
+                          {step.number}
+                        </span>
+                      </div>
+                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                        <step.icon className="h-6 w-6 text-primary" />
+                      </div>
+                      <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
+                      <p className="text-muted-foreground">{step.description}</p>
+                    </CardContent>
+                  </Card>
+                  {index < steps.length - 1 && (
+                    <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
+                      <ArrowRight className="h-6 w-6 text-muted-foreground/30" />
                     </div>
-                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                      <step.icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="text-xl font-semibold mb-2">{step.title}</h3>
-                    <p className="text-muted-foreground">{step.description}</p>
-                  </CardContent>
-                </Card>
-                {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-1/2 -right-4 transform -translate-y-1/2">
-                    <ArrowRight className="h-6 w-6 text-muted-foreground/30" />
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </AnimatedSection>
             ))}
           </div>
         </div>
@@ -269,7 +274,7 @@ const LandingPage = () => {
       {/* Features Section */}
       <section id="features" className="py-20 md:py-32 bg-muted/30">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <AnimatedSection className="text-center mb-16">
             <Badge variant="outline" className="mb-4">Features</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Everything You Need to Scale Your Content
@@ -277,19 +282,21 @@ const LandingPage = () => {
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Powerful tools designed to save you time and grow your audience across platforms.
             </p>
-          </div>
+          </AnimatedSection>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
             {features.map((feature, index) => (
-              <Card key={index} className="group bg-card/50 border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
-                    <feature.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
-                  <p className="text-sm text-muted-foreground">{feature.description}</p>
-                </CardContent>
-              </Card>
+              <AnimatedSection key={index} delay={index * 50} animation="scale-in">
+                <Card className="group h-full bg-card/50 border-border/50 hover:border-primary/50 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5">
+                  <CardContent className="p-6">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/20 transition-colors">
+                      <feature.icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
+                    <p className="text-sm text-muted-foreground">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              </AnimatedSection>
             ))}
           </div>
         </div>
@@ -298,7 +305,7 @@ const LandingPage = () => {
       {/* Testimonials Section */}
       <section id="testimonials" className="py-20 md:py-32">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <AnimatedSection className="text-center mb-16">
             <Badge variant="outline" className="mb-4">Testimonials</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Loved by Creators Worldwide
@@ -306,64 +313,68 @@ const LandingPage = () => {
             <p className="text-muted-foreground max-w-2xl mx-auto">
               See what our users have to say about their experience with RepostFlow.
             </p>
-          </div>
+          </AnimatedSection>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             {testimonials.map((testimonial, index) => (
-              <Card key={index} className="bg-card/50 border-border/50">
-                <CardContent className="p-6">
-                  <div className="flex gap-1 mb-4">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" />
-                    ))}
-                  </div>
-                  <p className="text-muted-foreground mb-6 italic">
-                    "{testimonial.quote}"
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
-                      <span className="text-sm font-medium text-primary">{testimonial.avatar}</span>
+              <AnimatedSection key={index} delay={index * 100} animation="scale-in">
+                <Card className="h-full bg-card/50 border-border/50">
+                  <CardContent className="p-6">
+                    <div className="flex gap-1 mb-4">
+                      {[...Array(testimonial.rating)].map((_, i) => (
+                        <Star key={i} className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                      ))}
                     </div>
-                    <div>
-                      <div className="font-medium">{testimonial.name}</div>
-                      <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+                    <p className="text-muted-foreground mb-6 italic">
+                      "{testimonial.quote}"
+                    </p>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="text-sm font-medium text-primary">{testimonial.avatar}</span>
+                      </div>
+                      <div>
+                        <div className="font-medium">{testimonial.name}</div>
+                        <div className="text-sm text-muted-foreground">{testimonial.role}</div>
+                      </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              </AnimatedSection>
             ))}
           </div>
         </div>
       </section>
 
       {/* Pricing Preview */}
-      <section className="py-20 md:py-32 bg-muted/30">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <Badge variant="outline" className="mb-4">Pricing</Badge>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Starting at just <span className="text-primary font-semibold">$7/month</span> per TikTok account. Cancel anytime.
-            </p>
-          </div>
+      <AnimatedSection>
+        <section className="py-20 md:py-32 bg-muted/30">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12">
+              <Badge variant="outline" className="mb-4">Pricing</Badge>
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Simple, Transparent Pricing
+              </h2>
+              <p className="text-muted-foreground max-w-2xl mx-auto">
+                Starting at just <span className="text-primary font-semibold">$7/month</span> per TikTok account. Cancel anytime.
+              </p>
+            </div>
 
-          <div className="flex justify-center">
-            <Link to="/pricing">
-              <Button size="lg" className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90">
-                View All Plans
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+            <div className="flex justify-center">
+              <Link to="/pricing">
+                <Button size="lg" className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90">
+                  View All Plans
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       {/* FAQ Section */}
       <section className="py-20 md:py-32">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
+          <AnimatedSection className="text-center mb-16">
             <Badge variant="outline" className="mb-4">FAQ</Badge>
             <h2 className="text-3xl md:text-4xl font-bold mb-4">
               Frequently Asked Questions
@@ -371,51 +382,55 @@ const LandingPage = () => {
             <p className="text-muted-foreground max-w-2xl mx-auto">
               Got questions? We've got answers.
             </p>
-          </div>
+          </AnimatedSection>
 
-          <div className="max-w-3xl mx-auto">
-            <Accordion type="single" collapsible className="w-full">
-              {faqs.map((faq, index) => (
-                <AccordionItem key={index} value={`item-${index}`}>
-                  <AccordionTrigger className="text-left">
-                    {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground">
-                    {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
-          </div>
+          <AnimatedSection delay={100}>
+            <div className="max-w-3xl mx-auto">
+              <Accordion type="single" collapsible className="w-full">
+                {faqs.map((faq, index) => (
+                  <AccordionItem key={index} value={`item-${index}`}>
+                    <AccordionTrigger className="text-left">
+                      {faq.question}
+                    </AccordionTrigger>
+                    <AccordionContent className="text-muted-foreground">
+                      {faq.answer}
+                    </AccordionContent>
+                  </AccordionItem>
+                ))}
+              </Accordion>
+            </div>
+          </AnimatedSection>
         </div>
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 md:py-32 bg-gradient-to-br from-primary/10 via-purple-500/10 to-pink-500/10">
-        <div className="container mx-auto px-4">
-          <div className="max-w-3xl mx-auto text-center">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Ready to Grow Your YouTube?
-            </h2>
-            <p className="text-lg text-muted-foreground mb-8">
-              Join 500+ creators who are already saving hours and growing their audience with RepostFlow.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link to="/auth">
-                <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-lg px-8">
-                  Start Free Today
-                  <ArrowRight className="ml-2 h-5 w-5" />
-                </Button>
-              </Link>
-              <Link to="/pricing">
-                <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8">
-                  View Pricing
-                </Button>
-              </Link>
+      <AnimatedSection animation="scale-in">
+        <section className="py-20 md:py-32 bg-gradient-to-br from-primary/10 via-purple-500/10 to-pink-500/10">
+          <div className="container mx-auto px-4">
+            <div className="max-w-3xl mx-auto text-center">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Ready to Grow Your YouTube?
+              </h2>
+              <p className="text-lg text-muted-foreground mb-8">
+                Join 500+ creators who are already saving hours and growing their audience with RepostFlow.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link to="/auth">
+                  <Button size="lg" className="w-full sm:w-auto bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 text-lg px-8">
+                    Start Free Today
+                    <ArrowRight className="ml-2 h-5 w-5" />
+                  </Button>
+                </Link>
+                <Link to="/pricing">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto text-lg px-8">
+                    View Pricing
+                  </Button>
+                </Link>
+              </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </AnimatedSection>
 
       <Footer />
     </div>

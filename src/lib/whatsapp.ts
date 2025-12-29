@@ -1,6 +1,11 @@
 export const WHATSAPP_NUMBER = "923068222670";
 export const WHATSAPP_DISPLAY = "+92 306 822 2670";
 
+export function openWhatsApp(message: string): void {
+  const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+  window.open(url, '_blank');
+}
+
 interface WhatsAppMessageParams {
   type: 'new' | 'renew';
   username: string;

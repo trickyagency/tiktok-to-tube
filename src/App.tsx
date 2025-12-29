@@ -15,6 +15,7 @@ import Pricing from "./pages/Pricing";
 import LandingPage from "./pages/LandingPage";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import Contact from "./pages/Contact";
 import Dashboard from "./pages/dashboard/Dashboard";
 import YouTubeChannels from "./pages/dashboard/YouTubeChannels";
 import TikTokAccounts from "./pages/dashboard/TikTokAccounts";
@@ -80,6 +81,7 @@ const AppContent = () => {
         <Route path="/pricing" element={<Pricing />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/contact" element={<Contact />} />
         <Route path="/auth" element={<Auth />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route

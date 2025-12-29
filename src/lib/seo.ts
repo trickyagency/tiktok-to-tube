@@ -98,4 +98,8 @@ export const pageSEO = {
     title: 'Terms of Service | RepostFlow',
     description: 'Read the terms and conditions for using RepostFlow. Understand your rights and responsibilities.',
   },
+  contact: {
+    title: 'Contact Us | RepostFlow',
+    description: 'Get in touch with the RepostFlow team. We\'re here to help with questions about TikTok to YouTube automation, billing, or technical support.',
+  },
 } as const;
