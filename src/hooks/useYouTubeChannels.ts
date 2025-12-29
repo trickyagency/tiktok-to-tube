@@ -2,8 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-
-const API_BASE_URL = 'https://repostflow.digitalautomators.com/functions/v1';
+import { API_BASE_URL } from '@/lib/api-config';
 
 export interface YouTubeChannel {
   id: string;

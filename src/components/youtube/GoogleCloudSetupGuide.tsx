@@ -4,9 +4,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Button } from '@/components/ui/button';
 import { CopyableUrl } from '@/components/ui/copyable-url';
 import { ChevronDown, ChevronUp, BookOpen, ExternalLink } from 'lucide-react';
-
-const REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
-const JAVASCRIPT_ORIGIN = 'https://repostflow.digitalautomators.com';
+import { OAUTH_REDIRECT_URI, JAVASCRIPT_ORIGIN } from '@/lib/api-config';
 
 export function GoogleCloudSetupGuide() {
   const [isOpen, setIsOpen] = useState(true);
@@ -94,7 +92,7 @@ export function GoogleCloudSetupGuide() {
               />
               
               <CopyableUrl 
-                url={REDIRECT_URI} 
+                url={OAUTH_REDIRECT_URI} 
                 label="Authorized Redirect URI:"
               />
             </div>
