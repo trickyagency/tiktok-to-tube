@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Loader2, PlayCircle } from 'lucide-react';
 import { useQueueAllAccounts, useScrapeQueueStats } from '@/hooks/useScrapeQueue';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
+import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -13,6 +14,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ScrapeAllAccountsButtonProps {
   disabled?: boolean;
@@ -20,14 +22,19 @@ interface ScrapeAllAccountsButtonProps {
 
 export function ScrapeAllAccountsButton({ disabled }: ScrapeAllAccountsButtonProps) {
   const { data: accounts } = useTikTokAccounts();
+  const { data: limits } = useUserAccountLimits();
   const queueAllAccounts = useQueueAllAccounts();
   const stats = useScrapeQueueStats();
 
   const hasActiveQueue = stats.pending + stats.processing > 0;
   const accountCount = accounts?.length || 0;
+  
+  const subscriptionStatus = limits?.subscriptionStatus ?? 'none';
+  const subscriptionMessage = limits?.subscriptionMessage ?? '';
+  const canScrape = subscriptionStatus === 'active' || limits?.isUnlimited;
 
   const handleScrapeAll = () => {
-    if (!accounts || accounts.length === 0) return;
+    if (!accounts || accounts.length === 0 || !canScrape) return;
     
     const accountIds = accounts.map(a => a.id);
     queueAllAccounts.mutate(accountIds);
@@ -37,6 +44,23 @@ export function ScrapeAllAccountsButton({ disabled }: ScrapeAllAccountsButtonPro
   const estimatedMinutes = Math.ceil(accountCount * 0.25); // ~15 seconds per account
 
   if (accountCount === 0) return null;
+
+  // If subscription is not active, show disabled button with tooltip
+  if (!canScrape) {
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" disabled className="opacity-60">
+            <PlayCircle className="h-4 w-4 mr-2" />
+            Scrape All ({accountCount})
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs">
+          <p>{subscriptionMessage}</p>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
 
   return (
     <AlertDialog>

@@ -10,6 +10,7 @@ import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLi
 import { TikTokAccount, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { useAccountSubscription } from '@/hooks/useSubscriptions';
+import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { SubscriptionBadge } from '@/components/subscriptions/SubscriptionBadge';
 import { SubscriptionDialog } from '@/components/subscriptions/SubscriptionDialog';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -28,7 +29,11 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
   const resetAccount = useResetTikTokAccount();
   const { data: publishedCount = 0 } = usePublishedVideosCount(account.id);
   const { data: subscription } = useAccountSubscription(account.id);
-
+  const { data: limits } = useUserAccountLimits();
+  
+  const subscriptionStatus = limits?.subscriptionStatus ?? 'none';
+  const subscriptionMessage = limits?.subscriptionMessage ?? '';
+  const canScrape = subscriptionStatus === 'active' || limits?.isUnlimited;
   const isScraping = account.scrape_status === 'scraping' || scrapeVideos.isPending;
   const isRefreshing = refreshAccount.isPending;
   
@@ -274,7 +279,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                     variant="default"
                     size="sm"
                     onClick={handleScrapeVideos}
-                    disabled={isScraping || !isApifyConfigured}
+                    disabled={isScraping || !isApifyConfigured || !canScrape}
                     className="shrink-0"
                   >
                     {isScraping ? (
@@ -285,9 +290,9 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                     Scrape Now
                   </Button>
                 </TooltipTrigger>
-                {!isApifyConfigured && (
-                  <TooltipContent>
-                    <p>Apify API key not configured</p>
+                {(!isApifyConfigured || !canScrape) && (
+                  <TooltipContent className="max-w-xs">
+                    <p>{!canScrape ? subscriptionMessage : 'Apify API key not configured'}</p>
                   </TooltipContent>
                 )}
               </Tooltip>

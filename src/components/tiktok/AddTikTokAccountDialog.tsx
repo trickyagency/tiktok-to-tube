@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, Loader2, AlertCircle } from 'lucide-react';
+import { Plus, Loader2, AlertCircle, Ban, Clock, XCircle } from 'lucide-react';
 import { useAddTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -15,8 +15,10 @@ export function AddTikTokAccountDialog() {
   const addAccount = useAddTikTokAccount();
   const { data: limits, isLoading: limitsLoading } = useUserAccountLimits();
 
-  const canAdd = limits?.canAddTikTokAccount ?? true;
+  const canAdd = limits?.canAddTikTokAccount ?? false;
   const remainingSlots = limits?.remainingTikTokSlots ?? 0;
+  const subscriptionStatus = limits?.subscriptionStatus ?? 'none';
+  const subscriptionMessage = limits?.subscriptionMessage ?? '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,7 +29,26 @@ export function AddTikTokAccountDialog() {
     setOpen(false);
   };
 
+  // Get appropriate icon and styling based on subscription status
+  const getStatusDisplay = () => {
+    switch (subscriptionStatus) {
+      case 'none':
+        return { icon: Ban, text: 'No subscription', className: 'text-destructive' };
+      case 'pending':
+        return { icon: Clock, text: 'Subscription pending', className: 'text-amber-500' };
+      case 'expired':
+        return { icon: XCircle, text: 'Subscription expired', className: 'text-destructive' };
+      case 'cancelled':
+        return { icon: XCircle, text: 'Subscription cancelled', className: 'text-destructive' };
+      default:
+        return { icon: AlertCircle, text: `Limit reached (${limits?.maxTikTokAccounts})`, className: 'text-muted-foreground' };
+    }
+  };
+
   if (!canAdd && !limitsLoading) {
+    const statusDisplay = getStatusDisplay();
+    const StatusIcon = statusDisplay.icon;
+
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -36,8 +57,11 @@ export function AddTikTokAccountDialog() {
             Add Account
           </Button>
         </TooltipTrigger>
-        <TooltipContent>
-          <p>You've reached your TikTok account limit ({limits?.maxTikTokAccounts})</p>
+        <TooltipContent className="max-w-xs">
+          <div className="flex items-center gap-2">
+            <StatusIcon className={`h-4 w-4 ${statusDisplay.className}`} />
+            <p>{subscriptionMessage}</p>
+          </div>
         </TooltipContent>
       </Tooltip>
     );
