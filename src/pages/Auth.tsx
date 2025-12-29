@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { getProductionUrl } from '@/lib/auth-utils';
@@ -29,6 +29,10 @@ const Auth = () => {
   // MFA state
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.title = "Sign In | RepostFlow";
+  }, []);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();

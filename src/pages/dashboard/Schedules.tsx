@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,10 @@ import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 const Schedules = () => {
   const { schedules, isLoading, toggleSchedule } = usePublishSchedules();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
+
+  useEffect(() => {
+    document.title = "Schedules | RepostFlow";
+  }, []);
 
   const activeSchedules = schedules.filter(s => s.is_active);
   const totalVideosPerDay = schedules

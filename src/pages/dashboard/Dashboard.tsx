@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
@@ -20,6 +20,10 @@ import { format } from 'date-fns';
 
 const Dashboard = () => {
   const [showQuickFixDialog, setShowQuickFixDialog] = useState(false);
+
+  useEffect(() => {
+    document.title = "Dashboard | RepostFlow";
+  }, []);
   
   const { channels: youtubeChannels, isLoading: isLoadingYouTube } = useYouTubeChannels();
   const { data: tikTokAccounts = [], isLoading: isLoadingTikTok } = useTikTokAccounts();

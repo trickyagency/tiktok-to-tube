@@ -1,8 +1,10 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { pageSEO, updateMetaDescription, updateCanonicalUrl } from '@/lib/seo';
 import {
   Check,
   Crown,
@@ -97,12 +99,18 @@ const benefits = [
 export default function Pricing() {
   const navigate = useNavigate();
 
+  useEffect(() => {
+    document.title = pageSEO.pricing.title;
+    updateMetaDescription(pageSEO.pricing.description);
+    updateCanonicalUrl('/pricing');
+  }, []);
+
   const handleWhatsAppContact = () => {
     window.open(generateGeneralWhatsAppLink(), '_blank');
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <main className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-16 items-center justify-between">
@@ -364,6 +372,6 @@ export default function Pricing() {
           © {new Date().getFullYear()} RepostFlow. All rights reserved.
         </div>
       </footer>
-    </div>
+    </main>
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,10 @@ const TikTokAccounts = () => {
   const { data: apifyValidation, isLoading: isValidationLoading } = useApifyValidation();
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = "TikTok Accounts | RepostFlow";
+  }, []);
 
   // Determine the effective Apify status for disabling actions
   const isApifyUsable = isApifyConfigured && apifyValidation?.valid;

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { History, Youtube, Upload, Clock } from 'lucide-react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
@@ -15,6 +15,10 @@ const UploadHistory = () => {
   const { history, channelStats, isLoading: historyLoading } = useUploadHistory(selectedChannelId);
 
   const isLoading = channelsLoading || historyLoading;
+
+  useEffect(() => {
+    document.title = "Upload History | RepostFlow";
+  }, []);
 
   // Get stats for selected channel
   const selectedStats = selectedChannelId !== 'all' && channelStats[selectedChannelId]
