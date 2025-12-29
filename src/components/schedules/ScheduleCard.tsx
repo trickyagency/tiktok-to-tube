@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +11,8 @@ import {
   Calendar,
   Video,
   Pencil,
-  Film
+  Film,
+  Youtube
 } from 'lucide-react';
 import { PublishSchedule, usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
@@ -29,6 +31,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ScheduleHistoryDialog } from './ScheduleHistoryDialog';
 import { SchedulePreviewDialog } from './SchedulePreviewDialog';
+import { AccountYouTubeSettingsDialog } from '@/components/tiktok/AccountYouTubeSettingsDialog';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ScheduleCardProps {
   schedule: PublishSchedule;
@@ -39,9 +43,12 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
   const { toggleSchedule, deleteSchedule, isDeleting } = usePublishSchedules();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youtubeChannels } = useYouTubeChannels();
+  const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
 
   const tiktokAccount = tikTokAccounts.find(a => a.id === schedule.tiktok_account_id);
   const youtubeChannel = youtubeChannels.find(c => c.id === schedule.youtube_channel_id);
+  
+  const hasYouTubeSettings = !!(tiktokAccount?.youtube_description || tiktokAccount?.youtube_tags);
 
   // Fetch count of remaining unpublished videos
   const { data: remainingCount = 0 } = useQuery({
@@ -90,6 +97,11 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
               <span className="text-muted-foreground">
                 @{tiktokAccount?.username || 'Unknown'}
               </span>
+              {hasYouTubeSettings && (
+                <Badge variant="outline" className="text-xs text-green-600 border-green-600/50">
+                  Configured
+                </Badge>
+              )}
               <ArrowRight className="h-4 w-4 text-muted-foreground" />
               <span className="text-muted-foreground">
                 {youtubeChannel?.channel_title || 'Unknown Channel'}
@@ -121,6 +133,24 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
           <div className="flex items-center gap-2">
             <SchedulePreviewDialog schedule={schedule} />
             <ScheduleHistoryDialog schedule={schedule} />
+            
+            {tiktokAccount && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    onClick={() => setYoutubeSettingsOpen(true)}
+                    className={hasYouTubeSettings ? 'text-red-600' : ''}
+                  >
+                    <Youtube className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  YouTube description & tags
+                </TooltipContent>
+              </Tooltip>
+            )}
             
             {onEdit && (
               <Button size="icon" variant="ghost" onClick={onEdit}>
@@ -161,6 +191,14 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
             </AlertDialog>
           </div>
         </div>
+        
+        {tiktokAccount && (
+          <AccountYouTubeSettingsDialog
+            account={tiktokAccount}
+            open={youtubeSettingsOpen}
+            onOpenChange={setYoutubeSettingsOpen}
+          />
+        )}
       </CardContent>
     </Card>
   );
