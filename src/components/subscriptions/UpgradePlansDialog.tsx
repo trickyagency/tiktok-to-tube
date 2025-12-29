@@ -11,19 +11,15 @@ import {
   calculateSavings,
   calculateAnnualWithVolumeDiscount,
   VOLUME_DISCOUNTS,
-  ANNUAL_DISCOUNT
 } from '@/lib/pricing';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -39,34 +35,16 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
   MessageCircle,
   Zap,
   Rocket,
   Crown,
   Check,
   Video,
-  ArrowRight,
-  X,
   ChevronDown,
-  ChevronUp,
-  Percent,
-  Calculator,
-  Minus,
-  Plus,
-  Calendar,
+  Sparkles,
   TrendingUp,
-  DollarSign,
-  User,
-  Target,
-  PiggyBank,
+  BarChart3,
 } from 'lucide-react';
 
 // Custom hook for animated counting
@@ -86,8 +64,6 @@ function useAnimatedCounter(value: number, duration: number = 400) {
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime;
       const progress = Math.min(elapsed / duration, 1);
-      
-      // Ease out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = startValue + difference * eased;
       
@@ -117,38 +93,30 @@ interface UpgradePlansDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const planIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  basic: Zap,
-  pro: Rocket,
-  scale: Crown,
-};
-
-const planColors: Record<string, string> = {
-  basic: 'from-blue-500 to-blue-600',
-  pro: 'from-primary to-primary/80',
-  scale: 'from-amber-500 to-amber-600',
-};
-
-const planFeatures: Record<string, string[]> = {
-  basic: ['2 videos/day', 'Auto-scheduling', 'Basic support'],
-  pro: ['4 videos/day', 'Priority scheduling', 'Priority support'],
-  scale: ['6 videos/day', 'Fastest processing', 'Premium support'],
-};
-
-// Human-readable labels for database feature keys
-const featureLabels: Record<string, string> = {
-  auto_upload: 'Auto Upload to YouTube',
-  watermark_free: 'Watermark-Free Downloads',
-  basic_seo: 'Basic SEO Optimization',
-  advanced_seo: 'Advanced SEO Optimization',
-  smart_seo: 'AI-Powered Smart SEO',
-  auto_scheduling: 'Auto Scheduling',
-  faster_processing: 'Faster Processing',
-  priority_processing: 'Priority Processing',
-  reupload_protection: 'Re-upload Protection',
-  best_posting_time: 'Best Posting Time Detection',
-  duplicate_detection: 'Duplicate Detection',
-  growth_optimization: 'Growth Optimization',
+const planConfig: Record<string, { 
+  icon: React.ComponentType<{ className?: string }>;
+  gradient: string;
+  bgGradient: string;
+  accentColor: string;
+}> = {
+  basic: { 
+    icon: Zap, 
+    gradient: 'from-slate-500 to-slate-600',
+    bgGradient: 'from-slate-500/5 to-slate-600/10',
+    accentColor: 'text-slate-600 dark:text-slate-400',
+  },
+  pro: { 
+    icon: Rocket, 
+    gradient: 'from-violet-500 to-fuchsia-500',
+    bgGradient: 'from-violet-500/5 to-fuchsia-500/10',
+    accentColor: 'text-violet-600 dark:text-violet-400',
+  },
+  scale: { 
+    icon: Crown, 
+    gradient: 'from-amber-500 to-orange-500',
+    bgGradient: 'from-amber-500/5 to-orange-500/10',
+    accentColor: 'text-amber-600 dark:text-amber-400',
+  },
 };
 
 export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogProps) {
@@ -157,14 +125,12 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   const { data: plans, isLoading } = useSubscriptionPlans();
   const { data: userSubscriptions } = useUserSubscriptions();
   const { data: tiktokAccounts } = useTikTokAccounts();
-  const [showComparison, setShowComparison] = useState(false);
   const [showROI, setShowROI] = useState(false);
   const [accountCount, setAccountCount] = useState(1);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [avgViews, setAvgViews] = useState('1000');
   const [cpmRate, setCpmRate] = useState('3');
   
-  // User's actual TikTok account count
   const userAccountCount = tiktokAccounts?.length || 0;
   
   // Get progress to next tier
@@ -196,7 +162,6 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   
   const progress = getProgressToNextTier(userAccountCount);
   
-  // Calculate yearly savings for animated counter (using Pro plan as example)
   const yearlySavings = useMemo(() => {
     const proBasePrice = 12;
     const annualData = calculateAnnualWithVolumeDiscount(proBasePrice, accountCount);
@@ -210,7 +175,7 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
     const proBasePrice = 12;
     const discountedPrice = calculateDiscountedPrice(proBasePrice, accountCount);
     const monthlySubscriptionCost = discountedPrice * accountCount;
-    const videosPerDay = 4; // Pro plan
+    const videosPerDay = 4;
     const monthlyVideos = videosPerDay * 30 * accountCount;
     const viewsNum = parseInt(avgViews) || 1000;
     const cpm = parseFloat(cpmRate) || 3;
@@ -219,24 +184,13 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
     const profit = monthlyEarnings - monthlySubscriptionCost;
     const roi = monthlySubscriptionCost > 0 ? ((monthlyEarnings - monthlySubscriptionCost) / monthlySubscriptionCost) * 100 : 0;
     
-    return {
-      monthlyVideos,
-      monthlyViews,
-      monthlyEarnings,
-      monthlySubscriptionCost,
-      profit,
-      roi,
-    };
+    return { monthlyVideos, monthlyViews, monthlyEarnings, monthlySubscriptionCost, profit, roi };
   }, [accountCount, avgViews, cpmRate]);
 
-  // Get unique active plan IDs the user is subscribed to
   const currentPlanIds = new Set(
-    userSubscriptions
-      ?.filter(sub => sub.status === 'active')
-      .map(sub => sub.plan_id) || []
+    userSubscriptions?.filter(sub => sub.status === 'active').map(sub => sub.plan_id) || []
   );
 
-  // Helper to determine plan action
   const getPlanAction = (planId: string): 'current' | 'upgrade' | 'downgrade' | 'subscribe' => {
     if (currentPlanIds.size === 0) return 'subscribe';
     if (currentPlanIds.has(planId)) return 'current';
@@ -248,8 +202,7 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   };
 
   const handleContactWhatsApp = () => {
-    const link = generateGeneralWhatsAppLink();
-    window.open(link, '_blank');
+    window.open(generateGeneralWhatsAppLink(), '_blank');
   };
 
   const handleGoToAccounts = () => {
@@ -257,14 +210,12 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
     navigate('/dashboard/tiktok');
   };
 
-  // Get current plan name for switch plan message
   const getCurrentPlanName = () => {
     if (currentPlanIds.size === 0) return null;
     const planId = Array.from(currentPlanIds)[0];
     return plans?.find(p => p.id === planId)?.name || 'current plan';
   };
 
-  // Handle switch plan via WhatsApp
   const handleSwitchPlan = (targetPlan: { id: string; name: string; price_monthly: number }) => {
     const currentPlanName = getCurrentPlanName();
     if (!currentPlanName) return;
@@ -278,7 +229,6 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
     window.open(link, '_blank');
   };
 
-  // Handle volume discount WhatsApp contact
   const handleVolumeDiscountContact = (plan: { id: string; name: string; price_monthly: number }) => {
     const basePrice = Math.round(plan.price_monthly / 100);
     const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
@@ -296,430 +246,389 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
     window.open(link, '_blank');
   };
 
-  // Get current discount percentage
   const currentDiscount = getDiscountPercentage(accountCount);
-
-  // Get all unique features from all plans
-  const getAllFeatures = () => {
-    if (!plans) return [];
-    const allFeatureKeys = new Set<string>();
-    plans.forEach(plan => {
-      if (plan.features && typeof plan.features === 'object') {
-        Object.keys(plan.features as Record<string, boolean>).forEach(key => allFeatureKeys.add(key));
-      }
-    });
-    return Array.from(allFeatureKeys);
-  };
-
-  const planHasFeature = (planFeatures: unknown, featureKey: string): boolean => {
-    if (!planFeatures || typeof planFeatures !== 'object') return false;
-    return (planFeatures as Record<string, boolean>)[featureKey] === true;
-  };
-
   const sortedPlans = plans?.slice().sort((a, b) => a.price_monthly - b.price_monthly);
-  const allFeatureKeys = getAllFeatures();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="pb-2">
-          <DialogTitle className="flex items-center gap-2">
-            <Rocket className="h-5 w-5 text-primary" />
-            Upgrade Your Plan
-          </DialogTitle>
-          <DialogDescription className="text-xs">
-            Choose a plan that fits your needs
-          </DialogDescription>
+      <DialogContent className="max-w-xl max-h-[85vh] overflow-y-auto p-0 gap-0 border-0 bg-gradient-to-b from-background to-muted/30">
+        {/* Premium Header */}
+        <DialogHeader className="px-5 pt-5 pb-4 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 border-b border-border/50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-primary to-primary/80 shadow-lg shadow-primary/20">
+                <Sparkles className="h-4 w-4 text-primary-foreground" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold">Choose Your Plan</DialogTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">Unlock your content automation</p>
+              </div>
+            </div>
+            <Badge variant="outline" className="text-[10px] bg-background/50 backdrop-blur-sm">
+              <MessageCircle className="h-3 w-3 mr-1 text-green-500" />
+              {WHATSAPP_DISPLAY}
+            </Badge>
+          </div>
         </DialogHeader>
 
-        {/* How to Subscribe - Compact */}
-        <div className="bg-muted/50 rounded-lg p-3 border text-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <MessageCircle className="h-4 w-4 text-green-500" />
-            <span className="font-medium">How to Subscribe</span>
-            <span className="text-xs text-muted-foreground ml-auto">WhatsApp: {WHATSAPP_DISPLAY}</span>
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            <span>1. Add TikTok account</span>
-            <span>2. Click "Subscribe"</span>
-            <span>3. Pay via WhatsApp</span>
-            <span>4. Get activated</span>
-          </div>
-        </div>
-
-        <Separator className="my-2" />
-
-        {/* Plans Grid - Compact */}
-        <div className="grid grid-cols-3 gap-3">
-          {isLoading ? (
-            Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-3">
-                  <div className="h-4 bg-muted rounded w-16 mb-2" />
-                  <div className="h-6 bg-muted rounded w-12" />
-                </CardContent>
-              </Card>
-            ))
-          ) : (
-            plans?.map((plan) => {
-              const Icon = planIcons[plan.id] || Zap;
-              const gradient = planColors[plan.id] || 'from-primary to-primary/80';
-              const features = planFeatures[plan.id] || [];
-              const isPopular = plan.id === 'pro';
-              const isCurrent = currentPlanIds.has(plan.id);
-              const planAction = getPlanAction(plan.id);
-              const displayPrice = Math.round(plan.price_monthly / 100);
-
-              return (
-                <Card
-                  key={plan.id}
-                  className={`relative transition-all hover:shadow-md ${
-                    isCurrent ? 'border-green-500 ring-1 ring-green-500/20' : 
-                    isPopular ? 'border-primary ring-1 ring-primary/20' : ''
-                  }`}
-                >
-                  {isCurrent && (
-                    <Badge className="absolute -top-2 right-2 bg-green-600 text-white text-[10px] px-1.5 py-0">
-                      Current
-                    </Badge>
-                  )}
-                  {isPopular && !isCurrent && (
-                    <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0">
-                      Popular
-                    </Badge>
-                  )}
-                  <CardContent className="p-3 pt-4">
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <div className={`p-1.5 rounded bg-gradient-to-r ${gradient}`}>
-                        <Icon className="h-3 w-3 text-white" />
-                      </div>
-                      <span className="font-medium capitalize text-sm">{plan.name}</span>
-                    </div>
-                    <div className="mb-2">
-                      <span className="text-2xl font-bold">${displayPrice}</span>
-                      <span className="text-xs text-muted-foreground">/mo</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
-                      <Video className="h-3 w-3" />
-                      <span>{plan.max_videos_per_day} videos/day</span>
-                    </div>
-                    <ul className="space-y-1 mb-3">
-                      {features.slice(0, 2).map((feature, index) => (
-                        <li key={index} className="flex items-center gap-1 text-xs">
-                          <Check className="h-3 w-3 text-green-500 shrink-0" />
-                          <span className="text-muted-foreground">{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    
-                    {planAction === 'current' ? (
-                      <Button variant="outline" size="sm" className="w-full h-7 text-xs" disabled>
-                        <Check className="h-3 w-3 mr-1" />
-                        Current
-                      </Button>
-                    ) : planAction === 'subscribe' ? (
-                      <Button size="sm" className="w-full h-7 text-xs" onClick={handleGoToAccounts}>
-                        Get Started
-                      </Button>
-                    ) : (
-                      <Button 
-                        size="sm" 
-                        className="w-full h-7 text-xs"
-                        variant={planAction === 'upgrade' ? 'default' : 'secondary'}
-                        onClick={() => handleSwitchPlan(plan)}
-                      >
-                        {planAction === 'upgrade' ? 'Upgrade' : 'Switch'}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              );
-            })
-          )}
-        </div>
-
-        <Separator className="my-2" />
-
-        {/* Volume Discount Calculator - Compact */}
-        <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-primary" />
-              <span className="font-medium text-sm">Volume Calculator</span>
-            </div>
-            {currentDiscount > 0 && (
-              <Badge className="bg-green-500 text-white text-xs">{currentDiscount}% OFF</Badge>
-            )}
-          </div>
-          
-          {/* Progress Bar to Next Tier */}
-          {userAccountCount > 0 && progress.hasNextTier && (
-            <div className="mb-3 p-2 bg-background/50 rounded-md">
-              <div className="flex items-center justify-between text-xs mb-1.5">
-                <span className="text-muted-foreground flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  You: {userAccountCount} account{userAccountCount !== 1 ? 's' : ''} ({progress.currentDiscount}% tier)
-                </span>
-                <span className="font-medium text-primary">
-                  +{progress.remaining} → {progress.nextDiscount}% off
-                </span>
-              </div>
-              <Progress value={progress.percentage} className="h-2" />
-              {accountCount !== userAccountCount && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-6 text-xs mt-1.5 p-0 text-primary hover:text-primary/80"
-                  onClick={() => setAccountCount(userAccountCount)}
-                >
-                  Use my count ({userAccountCount})
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* Account Counter + Slider */}
-          <div className="flex items-center gap-3 mb-3">
-            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAccountCount(Math.max(1, accountCount - 1))} disabled={accountCount <= 1}>
-              <Minus className="h-3 w-3" />
-            </Button>
-            <div className="flex-1">
-              <Slider value={[accountCount]} onValueChange={([value]) => setAccountCount(value)} min={1} max={15} step={1} />
-            </div>
-            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAccountCount(Math.min(15, accountCount + 1))} disabled={accountCount >= 15}>
-              <Plus className="h-3 w-3" />
-            </Button>
-            <div className="text-center min-w-[50px]">
-              <span className="text-lg font-bold">{accountCount}</span>
-              <span className="text-[10px] text-muted-foreground block">accounts</span>
-            </div>
-          </div>
-
-          {/* Billing Cycle Toggle */}
-          <div className="flex gap-2 mb-3">
-            <Button variant={billingCycle === 'monthly' ? 'default' : 'outline'} size="sm" onClick={() => setBillingCycle('monthly')} className="flex-1 h-7 text-xs">
-              Monthly
-            </Button>
-            <Button variant={billingCycle === 'annual' ? 'default' : 'outline'} size="sm" onClick={() => setBillingCycle('annual')} className="flex-1 h-7 text-xs">
-              <Calendar className="h-3 w-3 mr-1" />
-              Annual -20%
-            </Button>
-          </div>
-
-          {/* Tier Pills */}
-          <div className="flex gap-1 mb-3">
-            {VOLUME_DISCOUNTS.map((tier, index) => {
-              const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
-              const tierLabel = tier.maxAccounts === Infinity ? `${tier.minAccounts}+` : `${tier.minAccounts}-${tier.maxAccounts}`;
-              
-              return (
-                <div 
-                  key={index}
-                  className={`flex-1 text-center py-1.5 px-1 rounded text-xs transition-all ${
-                    isActive 
-                      ? 'bg-primary text-primary-foreground font-medium' 
-                      : 'bg-muted/50'
-                  }`}
-                >
-                  <div className="font-medium">{tierLabel}</div>
-                  <div className={`text-[10px] ${isActive ? 'opacity-80' : 'text-green-600'}`}>
-                    {tier.discount === 0 ? '0%' : `-${Math.round(tier.discount * 100)}%`}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Savings Display */}
-          {(currentDiscount > 0 || billingCycle === 'annual') && (
-            <div className="flex items-center justify-between p-2 bg-green-500/10 border border-green-500/20 rounded-md">
-              <div className="flex items-center gap-1.5">
-                <PiggyBank className="h-4 w-4 text-green-600" />
-                <span className="text-xs font-medium text-green-700 dark:text-green-400">Yearly Savings</span>
-              </div>
-              <span className="text-lg font-bold text-green-600 tabular-nums">${animatedSavings.toFixed(0)}</span>
-            </div>
-          )}
-
-          {/* Quick Price Grid */}
-          {sortedPlans && (
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              {sortedPlans.map((plan) => {
-                const basePrice = Math.round(plan.price_monthly / 100);
-                const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
-                const totalPrice = calculateTotalPrice(basePrice, accountCount);
-                const hasDiscount = currentDiscount > 0 || billingCycle === 'annual';
-                const annualData = calculateAnnualWithVolumeDiscount(basePrice, accountCount);
-                const displayPrice = billingCycle === 'monthly' ? discountedPrice : annualData.annualPerAccountPerMonth;
-                const displayTotal = billingCycle === 'monthly' ? totalPrice : annualData.totalAnnualPerMonth;
+        <div className="px-5 py-4 space-y-4">
+          {/* Plan Cards - Glassmorphism Style */}
+          <div className="grid grid-cols-3 gap-2.5">
+            {isLoading ? (
+              Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="h-40 rounded-xl bg-muted/50 animate-pulse" />
+              ))
+            ) : (
+              sortedPlans?.map((plan) => {
+                const config = planConfig[plan.id] || planConfig.basic;
+                const Icon = config.icon;
+                const isPopular = plan.id === 'pro';
+                const isCurrent = currentPlanIds.has(plan.id);
+                const planAction = getPlanAction(plan.id);
+                const displayPrice = Math.round(plan.price_monthly / 100);
 
                 return (
-                  <div key={plan.id} className="bg-background rounded p-2 border text-center">
-                    <div className="text-xs font-medium capitalize mb-1">{plan.name}</div>
-                    {hasDiscount && <div className="text-[10px] text-muted-foreground line-through">${basePrice}/ea</div>}
-                    <div className="text-sm font-bold text-primary">${displayPrice.toFixed(2)}/ea</div>
-                    <div className="text-[10px] text-muted-foreground">${displayTotal.toFixed(0)}/mo total</div>
-                    <Button size="sm" variant="ghost" className="w-full h-6 text-[10px] mt-1" onClick={() => handleVolumeDiscountContact(plan)}>
-                      <MessageCircle className="h-3 w-3 mr-1" />
-                      Contact
-                    </Button>
+                  <div
+                    key={plan.id}
+                    className={`relative group rounded-xl border transition-all duration-300 overflow-hidden
+                      ${isPopular ? 'border-primary/50 shadow-lg shadow-primary/10' : 'border-border/50'}
+                      ${isCurrent ? 'ring-2 ring-green-500/30 border-green-500/50' : ''}
+                      hover:shadow-xl hover:-translate-y-0.5 hover:border-primary/30
+                      bg-gradient-to-b ${config.bgGradient} backdrop-blur-sm
+                    `}
+                  >
+                    {/* Popular Glow Effect */}
+                    {isPopular && (
+                      <div className="absolute inset-0 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
+                    )}
+                    
+                    {/* Badges */}
+                    {isCurrent && (
+                      <div className="absolute top-2 right-2">
+                        <Badge className="bg-green-500 text-white text-[9px] px-1.5 py-0 shadow-sm">
+                          Active
+                        </Badge>
+                      </div>
+                    )}
+                    {isPopular && !isCurrent && (
+                      <div className="absolute -top-px left-1/2 -translate-x-1/2">
+                        <div className="bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white text-[9px] px-3 py-0.5 rounded-b-md font-medium shadow-lg">
+                          Best Value
+                        </div>
+                      </div>
+                    )}
+                    
+                    <div className="p-3 pt-4 relative">
+                      {/* Icon & Name */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className={`p-1.5 rounded-lg bg-gradient-to-br ${config.gradient} shadow-md`}>
+                          <Icon className="h-3.5 w-3.5 text-white" />
+                        </div>
+                        <span className="font-semibold capitalize text-sm">{plan.name}</span>
+                      </div>
+                      
+                      {/* Price */}
+                      <div className="mb-3">
+                        <div className="flex items-baseline gap-0.5">
+                          <span className="text-2xl font-bold tracking-tight">${displayPrice}</span>
+                          <span className="text-xs text-muted-foreground">/mo</span>
+                        </div>
+                        <div className={`text-xs ${config.accentColor} font-medium`}>
+                          {plan.max_videos_per_day} videos/day
+                        </div>
+                      </div>
+                      
+                      {/* CTA Button */}
+                      {planAction === 'current' ? (
+                        <Button variant="outline" size="sm" className="w-full h-7 text-xs bg-green-500/10 border-green-500/30 text-green-600 dark:text-green-400" disabled>
+                          <Check className="h-3 w-3 mr-1" />
+                          Current
+                        </Button>
+                      ) : planAction === 'subscribe' ? (
+                        <Button 
+                          size="sm" 
+                          className={`w-full h-7 text-xs bg-gradient-to-r ${config.gradient} hover:opacity-90 shadow-md`}
+                          onClick={handleGoToAccounts}
+                        >
+                          Get Started
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          className={`w-full h-7 text-xs ${planAction === 'upgrade' ? `bg-gradient-to-r ${config.gradient} hover:opacity-90 shadow-md` : ''}`}
+                          variant={planAction === 'upgrade' ? 'default' : 'secondary'}
+                          onClick={() => handleSwitchPlan(plan)}
+                        >
+                          {planAction === 'upgrade' ? 'Upgrade' : 'Switch'}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 );
-              })}
+              })
+            )}
+          </div>
+
+          {/* Volume Pricing Section */}
+          <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/50 bg-muted/30">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                  <span className="font-medium text-sm">Volume Pricing</span>
+                </div>
+                {currentDiscount > 0 && (
+                  <Badge className="bg-gradient-to-r from-emerald-500 to-green-500 text-white text-[10px] px-2 shadow-sm">
+                    Save {currentDiscount}%
+                  </Badge>
+                )}
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* ROI Calculator - Collapsible */}
-        <Collapsible open={showROI} onOpenChange={setShowROI}>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full h-8 text-xs gap-1">
-              <Target className="h-3 w-3" />
-              ROI Calculator
-              {showROI ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2">
-            <div className="bg-muted/30 rounded-lg p-3 border">
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">Avg views/video</label>
-                  <Select value={avgViews} onValueChange={setAvgViews}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="500">500</SelectItem>
-                      <SelectItem value="1000">1,000</SelectItem>
-                      <SelectItem value="5000">5,000</SelectItem>
-                      <SelectItem value="10000">10,000</SelectItem>
-                      <SelectItem value="50000">50,000</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <label className="text-xs text-muted-foreground mb-1 block">CPM Rate ($)</label>
-                  <Select value={cpmRate} onValueChange={setCpmRate}>
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1">$1 (Low)</SelectItem>
-                      <SelectItem value="3">$3 (Avg)</SelectItem>
-                      <SelectItem value="5">$5 (Good)</SelectItem>
-                      <SelectItem value="10">$10 (Great)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="text-xs text-muted-foreground mb-2">
-                Pro Plan × {accountCount} accounts = {roiData.monthlyVideos.toLocaleString()} videos/mo
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <div className="bg-background rounded p-2">
-                  <div className="text-[10px] text-muted-foreground">Cost</div>
-                  <div className="text-sm font-bold">${roiData.monthlySubscriptionCost.toFixed(0)}</div>
-                </div>
-                <div className="bg-background rounded p-2">
-                  <div className="text-[10px] text-muted-foreground">Est. Earnings</div>
-                  <div className="text-sm font-bold text-green-600">${roiData.monthlyEarnings.toFixed(0)}</div>
-                </div>
-                <div className={`rounded p-2 ${roiData.roi > 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
-                  <div className="text-[10px] text-muted-foreground">ROI</div>
-                  <div className={`text-sm font-bold ${roiData.roi > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {roiData.roi > 0 ? '+' : ''}{roiData.roi.toFixed(0)}%
+            
+            <div className="p-4 space-y-4">
+              {/* Progress to Next Tier */}
+              {userAccountCount > 0 && progress.hasNextTier && (
+                <div className="flex items-center gap-3 p-2.5 rounded-lg bg-muted/50">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between text-[11px] mb-1.5">
+                      <span className="text-muted-foreground">
+                        {userAccountCount} account{userAccountCount !== 1 ? 's' : ''} • {progress.currentDiscount}% tier
+                      </span>
+                      <span className="font-medium text-primary">
+                        +{progress.remaining} for {progress.nextDiscount}%
+                      </span>
+                    </div>
+                    <Progress value={progress.percentage} className="h-1.5" />
                   </div>
                 </div>
+              )}
+
+              {/* Account Slider */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-muted-foreground">Accounts</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold tabular-nums">{accountCount}</span>
+                    {userAccountCount > 0 && accountCount !== userAccountCount && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-5 text-[10px] px-1.5 text-primary"
+                        onClick={() => setAccountCount(userAccountCount)}
+                      >
+                        Use mine ({userAccountCount})
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <Slider 
+                  value={[accountCount]} 
+                  onValueChange={([value]) => setAccountCount(value)} 
+                  min={1} 
+                  max={15} 
+                  step={1}
+                  className="py-1"
+                />
               </div>
 
-              {roiData.profit > 0 && (
-                <div className="mt-2 text-center text-xs text-green-600 font-medium">
-                  Potential profit: ${roiData.profit.toFixed(0)}/month
+              {/* Tier Indicators */}
+              <div className="flex gap-1">
+                {VOLUME_DISCOUNTS.map((tier, index) => {
+                  const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
+                  const tierLabel = tier.maxAccounts === Infinity ? `${tier.minAccounts}+` : `${tier.minAccounts}-${tier.maxAccounts}`;
+                  
+                  return (
+                    <button 
+                      key={index}
+                      onClick={() => setAccountCount(tier.minAccounts)}
+                      className={`flex-1 py-1.5 rounded-md text-[10px] transition-all
+                        ${isActive 
+                          ? 'bg-primary text-primary-foreground font-medium shadow-sm' 
+                          : 'bg-muted/50 hover:bg-muted text-muted-foreground'
+                        }`}
+                    >
+                      <div>{tierLabel}</div>
+                      <div className={isActive ? 'opacity-80' : 'text-emerald-600 dark:text-emerald-400'}>
+                        {tier.discount === 0 ? '—' : `-${Math.round(tier.discount * 100)}%`}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Billing Toggle */}
+              <div className="flex gap-1.5 p-1 bg-muted/50 rounded-lg">
+                <button
+                  onClick={() => setBillingCycle('monthly')}
+                  className={`flex-1 py-1.5 text-xs rounded-md transition-all ${
+                    billingCycle === 'monthly' 
+                      ? 'bg-background text-foreground shadow-sm font-medium' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Monthly
+                </button>
+                <button
+                  onClick={() => setBillingCycle('annual')}
+                  className={`flex-1 py-1.5 text-xs rounded-md transition-all flex items-center justify-center gap-1 ${
+                    billingCycle === 'annual' 
+                      ? 'bg-background text-foreground shadow-sm font-medium' 
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  Annual
+                  <span className="text-emerald-600 dark:text-emerald-400 font-semibold">-20%</span>
+                </button>
+              </div>
+
+              {/* Savings Display */}
+              {(currentDiscount > 0 || billingCycle === 'annual') && (
+                <div className="flex items-center justify-between p-3 rounded-lg bg-gradient-to-r from-emerald-500/10 to-green-500/10 border border-emerald-500/20">
+                  <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">Yearly Savings</span>
+                  <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                    ${animatedSavings.toFixed(0)}
+                  </span>
+                </div>
+              )}
+
+              {/* Price Grid */}
+              {sortedPlans && (
+                <div className="grid grid-cols-3 gap-2">
+                  {sortedPlans.map((plan) => {
+                    const config = planConfig[plan.id] || planConfig.basic;
+                    const basePrice = Math.round(plan.price_monthly / 100);
+                    const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
+                    const totalPrice = calculateTotalPrice(basePrice, accountCount);
+                    const hasDiscount = currentDiscount > 0 || billingCycle === 'annual';
+                    const annualData = calculateAnnualWithVolumeDiscount(basePrice, accountCount);
+                    const displayPrice = billingCycle === 'monthly' ? discountedPrice : annualData.annualPerAccountPerMonth;
+                    const displayTotal = billingCycle === 'monthly' ? totalPrice : annualData.totalAnnualPerMonth;
+
+                    return (
+                      <div key={plan.id} className="rounded-lg border border-border/50 bg-background p-2.5 text-center">
+                        <div className={`text-xs font-semibold capitalize mb-1 ${config.accentColor}`}>{plan.name}</div>
+                        {hasDiscount && (
+                          <div className="text-[10px] text-muted-foreground line-through">${basePrice}</div>
+                        )}
+                        <div className="text-sm font-bold">${displayPrice.toFixed(2)}<span className="text-[10px] font-normal text-muted-foreground">/ea</span></div>
+                        <div className="text-[10px] text-muted-foreground mb-1.5">${displayTotal.toFixed(0)}/mo</div>
+                        <Button 
+                          size="sm" 
+                          variant="ghost" 
+                          className="w-full h-6 text-[10px] hover:bg-muted" 
+                          onClick={() => handleVolumeDiscountContact(plan)}
+                        >
+                          <MessageCircle className="h-3 w-3 mr-1 text-green-500" />
+                          Contact
+                        </Button>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
-          </CollapsibleContent>
-        </Collapsible>
+          </div>
 
-        {/* Compare Features - Collapsible */}
-        <Collapsible open={showComparison} onOpenChange={setShowComparison}>
-          <CollapsibleTrigger asChild>
-            <Button variant="outline" size="sm" className="w-full h-8 text-xs gap-1">
-              Compare Features
-              {showComparison ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-2">
-            {sortedPlans && (
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="font-medium text-xs py-2">Feature</TableHead>
-                      {sortedPlans.map((plan) => (
-                        <TableHead key={plan.id} className="text-center font-medium capitalize text-xs py-2">
-                          {plan.name}
-                        </TableHead>
-                      ))}
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell className="text-xs py-1.5">Videos/Day</TableCell>
-                      {sortedPlans.map((plan) => (
-                        <TableCell key={plan.id} className="text-center text-xs font-semibold text-primary py-1.5">
-                          {plan.max_videos_per_day}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    <TableRow>
-                      <TableCell className="text-xs py-1.5">Price</TableCell>
-                      {sortedPlans.map((plan) => (
-                        <TableCell key={plan.id} className="text-center text-xs font-semibold py-1.5">
-                          ${Math.round(plan.price_monthly / 100)}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                    {allFeatureKeys.slice(0, 6).map((featureKey) => (
-                      <TableRow key={featureKey}>
-                        <TableCell className="text-xs py-1.5">
-                          {featureLabels[featureKey] || featureKey.replace(/_/g, ' ')}
-                        </TableCell>
-                        {sortedPlans.map((plan) => (
-                          <TableCell key={plan.id} className="text-center py-1.5">
-                            {planHasFeature(plan.features, featureKey) ? (
-                              <Check className="h-3.5 w-3.5 text-green-500 mx-auto" />
-                            ) : (
-                              <X className="h-3.5 w-3.5 text-muted-foreground/40 mx-auto" />
-                            )}
-                          </TableCell>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+          {/* ROI Calculator */}
+          <Collapsible open={showROI} onOpenChange={setShowROI}>
+            <CollapsibleTrigger asChild>
+              <button className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg border border-border/50 bg-card/50 hover:bg-muted/50 transition-colors group">
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-4 w-4 text-primary" />
+                  <span className="text-sm font-medium">Earnings Calculator</span>
+                </div>
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${showROI ? 'rotate-180' : ''}`} />
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="mt-2 p-4 rounded-lg border border-border/50 bg-card/50 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wide">Views/Video</label>
+                    <Select value={avgViews} onValueChange={setAvgViews}>
+                      <SelectTrigger className="h-8 text-xs bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="500">500</SelectItem>
+                        <SelectItem value="1000">1,000</SelectItem>
+                        <SelectItem value="5000">5,000</SelectItem>
+                        <SelectItem value="10000">10,000</SelectItem>
+                        <SelectItem value="50000">50,000</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wide">CPM Rate</label>
+                    <Select value={cpmRate} onValueChange={setCpmRate}>
+                      <SelectTrigger className="h-8 text-xs bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1">$1 (Low)</SelectItem>
+                        <SelectItem value="3">$3 (Avg)</SelectItem>
+                        <SelectItem value="5">$5 (Good)</SelectItem>
+                        <SelectItem value="10">$10 (Great)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-muted-foreground text-center py-1">
+                  Pro Plan × {accountCount} = {roiData.monthlyVideos.toLocaleString()} videos/month
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg bg-muted/50 p-2.5 text-center">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Cost</div>
+                    <div className="text-base font-bold">${roiData.monthlySubscriptionCost.toFixed(0)}</div>
+                  </div>
+                  <div className="rounded-lg bg-emerald-500/10 p-2.5 text-center">
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">Earnings</div>
+                    <div className="text-base font-bold text-emerald-600 dark:text-emerald-400">${roiData.monthlyEarnings.toFixed(0)}</div>
+                  </div>
+                  <div className={`rounded-lg p-2.5 text-center ${roiData.roi > 0 ? 'bg-gradient-to-br from-emerald-500/10 to-green-500/10' : 'bg-red-500/10'}`}>
+                    <div className="text-[10px] text-muted-foreground uppercase tracking-wide">ROI</div>
+                    <div className={`text-base font-bold ${roiData.roi > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`}>
+                      {roiData.roi > 0 ? '+' : ''}{roiData.roi.toFixed(0)}%
+                    </div>
+                  </div>
+                </div>
+
+                {roiData.profit > 0 && (
+                  <div className="text-center text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                    ≈ ${roiData.profit.toFixed(0)}/mo profit · ${(roiData.profit * 12).toFixed(0)}/year
+                  </div>
+                )}
               </div>
-            )}
-          </CollapsibleContent>
-        </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
 
-        {/* Action Buttons */}
-        <div className="flex gap-2 pt-1">
-          <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={handleGoToAccounts}>
-            <Video className="h-3 w-3 mr-1" />
-            TikTok Accounts
-          </Button>
-          <Button size="sm" className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleContactWhatsApp}>
-            <MessageCircle className="h-3 w-3 mr-1" />
-            WhatsApp
-          </Button>
+          {/* Footer Actions */}
+          <div className="flex gap-2 pt-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1 h-9 text-xs" 
+              onClick={handleGoToAccounts}
+            >
+              <Video className="h-3.5 w-3.5 mr-1.5" />
+              Manage Accounts
+            </Button>
+            <Button 
+              size="sm" 
+              className="flex-1 h-9 text-xs bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white shadow-md" 
+              onClick={handleContactWhatsApp}
+            >
+              <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+              Contact Us
+            </Button>
+          </div>
+
+          <p className="text-[10px] text-center text-muted-foreground">
+            Subscriptions are per TikTok account
+          </p>
         </div>
-
-        <p className="text-[10px] text-center text-muted-foreground">
-          Subscriptions are per TikTok account.
-        </p>
       </DialogContent>
     </Dialog>
   );
