@@ -819,6 +819,51 @@ export type Database = {
         }
         Relationships: []
       }
+      user_subscriptions: {
+        Row: {
+          account_count: number
+          activated_at: string | null
+          activated_by: string | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          payment_notes: string | null
+          plan_id: string
+          starts_at: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_count?: number
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          payment_notes?: string | null
+          plan_id: string
+          starts_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_count?: number
+          activated_at?: string | null
+          activated_by?: string | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          payment_notes?: string | null
+          plan_id?: string
+          starts_at?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       videos: {
         Row: {
           created_at: string

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useSubscriptionPlans, useUserSubscriptions } from '@/hooks/useSubscriptions';
+import { useSubscriptionPlans } from '@/hooks/useSubscriptions';
+import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   getDiscountPercentage, 
@@ -9,18 +10,18 @@ import {
   calculateAnnualWithVolumeDiscount,
   VOLUME_DISCOUNTS
 } from '@/lib/pricing';
-import { generateGeneralWhatsAppLink, generateSwitchPlanWhatsAppLink, generateVolumeDiscountWhatsAppLink } from '@/lib/whatsapp';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { ArrowLeft, Check, ChevronDown, MessageCircle, HelpCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Check, ChevronDown, HelpCircle, Info } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export default function UpgradePlans() {
   const { data: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
-  const { data: userSubscriptions } = useUserSubscriptions();
-  const { user } = useAuth();
+  const { data: currentSubscription } = useCurrentUserSubscription();
+  const { isOwner } = useAuth();
   
   const [accountCount, setAccountCount] = useState(1);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
@@ -29,52 +30,7 @@ export default function UpgradePlans() {
   const [cpmRate, setCpmRate] = useState(2);
 
   const activePlans = subscriptionPlans?.filter(p => p.is_active) || [];
-  const activeSubscriptionCount = userSubscriptions?.filter(s => s.status === 'active').length || 0;
   
-  const getPlanAction = (planId: string) => {
-    const currentPlan = userSubscriptions?.find(s => s.status === 'active');
-    if (!currentPlan) return 'subscribe';
-    if (currentPlan.plan_id === planId) return 'current';
-    
-    const planOrder = ['basic', 'pro', 'scale'];
-    const currentIndex = planOrder.indexOf(currentPlan.plan_id);
-    const targetIndex = planOrder.indexOf(planId);
-    return targetIndex > currentIndex ? 'upgrade' : 'downgrade';
-  };
-
-  const handleContactWhatsApp = () => {
-    const link = generateGeneralWhatsAppLink();
-    window.open(link, '_blank');
-  };
-
-  const handleSwitchPlan = (targetPlan: { id: string; name: string; price_monthly: number }) => {
-    const currentPlan = userSubscriptions?.find(s => s.status === 'active');
-    const link = generateSwitchPlanWhatsAppLink({
-      currentPlanName: currentPlan?.plan?.name || 'None',
-      newPlanName: targetPlan.name,
-      newPlanPrice: targetPlan.price_monthly,
-      userEmail: user?.email,
-    });
-    window.open(link, '_blank');
-  };
-
-  const handleVolumeDiscountContact = (plan: { name: string; price_monthly: number }) => {
-    const discount = getDiscountPercentage(accountCount);
-    const pricePerAccount = calculateDiscountedPrice(plan.price_monthly, accountCount);
-    const totalMonthly = pricePerAccount * accountCount;
-    
-    const link = generateVolumeDiscountWhatsAppLink({
-      planName: plan.name,
-      accountCount,
-      pricePerAccount,
-      totalPrice: totalMonthly,
-      discountPercentage: discount,
-      userEmail: user?.email,
-    });
-    window.open(link, '_blank');
-  };
-
-  const discountTierLabel = getDiscountTierLabel(accountCount);
   const proPlan = activePlans.find(p => p.id === 'pro');
   const yearlySavings = proPlan 
     ? calculateAnnualWithVolumeDiscount(proPlan.price_monthly, accountCount).totalSavingsYear
@@ -113,10 +69,48 @@ export default function UpgradePlans() {
         </Link>
 
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-semibold tracking-tight mb-3">Choose your plan</h1>
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-semibold tracking-tight mb-3">Subscription Plans</h1>
           <p className="text-muted-foreground text-lg">Scale your content automation effortlessly</p>
         </div>
+
+        {/* Info Banner for non-owners */}
+        {!isOwner && (
+          <Alert className="mb-8">
+            <Info className="h-4 w-4" />
+            <AlertDescription>
+              Subscriptions are managed by your account administrator. Contact them to upgrade your plan or add more accounts.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Current Subscription Status */}
+        {currentSubscription && (
+          <Card className="mb-8 border-primary/50 bg-primary/5">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground mb-1">Your Current Plan</p>
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl font-bold capitalize">{currentSubscription.plan?.name || currentSubscription.plan_id}</span>
+                    <Badge variant="secondary" className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
+                      {currentSubscription.account_count} accounts
+                    </Badge>
+                    <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
+                      Active
+                    </Badge>
+                  </div>
+                </div>
+                {currentSubscription.expires_at && (
+                  <div className="text-right">
+                    <p className="text-sm text-muted-foreground">Expires</p>
+                    <p className="font-medium">{new Date(currentSubscription.expires_at).toLocaleDateString()}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Billing Toggle */}
         <div className="flex justify-center mb-10">
@@ -147,8 +141,8 @@ export default function UpgradePlans() {
         {/* Plan Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           {activePlans.map((plan) => {
-            const action = getPlanAction(plan.id);
             const isRecommended = plan.id === 'pro';
+            const isCurrentPlan = currentSubscription?.plan_id === plan.id;
             const features = planFeatures[plan.id] || [];
             const price = billingCycle === 'annual' 
               ? (plan.price_monthly * 0.8).toFixed(0) 
@@ -158,12 +152,21 @@ export default function UpgradePlans() {
               <Card 
                 key={plan.id} 
                 className={`relative flex flex-col ${
-                  isRecommended 
-                    ? 'border-primary shadow-lg' 
-                    : 'border-border'
+                  isCurrentPlan 
+                    ? 'border-emerald-500 shadow-lg' 
+                    : isRecommended 
+                      ? 'border-primary shadow-lg' 
+                      : 'border-border'
                 }`}
               >
-                {isRecommended && (
+                {isCurrentPlan && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="bg-emerald-500 text-white text-xs font-medium px-3 py-1 rounded-full">
+                      Your Plan
+                    </span>
+                  </div>
+                )}
+                {!isCurrentPlan && isRecommended && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className="bg-primary text-primary-foreground text-xs font-medium px-3 py-1 rounded-full">
                       Recommended
@@ -192,34 +195,10 @@ export default function UpgradePlans() {
                     ))}
                   </ul>
                   
-                  {action === 'current' ? (
-                    <Button variant="outline" disabled className="w-full">
-                      Current Plan
-                    </Button>
-                  ) : action === 'upgrade' ? (
-                    <Button 
-                      className="w-full"
-                      onClick={() => handleSwitchPlan(plan)}
-                    >
-                      Upgrade
-                    </Button>
-                  ) : action === 'downgrade' ? (
-                    <Button 
-                      variant="outline" 
-                      className="w-full"
-                      onClick={() => handleSwitchPlan(plan)}
-                    >
-                      Switch
-                    </Button>
-                  ) : (
-                    <Button 
-                      className="w-full"
-                      variant={isRecommended ? 'default' : 'outline'}
-                      onClick={() => handleSwitchPlan(plan)}
-                    >
-                      Get Started
-                    </Button>
-                  )}
+                  {/* No action buttons - subscriptions managed by owner */}
+                  <div className="text-center text-sm text-muted-foreground py-3 border-t">
+                    {isCurrentPlan ? 'Currently active' : 'Contact admin to subscribe'}
+                  </div>
                 </CardContent>
               </Card>
             );
@@ -230,7 +209,7 @@ export default function UpgradePlans() {
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Volume discounts</CardTitle>
-            <p className="text-sm text-muted-foreground">Save more when you add multiple accounts</p>
+            <p className="text-sm text-muted-foreground">Save more with multiple accounts</p>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Discount Tiers */}
@@ -294,14 +273,6 @@ export default function UpgradePlans() {
                 </div>
               </div>
             )}
-
-            <Button 
-              className="w-full"
-              onClick={() => proPlan && handleVolumeDiscountContact(proPlan)}
-            >
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Contact for Volume Pricing
-            </Button>
           </CardContent>
         </Card>
 
@@ -390,71 +361,56 @@ export default function UpgradePlans() {
               <AccordionItem value="billing">
                 <AccordionTrigger className="text-left">How does billing work?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  You're billed per TikTok account. Each account requires its own subscription. 
-                  Billing occurs monthly on the date you subscribed. You can choose between monthly 
-                  or annual billing, with annual plans saving you 20%.
+                  Billing is based on the number of accounts in your subscription. Your administrator 
+                  assigns a plan with a specific number of accounts. Volume discounts are automatically 
+                  applied for larger subscriptions.
                 </AccordionContent>
               </AccordionItem>
               
-              <AccordionItem value="cancel">
-                <AccordionTrigger className="text-left">Can I cancel anytime?</AccordionTrigger>
+              <AccordionItem value="accounts">
+                <AccordionTrigger className="text-left">How do account limits work?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Yes, you can cancel your subscription at any time. There's no long-term commitment 
-                  required. When you cancel, you'll continue to have access until the end of your 
-                  current billing period.
+                  Your subscription includes a set number of TikTok accounts you can add. Once assigned 
+                  by your administrator, you can add accounts up to your limit. Need more? Contact your 
+                  administrator to upgrade your subscription.
                 </AccordionContent>
               </AccordionItem>
               
               <AccordionItem value="upgrade">
-                <AccordionTrigger className="text-left">What happens when I upgrade?</AccordionTrigger>
+                <AccordionTrigger className="text-left">How do I upgrade my plan?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Your new plan takes effect immediately. You'll be charged the prorated difference 
-                  for the remainder of your current billing period. All the new features will be 
-                  available right away.
+                  Subscriptions are managed by your account administrator. Contact them to request 
+                  a plan upgrade, add more accounts, or extend your subscription period.
                 </AccordionContent>
               </AccordionItem>
               
-              <AccordionItem value="refunds">
-                <AccordionTrigger className="text-left">Do you offer refunds?</AccordionTrigger>
+              <AccordionItem value="cancel">
+                <AccordionTrigger className="text-left">Can subscriptions be cancelled?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  We offer refunds within 7 days of purchase if you're not satisfied with the service. 
-                  Contact us via WhatsApp to request a refund, and we'll process it promptly.
+                  Yes, administrators can cancel subscriptions at any time. When cancelled, access 
+                  continues until the current subscription period ends.
                 </AccordionContent>
               </AccordionItem>
               
               <AccordionItem value="volume">
                 <AccordionTrigger className="text-left">How do volume discounts work?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Add more accounts to automatically unlock bigger discounts. With 3-5 accounts you 
-                  save 10%, with 6-10 accounts you save 25%, and with 11+ accounts you can save up 
-                  to 50% off the regular price. Use the slider above to see your potential savings.
+                  Volume discounts are automatically applied based on the number of accounts in your 
+                  subscription: 3-5 accounts get 17% off, 6-10 accounts get 33% off, and 11+ accounts 
+                  get 50% off the per-account price.
                 </AccordionContent>
               </AccordionItem>
               
               <AccordionItem value="payment">
-                <AccordionTrigger className="text-left">What payment methods do you accept?</AccordionTrigger>
+                <AccordionTrigger className="text-left">What payment methods are accepted?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  We process payments through WhatsApp checkout for a personalized experience. We 
-                  accept all major payment methods including credit cards, debit cards, and bank 
-                  transfers depending on your region.
+                  Payment is handled directly with your administrator. They can accept various 
+                  payment methods based on your arrangement.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
           </CardContent>
         </Card>
-
-        {/* Footer */}
-        <div className="text-center mt-12 space-y-4">
-          <button 
-            onClick={handleContactWhatsApp}
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Questions? Contact us on WhatsApp
-          </button>
-          <p className="text-xs text-muted-foreground">
-            Subscriptions are per account · Cancel anytime
-          </p>
-        </div>
       </div>
     </div>
   );
