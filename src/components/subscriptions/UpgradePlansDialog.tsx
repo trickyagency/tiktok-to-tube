@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useSubscriptionPlans } from '@/hooks/useSubscriptions';
+import { useSubscriptionPlans, useUserSubscriptions } from '@/hooks/useSubscriptions';
 import { generateGeneralWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
 import {
   Dialog,
@@ -32,6 +32,7 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  Percent,
 } from 'lucide-react';
 
 interface UpgradePlansDialogProps {
@@ -76,7 +77,26 @@ const featureLabels: Record<string, string> = {
 export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogProps) {
   const navigate = useNavigate();
   const { data: plans, isLoading } = useSubscriptionPlans();
+  const { data: userSubscriptions } = useUserSubscriptions();
   const [showComparison, setShowComparison] = useState(false);
+
+  // Get unique active plan IDs the user is subscribed to
+  const currentPlanIds = new Set(
+    userSubscriptions
+      ?.filter(sub => sub.status === 'active')
+      .map(sub => sub.plan_id) || []
+  );
+
+  // Helper to determine plan action
+  const getPlanAction = (planId: string): 'current' | 'upgrade' | 'downgrade' | 'subscribe' => {
+    if (currentPlanIds.size === 0) return 'subscribe';
+    if (currentPlanIds.has(planId)) return 'current';
+    const currentMaxPrice = Math.max(...Array.from(currentPlanIds).map(id => 
+      plans?.find(p => p.id === id)?.price_monthly || 0
+    ));
+    const targetPrice = plans?.find(p => p.id === planId)?.price_monthly || 0;
+    return targetPrice > currentMaxPrice ? 'upgrade' : 'downgrade';
+  };
 
   const handleContactWhatsApp = () => {
     const link = generateGeneralWhatsAppLink();
@@ -178,15 +198,24 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
               const gradient = planColors[plan.id] || 'from-primary to-primary/80';
               const features = planFeatures[plan.id] || [];
               const isPopular = plan.id === 'pro';
+              const isCurrent = currentPlanIds.has(plan.id);
+              const planAction = getPlanAction(plan.id);
+              const displayPrice = Math.round(plan.price_monthly / 100);
 
               return (
                 <Card
                   key={plan.id}
                   className={`relative transition-all hover:shadow-lg ${
+                    isCurrent ? 'border-green-500 ring-2 ring-green-500/20' : 
                     isPopular ? 'border-primary ring-2 ring-primary/20' : ''
                   }`}
                 >
-                  {isPopular && (
+                  {isCurrent && (
+                    <Badge className="absolute -top-2 right-2 bg-green-600 text-white">
+                      Current Plan
+                    </Badge>
+                  )}
+                  {isPopular && !isCurrent && (
                     <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">
                       Most Popular
                     </Badge>
@@ -201,13 +230,23 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
-                      <span className="text-3xl font-bold">${plan.price_monthly}</span>
+                      <span className="text-3xl font-bold">${displayPrice}</span>
                       <span className="text-muted-foreground">/month</span>
                     </div>
                     <div className="flex items-center gap-2 text-sm">
                       <Video className="h-4 w-4 text-muted-foreground" />
                       <span>{plan.max_videos_per_day} videos/day</span>
                     </div>
+                    {planAction !== 'subscribe' && (
+                      <div className={`text-xs font-medium ${
+                        planAction === 'current' ? 'text-green-600' :
+                        planAction === 'upgrade' ? 'text-primary' : 'text-muted-foreground'
+                      }`}>
+                        {planAction === 'current' && '✓ Your active plan'}
+                        {planAction === 'upgrade' && '↑ Upgrade'}
+                        {planAction === 'downgrade' && '↓ Downgrade'}
+                      </div>
+                    )}
                     <ul className="space-y-2">
                       {features.map((feature, index) => (
                         <li key={index} className="flex items-center gap-2 text-sm">
@@ -274,7 +313,7 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
                   <TableCell className="font-medium">Monthly Price</TableCell>
                   {sortedPlans.map((plan) => (
                     <TableCell key={plan.id} className="text-center font-semibold">
-                      ${plan.price_monthly}
+                      ${Math.round(plan.price_monthly / 100)}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -299,6 +338,36 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
             </Table>
           </div>
         )}
+
+        {/* Annual Discount Section */}
+        <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Percent className="h-5 w-5 text-green-500" />
+            <h3 className="font-semibold text-green-700 dark:text-green-400">
+              Save 20% with Annual Plans!
+            </h3>
+          </div>
+          <div className="grid grid-cols-3 gap-4 text-sm text-center">
+            <div>
+              <span className="font-medium block">Basic</span>
+              <div className="text-muted-foreground line-through text-xs">$84/year</div>
+              <div className="text-green-600 dark:text-green-400 font-bold">$67/year</div>
+            </div>
+            <div>
+              <span className="font-medium block">Pro</span>
+              <div className="text-muted-foreground line-through text-xs">$144/year</div>
+              <div className="text-green-600 dark:text-green-400 font-bold">$115/year</div>
+            </div>
+            <div>
+              <span className="font-medium block">Scale</span>
+              <div className="text-muted-foreground line-through text-xs">$216/year</div>
+              <div className="text-green-600 dark:text-green-400 font-bold">$173/year</div>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground mt-3 text-center">
+            Contact us on WhatsApp for annual pricing!
+          </p>
+        </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
