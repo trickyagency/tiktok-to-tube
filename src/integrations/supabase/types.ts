@@ -869,6 +869,8 @@ export type Database = {
           created_at: string
           expires_at: string | null
           id: string
+          notification_1day_sent_at: string | null
+          notification_3day_sent_at: string | null
           notification_sent_at: string | null
           payment_notes: string | null
           plan_id: string
@@ -884,6 +886,8 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          notification_1day_sent_at?: string | null
+          notification_3day_sent_at?: string | null
           notification_sent_at?: string | null
           payment_notes?: string | null
           plan_id: string
@@ -899,6 +903,8 @@ export type Database = {
           created_at?: string
           expires_at?: string | null
           id?: string
+          notification_1day_sent_at?: string | null
+          notification_3day_sent_at?: string | null
           notification_sent_at?: string | null
           payment_notes?: string | null
           plan_id?: string
