@@ -24,9 +24,13 @@ interface BrandingSettings {
 function generateInviteEmailHtml(options: BrandingSettings & { role: string }): string {
   const { platformName, logoUrl, primaryColor, accentColor, role } = options;
   
+  const roleBadge = role === "admin" 
+    ? `<span style="display: inline-block; background: linear-gradient(135deg, ${accentColor}, #6366f1); color: white; font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">Admin Access</span>`
+    : `<span style="display: inline-block; background: #e0f2fe; color: #0369a1; font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">User Access</span>`;
+
   const logoHtml = logoUrl 
-    ? `<img src="${logoUrl}" alt="${platformName}" style="max-height: 48px; margin-bottom: 24px;" />`
-    : `<div style="color: ${primaryColor}; font-size: 24px; font-weight: 700; margin-bottom: 24px;">${platformName}</div>`;
+    ? `<img src="${logoUrl}" alt="${platformName}" style="max-height: 48px;" />`
+    : `<div style="font-size: 28px; font-weight: 800; background: linear-gradient(135deg, ${primaryColor}, ${accentColor}); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">🎬 ${platformName}</div>`;
   
   return `
     <!DOCTYPE html>
@@ -34,28 +38,147 @@ function generateInviteEmailHtml(options: BrandingSettings & { role: string }): 
     <head>
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <meta name="color-scheme" content="light dark">
+      <title>Welcome to ${platformName}</title>
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f5; margin: 0; padding: 40px 20px;">
-      <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; padding: 40px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
-        ${logoHtml}
-        <h1 style="color: ${primaryColor}; font-size: 24px; font-weight: 600; margin: 0 0 16px 0;">Welcome to ${platformName}!</h1>
-        <p style="color: #52525b; font-size: 16px; line-height: 1.6; margin: 0 0 24px 0;">
-          You've been invited to join ${platformName}${role === "admin" ? " as an Admin" : ""}. 
-          Click the button below to set up your account.
-        </p>
-        <p style="color: #71717a; font-size: 14px; margin: 0 0 24px 0;">
-          Check your email for a separate message from Supabase with your account setup link.
-        </p>
-        <div style="background: #f4f4f5; border-radius: 8px; padding: 16px; margin: 24px 0;">
-          <p style="color: #52525b; font-size: 14px; margin: 0;">
-            <strong>Note:</strong> This invitation expires in 7 days.
-          </p>
-        </div>
-        <hr style="border: none; border-top: 1px solid #e4e4e7; margin: 32px 0;">
-        <p style="color: #a1a1aa; font-size: 12px; margin: 0;">
-          If you didn't expect this invitation, you can safely ignore this email.
-        </p>
+    <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; -webkit-font-smoothing: antialiased;">
+      <!-- Preheader text -->
+      <div style="display: none; max-height: 0; overflow: hidden;">
+        You've been invited to join ${platformName}${role === "admin" ? " as an Admin" : ""}. Set up your account to get started with automated TikTok to YouTube uploads.
       </div>
+      
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f8fafc;">
+        <tr>
+          <td style="padding: 40px 20px;">
+            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="max-width: 560px; margin: 0 auto;">
+              
+              <!-- Header with Gradient -->
+              <tr>
+                <td style="background: linear-gradient(135deg, ${primaryColor} 0%, ${accentColor} 100%); border-radius: 16px 16px 0 0; padding: 40px 40px 32px 40px; text-align: center;">
+                  ${logoHtml}
+                  <div style="color: rgba(255,255,255,0.9); font-size: 14px; margin-top: 12px; font-weight: 500;">
+                    TikTok → YouTube Automation
+                  </div>
+                </td>
+              </tr>
+              
+              <!-- Main Content -->
+              <tr>
+                <td style="background: white; padding: 40px; border-radius: 0 0 16px 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);">
+                  
+                  <!-- Welcome Message -->
+                  <h1 style="margin: 0 0 8px 0; font-size: 24px; font-weight: 700; color: ${primaryColor};">
+                    You're Invited! 🎉
+                  </h1>
+                  <div style="margin-bottom: 24px;">
+                    ${roleBadge}
+                  </div>
+                  
+                  <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.7; color: #475569;">
+                    Welcome! You've been invited to join <strong style="color: ${primaryColor};">${platformName}</strong>. 
+                    We're excited to have you on board.
+                  </p>
+                  
+                  <!-- Info Card -->
+                  <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 24px; margin: 24px 0; border: 1px solid #e2e8f0;">
+                    <div style="font-weight: 600; color: ${primaryColor}; margin-bottom: 12px; font-size: 14px;">📬 Check Your Inbox</div>
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #64748b;">
+                      You'll receive a separate email from our authentication service with your secure account setup link. Click that link to create your password and get started.
+                    </p>
+                  </div>
+                  
+                  <!-- Features Section -->
+                  <div style="margin: 28px 0;">
+                    <div style="font-weight: 600; color: ${primaryColor}; margin-bottom: 16px; font-size: 14px;">✨ What you'll be able to do:</div>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                              <td style="width: 28px; vertical-align: top;">
+                                <div style="width: 20px; height: 20px; background: #dcfce7; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px;">✓</div>
+                              </td>
+                              <td style="font-size: 14px; color: #475569;">Connect your TikTok accounts</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                              <td style="width: 28px; vertical-align: top;">
+                                <div style="width: 20px; height: 20px; background: #dcfce7; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px;">✓</div>
+                              </td>
+                              <td style="font-size: 14px; color: #475569;">Automatically scrape and download videos</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                              <td style="width: 28px; vertical-align: top;">
+                                <div style="width: 20px; height: 20px; background: #dcfce7; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px;">✓</div>
+                              </td>
+                              <td style="font-size: 14px; color: #475569;">Schedule uploads to YouTube</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 8px 0;">
+                          <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                              <td style="width: 28px; vertical-align: top;">
+                                <div style="width: 20px; height: 20px; background: #dcfce7; border-radius: 50%; text-align: center; line-height: 20px; font-size: 12px;">✓</div>
+                              </td>
+                              <td style="font-size: 14px; color: #475569;">Track analytics and performance</td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+                  
+                  <!-- Expiry Notice -->
+                  <div style="background: #fef3c7; border-radius: 8px; padding: 14px 18px; margin: 24px 0; border-left: 4px solid #f59e0b;">
+                    <p style="margin: 0; font-size: 13px; color: #92400e;">
+                      <strong>⏰ Note:</strong> This invitation expires in 7 days. Please accept it soon!
+                    </p>
+                  </div>
+                  
+                  <!-- Divider -->
+                  <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;">
+                  
+                  <!-- Footer Note -->
+                  <p style="margin: 0; font-size: 13px; color: #94a3b8; line-height: 1.6;">
+                    If you didn't expect this invitation, you can safely ignore this email.
+                  </p>
+                  
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="padding: 32px 40px; text-align: center;">
+                  <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 600; color: ${primaryColor};">
+                    ${platformName}
+                  </p>
+                  <p style="margin: 0 0 4px 0; font-size: 12px; color: #94a3b8;">
+                    Powered by Digital Automators
+                  </p>
+                  <p style="margin: 16px 0 0 0; font-size: 11px; color: #cbd5e1;">
+                    © ${new Date().getFullYear()} ${platformName}. All rights reserved.
+                  </p>
+                </td>
+              </tr>
+              
+            </table>
+          </td>
+        </tr>
+      </table>
     </body>
     </html>
   `;
@@ -137,7 +260,7 @@ serve(async (req) => {
     const branding: BrandingSettings = {
       platformName: getBrandingSetting("EMAIL_PLATFORM_NAME", "RepostFlow"),
       senderName: getBrandingSetting("EMAIL_SENDER_NAME", "RepostFlow"),
-      senderAddress: getBrandingSetting("EMAIL_SENDER_ADDRESS", "onboarding@resend.dev"),
+      senderAddress: getBrandingSetting("EMAIL_SENDER_ADDRESS", "notifications@repostflow.digitalautomators.com"),
       logoUrl: getBrandingSetting("EMAIL_LOGO_URL", ""),
       primaryColor: getBrandingSetting("EMAIL_PRIMARY_COLOR", "#18181b"),
       accentColor: getBrandingSetting("EMAIL_ACCENT_COLOR", "#3b82f6"),
@@ -228,7 +351,7 @@ serve(async (req) => {
         await resend.emails.send({
           from: `${branding.senderName} <${branding.senderAddress}>`,
           to: [email],
-          subject: `You've been invited to ${branding.platformName}`,
+          subject: `🎬 You've been invited to ${branding.platformName}`,
           html: emailHtml,
         });
 
