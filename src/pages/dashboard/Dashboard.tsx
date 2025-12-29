@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
+import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons';
 import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
 import { UploadLogDetails } from '@/components/history/UploadLogDetails';
 import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminderBanner';
+import { useWelcomeModal } from '@/hooks/useWelcomeModal';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -20,6 +22,7 @@ import { format } from 'date-fns';
 
 const Dashboard = () => {
   const [showQuickFixDialog, setShowQuickFixDialog] = useState(false);
+  const { showWelcome, dismissWelcome } = useWelcomeModal();
 
   useEffect(() => {
     document.title = "Dashboard | RepostFlow";
@@ -321,6 +324,9 @@ const Dashboard = () => {
         mismatchedItems={mismatchedItems}
         youtubeChannels={youtubeChannels}
       />
+
+      {/* Welcome Modal for New Users */}
+      <WelcomeModal isOpen={showWelcome} onClose={dismissWelcome} />
     </DashboardLayout>
   );
 };
