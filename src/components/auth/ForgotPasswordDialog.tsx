@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { getProductionUrl } from '@/lib/auth-utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -34,11 +33,12 @@ const ForgotPasswordDialog = ({ open, onOpenChange }: ForgotPasswordDialogProps)
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${getProductionUrl()}/reset-password`
+      const { data, error } = await supabase.functions.invoke('password-reset', {
+        body: { email: email.trim() }
       });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       setSent(true);
       toast.success('Password reset email sent!');

@@ -21,8 +21,8 @@ interface BrandingSettings {
   accentColor: string;
 }
 
-function generateInviteEmailHtml(options: BrandingSettings & { role: string }): string {
-  const { platformName, logoUrl, primaryColor, accentColor, role } = options;
+function generateInviteEmailHtml(options: BrandingSettings & { role: string; inviteUrl: string }): string {
+  const { platformName, logoUrl, primaryColor, accentColor, role, inviteUrl } = options;
   
   const roleBadge = role === "admin" 
     ? `<span style="display: inline-block; background: linear-gradient(135deg, ${accentColor}, #6366f1); color: white; font-size: 11px; font-weight: 600; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.5px;">Admin Access</span>`
@@ -76,16 +76,19 @@ function generateInviteEmailHtml(options: BrandingSettings & { role: string }): 
                   
                   <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.7; color: #475569;">
                     Welcome! You've been invited to join <strong style="color: ${primaryColor};">${platformName}</strong>. 
-                    We're excited to have you on board.
+                    Click the button below to set up your account and get started.
                   </p>
                   
-                  <!-- Info Card -->
-                  <div style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; padding: 24px; margin: 24px 0; border: 1px solid #e2e8f0;">
-                    <div style="font-weight: 600; color: ${primaryColor}; margin-bottom: 12px; font-size: 14px;">📬 Check Your Inbox</div>
-                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #64748b;">
-                      You'll receive a separate email from our authentication service with your secure account setup link. Click that link to create your password and get started.
-                    </p>
-                  </div>
+                  <!-- CTA Button -->
+                  <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                    <tr>
+                      <td align="center" style="padding: 16px 0 24px 0;">
+                        <a href="${inviteUrl}" style="display: inline-block; background: linear-gradient(135deg, ${primaryColor} 0%, ${accentColor} 100%); color: #ffffff; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-size: 16px; font-weight: 600; box-shadow: 0 4px 14px 0 rgba(0, 0, 0, 0.2);">
+                          Set Up Your Account
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
                   
                   <!-- Features Section -->
                   <div style="margin: 28px 0;">
@@ -148,6 +151,12 @@ function generateInviteEmailHtml(options: BrandingSettings & { role: string }): 
                       <strong>⏰ Note:</strong> This invitation expires in 7 days. Please accept it soon!
                     </p>
                   </div>
+                  
+                  <!-- Link fallback -->
+                  <p style="margin: 24px 0 0 0; color: #6b7280; font-size: 13px; line-height: 1.5;">
+                    If the button doesn't work, copy and paste this link into your browser:<br>
+                    <a href="${inviteUrl}" style="color: ${primaryColor}; word-break: break-all;">${inviteUrl}</a>
+                  </p>
                   
                   <!-- Divider -->
                   <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;">
@@ -288,23 +297,35 @@ serve(async (req) => {
       throw new Error("An invitation is already pending for this email");
     }
 
-    // Use production domain for redirect URL (configurable via SITE_URL env var)
-    const PRODUCTION_URL = Deno.env.get("SITE_URL") || "https://repostflow.digitalautomators.com";
-
-    // Generate invite using Supabase Auth Admin API
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-      email,
-      {
-        redirectTo: `${PRODUCTION_URL}/auth?type=invite`,
-      }
-    );
-
-    if (inviteError) {
-      console.error("Supabase invite error:", inviteError);
-      throw new Error(`Failed to create invitation: ${inviteError.message}`);
+    // Get Resend API key - required for sending emails
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    if (!resendApiKey) {
+      throw new Error("Email service not configured. Please add RESEND_API_KEY.");
     }
 
-    console.log("Supabase invite created:", inviteData);
+    // Use production domain for redirect URL
+    const PRODUCTION_URL = Deno.env.get("SITE_URL") || "https://repostflow.site";
+
+    // Generate invite link WITHOUT sending Supabase's default email
+    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+      type: "invite",
+      email: email,
+      options: {
+        redirectTo: `${PRODUCTION_URL}/auth?type=invite`,
+      },
+    });
+
+    if (linkError) {
+      console.error("Supabase generateLink error:", linkError);
+      throw new Error(`Failed to create invitation: ${linkError.message}`);
+    }
+
+    const inviteUrl = linkData.properties?.action_link;
+    if (!inviteUrl) {
+      throw new Error("Failed to generate invite link");
+    }
+
+    console.log("Invite link generated successfully");
 
     // Store pending invitation in database
     const { error: insertError } = await supabaseAdmin
@@ -318,17 +339,15 @@ serve(async (req) => {
 
     if (insertError) {
       console.error("Failed to store invitation:", insertError);
-      // Don't fail the request, the Supabase invite was already sent
+      // Don't fail the request, continue with email
     }
 
-    // If role is admin, we need to add the role when user accepts
-    // Store this info so we can process it when user signs up
-    if (assignRole === "admin" && inviteData.user) {
-      // Pre-create the admin role so it's ready when user accepts
+    // If role is admin, pre-create the admin role
+    if (assignRole === "admin" && linkData.user) {
       const { error: roleError } = await supabaseAdmin
         .from("user_roles")
         .insert({
-          user_id: inviteData.user.id,
+          user_id: linkData.user.id,
           role: "admin",
         });
 
@@ -337,46 +356,45 @@ serve(async (req) => {
       }
     }
 
-    // Send custom branded email via Resend
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (resendApiKey) {
-      try {
-        const resend = new Resend(resendApiKey);
-        
-        const emailHtml = generateInviteEmailHtml({
-          ...branding,
-          role: assignRole,
-        });
+    // Send branded email via Resend (this is the ONLY email sent)
+    const resend = new Resend(resendApiKey);
+    
+    const emailHtml = generateInviteEmailHtml({
+      ...branding,
+      role: assignRole,
+      inviteUrl: inviteUrl,
+    });
 
-        await resend.emails.send({
-          from: `${branding.senderName} <${branding.senderAddress}>`,
-          to: [email],
-          subject: `🎬 You've been invited to ${branding.platformName}`,
-          html: emailHtml,
-        });
+    const { error: emailError } = await resend.emails.send({
+      from: `${branding.senderName} <${branding.senderAddress}>`,
+      to: [email],
+      subject: `🎬 You've been invited to ${branding.platformName}`,
+      html: emailHtml,
+    });
 
-        console.log("Custom branded email sent via Resend");
-      } catch (emailError) {
-        console.error("Resend email failed (non-critical):", emailError);
-        // Don't fail the request, the Supabase invite email was already sent
-      }
+    if (emailError) {
+      console.error("Resend email error:", emailError);
+      throw new Error("Failed to send invitation email");
     }
+
+    console.log(`Invitation email sent successfully to ${email}`);
 
     return new Response(
       JSON.stringify({
         success: true,
         message: `Invitation sent to ${email}`,
-        userId: inviteData.user?.id,
+        userId: linkData.user?.id,
       }),
       {
         status: 200,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Unknown error";
     console.error("Invite error:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       {
         status: 400,
         headers: { "Content-Type": "application/json", ...corsHeaders },
