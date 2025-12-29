@@ -25,8 +25,6 @@ import DashboardSidebar from './DashboardSidebar';
 import ThemeToggle from './ThemeToggle';
 import NotificationsDropdown from './NotificationsDropdown';
 import MobileBottomNav from './MobileBottomNav';
-import OnboardingTour from './OnboardingTour';
-import { useOnboardingTour } from '@/hooks/useOnboardingTour';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Plus, LogOut, Settings, User, ChevronDown, Home, Search } from 'lucide-react';
 
@@ -53,15 +51,6 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
   const { user, signOut } = useAuth();
   const isMobile = useIsMobile();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const {
-    isActive: tourActive,
-    currentTourStep,
-    currentStep,
-    totalSteps,
-    nextStep,
-    prevStep,
-    skipTour,
-  } = useOnboardingTour();
 
   // Fetch user avatar
   useEffect(() => {
@@ -247,18 +236,6 @@ const DashboardLayout = ({ children, title, description }: DashboardLayoutProps)
         {isMobile && <MobileBottomNav />}
       </div>
 
-      {/* Onboarding Tour */}
-      {tourActive && currentTourStep && (
-        <OnboardingTour
-          isActive={tourActive}
-          currentStep={currentTourStep}
-          stepNumber={currentStep}
-          totalSteps={totalSteps}
-          onNext={nextStep}
-          onPrev={prevStep}
-          onSkip={skipTour}
-        />
-      )}
     </SidebarProvider>
   );
 };
