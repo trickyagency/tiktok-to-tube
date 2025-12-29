@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +21,10 @@ const VideoQueue = () => {
   const [showOnlyMismatched, setShowOnlyMismatched] = useState(() => 
     searchParams.get('showMismatched') === 'true'
   );
+
+  useEffect(() => {
+    document.title = "Video Queue | RepostFlow";
+  }, []);
 
   const handleMismatchFilterChange = (checked: boolean) => {
     setShowOnlyMismatched(checked);

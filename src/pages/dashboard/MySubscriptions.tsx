@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -68,6 +70,10 @@ export default function MySubscriptions() {
   const { user, isOwner } = useAuth();
 
   const isLoading = accountsLoading || subscriptionLoading || limitsLoading;
+
+  useEffect(() => {
+    document.title = "My Subscription | RepostFlow";
+  }, []);
 
   const handleWhatsAppContact = () => {
     window.open(generateGeneralWhatsAppLink(), '_blank');
@@ -375,7 +381,7 @@ export default function MySubscriptions() {
                   Add a TikTok account to get started
                 </p>
                 <Button variant="outline" asChild>
-                  <a href="/dashboard/tiktok">Add TikTok Account</a>
+                  <Link to="/dashboard/tiktok">Add TikTok Account</Link>
                 </Button>
               </div>
             ) : (

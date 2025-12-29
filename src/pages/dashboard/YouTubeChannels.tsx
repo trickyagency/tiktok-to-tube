@@ -11,6 +11,10 @@ import { toast } from 'sonner';
 const YouTubeChannels = () => {
   const { channels, isLoading, refetch } = useYouTubeChannels();
 
+  useEffect(() => {
+    document.title = "YouTube Channels | RepostFlow";
+  }, []);
+
   // Listen for OAuth completion messages from popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {

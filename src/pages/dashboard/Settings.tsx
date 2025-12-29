@@ -69,6 +69,10 @@ const Settings = () => {
   
   // Sync fullName and avatar from user data
   useEffect(() => {
+    document.title = "Settings | RepostFlow";
+  }, []);
+
+  useEffect(() => {
     if (user?.user_metadata?.full_name) {
       setFullName(user.user_metadata.full_name);
     }
