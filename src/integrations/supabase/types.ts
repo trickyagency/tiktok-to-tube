@@ -269,6 +269,7 @@ export type Database = {
           updated_at: string
           user_id: string
           videos_uploaded: number | null
+          welcome_email_sent: boolean | null
           youtube_channel_url: string | null
         }
         Insert: {
@@ -284,6 +285,7 @@ export type Database = {
           updated_at?: string
           user_id: string
           videos_uploaded?: number | null
+          welcome_email_sent?: boolean | null
           youtube_channel_url?: string | null
         }
         Update: {
@@ -299,6 +301,7 @@ export type Database = {
           updated_at?: string
           user_id?: string
           videos_uploaded?: number | null
+          welcome_email_sent?: boolean | null
           youtube_channel_url?: string | null
         }
         Relationships: []

@@ -9,6 +9,7 @@ import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDia
 import { UploadLogDetails } from '@/components/history/UploadLogDetails';
 import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminderBanner';
 import { useWelcomeModal } from '@/hooks/useWelcomeModal';
+import { useWelcomeEmail } from '@/hooks/useWelcomeEmail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -23,6 +24,9 @@ import { format } from 'date-fns';
 const Dashboard = () => {
   const [showQuickFixDialog, setShowQuickFixDialog] = useState(false);
   const { showWelcome, dismissWelcome } = useWelcomeModal();
+  
+  // Trigger welcome email for new users (runs once per user)
+  useWelcomeEmail();
 
   useEffect(() => {
     document.title = "Dashboard | RepostFlow";
