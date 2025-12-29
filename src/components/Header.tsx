@@ -53,6 +53,12 @@ const Header = () => {
             >
               Pricing
             </Link>
+            <Link
+              to="/contact"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Contact
+            </Link>
           </nav>
 
           {/* Desktop Actions */}
@@ -111,6 +117,13 @@ const Header = () => {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Pricing
+              </Link>
+              <Link
+                to="/contact"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Contact
               </Link>
               <div className="flex flex-col gap-2 pt-4 border-t border-border/50">
                 <Link to="/auth" onClick={() => setMobileMenuOpen(false)}>

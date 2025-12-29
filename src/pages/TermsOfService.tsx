@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { FileText, ArrowLeft } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import { updatePageTitle, updateMetaDescription, updateCanonicalUrl } from "@/lib/seo";
 
 const TermsOfService = () => {
@@ -29,32 +30,17 @@ const TermsOfService = () => {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/pricing" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-sm">RF</span>
-            </div>
-            <span className="font-semibold text-xl text-foreground">RepostFlow</span>
-          </Link>
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" asChild>
-              <Link to="/auth">Sign In</Link>
-            </Button>
-            <Button asChild>
-              <Link to="/pricing">Get Started</Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Header />
+      
+      {/* Spacer for fixed header */}
+      <div className="h-16" />
 
       <div className="container mx-auto px-4 py-12">
         <div className="flex flex-col lg:flex-row gap-12">
           {/* Sidebar Navigation */}
           <aside className="lg:w-64 shrink-0">
             <div className="sticky top-24">
-              <Link to="/pricing" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors">
+              <Link to="/" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors">
                 <ArrowLeft className="w-4 h-4" />
                 Back to Home
               </Link>
@@ -244,24 +230,7 @@ const TermsOfService = () => {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-border bg-muted/30 py-8">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-muted-foreground">
-              © 2024 RepostFlow. All rights reserved.
-            </p>
-            <nav className="flex items-center gap-6">
-              <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Privacy Policy
-              </Link>
-              <Link to="/terms" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                Terms of Service
-              </Link>
-            </nav>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </main>
   );
 };
