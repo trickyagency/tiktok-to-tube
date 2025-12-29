@@ -214,17 +214,29 @@ async function downloadVideo(videoUrl: string): Promise<{ blob: Blob; duration: 
   return { blob, duration: Date.now() - startTime };
 }
 
+// Parse tags string into array for YouTube API
+function parseTags(tagsString: string): string[] {
+  if (!tagsString) return [];
+  return tagsString
+    .split(/[,\n]+/)
+    .map(t => t.trim().replace(/^#/, ''))
+    .filter(t => t.length > 0)
+    .slice(0, 500); // YouTube max 500 tags
+}
+
 async function uploadToYouTube(
   accessToken: string,
   videoBlob: Blob,
   title: string,
   description: string,
+  tags: string[],
   privacyStatus: string,
   videoDuration: number
 ): Promise<{ videoId: string; videoUrl: string; duration: number }> {
   const startTime = Date.now();
+  console.log(`Tags for upload: ${tags.length} items`);
   
-  const metadata = {
+  const metadata: any = {
     snippet: {
       title: title.substring(0, 100),
       description: description.substring(0, 5000),
@@ -235,6 +247,11 @@ async function uploadToYouTube(
       selfDeclaredMadeForKids: false,
     },
   };
+
+  // Add tags if present
+  if (tags.length > 0) {
+    metadata.snippet.tags = tags;
+  }
 
   const initResponse = await fetch(
     'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
@@ -562,7 +579,7 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       .eq('id', queueId);
 
     // Build video description with account settings
-    // Format: Title (3 times) + Account Description + Account Tags
+    // Format: Title (3 times) + Account Description (tags are now metadata)
     const videoTitle = currentVideo.title || 'TikTok Video';
     const accountDescription = tiktokAccount?.youtube_description || '';
     const accountTags = tiktokAccount?.youtube_tags || '';
@@ -571,9 +588,9 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     if (accountDescription) {
       finalDescription += `\n\n${accountDescription}`;
     }
-    if (accountTags) {
-      finalDescription += `\n\n${accountTags}`;
-    }
+
+    // Parse tags for YouTube metadata (not in description)
+    const parsedTagsList = parseTags(accountTags);
 
     // Upload to YouTube
     console.log(`Uploading to YouTube for queue item ${queueId}...`);
@@ -582,6 +599,7 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       downloadResult.blob,
       videoTitle,
       finalDescription.trim(),
+      parsedTagsList,
       'public',
       currentVideo.duration || 0
     );
