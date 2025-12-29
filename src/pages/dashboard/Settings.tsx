@@ -49,6 +49,11 @@ const Settings = () => {
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   
+  // Email change state
+  const [newEmail, setNewEmail] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [showEmailChange, setShowEmailChange] = useState(false);
+  
   // Email branding state
   const [platformName, setPlatformName] = useState('RepostFlow');
   const [senderName, setSenderName] = useState('RepostFlow');
@@ -157,6 +162,41 @@ const Settings = () => {
       toast.error('Failed to update profile');
     } finally {
       setIsUpdatingProfile(false);
+    }
+  };
+
+  const handleEmailChange = async () => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newEmail.trim())) {
+      toast.error('Please enter a valid email address');
+      return;
+    }
+
+    if (newEmail.trim().toLowerCase() === user?.email?.toLowerCase()) {
+      toast.error('New email must be different from current email');
+      return;
+    }
+
+    setIsChangingEmail(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        email: newEmail.trim()
+      });
+
+      if (error) throw error;
+      
+      toast.success('Verification email sent', {
+        description: 'Check your new email inbox and click the verification link to confirm the change.'
+      });
+      setShowEmailChange(false);
+      setNewEmail('');
+    } catch (error: any) {
+      console.error('Failed to change email:', error);
+      toast.error('Failed to change email', {
+        description: error.message || 'Please try again later'
+      });
+    } finally {
+      setIsChangingEmail(false);
     }
   };
 
@@ -316,7 +356,46 @@ const Settings = () => {
 
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" value={user?.email || ''} disabled />
+              <div className="flex gap-2">
+                <Input id="email" value={user?.email || ''} disabled className="flex-1" />
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEmailChange(!showEmailChange)}
+                >
+                  {showEmailChange ? 'Cancel' : 'Change'}
+                </Button>
+              </div>
+              
+              {showEmailChange && (
+                <div className="mt-3 p-4 border rounded-lg bg-muted/50 space-y-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="new-email">New Email Address</Label>
+                    <Input 
+                      id="new-email" 
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      placeholder="Enter your new email address"
+                    />
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    A verification link will be sent to your new email address. You'll need to click the link to confirm the change.
+                  </p>
+                  <Button 
+                    onClick={handleEmailChange}
+                    disabled={isChangingEmail || !newEmail.trim()}
+                  >
+                    {isChangingEmail ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Sending...
+                      </>
+                    ) : (
+                      'Send Verification Email'
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Full Name</Label>
