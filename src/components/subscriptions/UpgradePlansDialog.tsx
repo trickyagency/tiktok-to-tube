@@ -25,6 +25,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
+import { Progress } from '@/components/ui/progress';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -33,20 +46,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from '@/components/ui/chart';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-} from 'recharts';
 import {
   MessageCircle,
   Zap,
@@ -62,18 +61,16 @@ import {
   Calculator,
   Minus,
   Plus,
-  TrendingDown,
   Calendar,
   TrendingUp,
-  Sparkles,
-  Lightbulb,
   DollarSign,
   User,
-  Star,
+  Target,
+  PiggyBank,
 } from 'lucide-react';
 
 // Custom hook for animated counting
-function useAnimatedCounter(value: number, duration: number = 500) {
+function useAnimatedCounter(value: number, duration: number = 400) {
   const [displayValue, setDisplayValue] = useState(value);
   const previousValue = useRef(value);
   
@@ -133,9 +130,9 @@ const planColors: Record<string, string> = {
 };
 
 const planFeatures: Record<string, string[]> = {
-  basic: ['2 videos per day', 'Auto-scheduling', 'Basic support'],
-  pro: ['4 videos per day', 'Priority scheduling', 'Priority support', 'Analytics access'],
-  scale: ['6 videos per day', 'Fastest processing', 'Premium support', 'Full analytics', 'Custom scheduling'],
+  basic: ['2 videos/day', 'Auto-scheduling', 'Basic support'],
+  pro: ['4 videos/day', 'Priority scheduling', 'Priority support'],
+  scale: ['6 videos/day', 'Fastest processing', 'Premium support'],
 };
 
 // Human-readable labels for database feature keys
@@ -161,40 +158,76 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   const { data: userSubscriptions } = useUserSubscriptions();
   const { data: tiktokAccounts } = useTikTokAccounts();
   const [showComparison, setShowComparison] = useState(false);
+  const [showROI, setShowROI] = useState(false);
   const [accountCount, setAccountCount] = useState(1);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [avgViews, setAvgViews] = useState('1000');
+  const [cpmRate, setCpmRate] = useState('3');
   
   // User's actual TikTok account count
   const userAccountCount = tiktokAccounts?.length || 0;
   
-  // Get recommendation based on user's current accounts
-  const getRecommendedTier = (currentCount: number) => {
-    const currentTier = VOLUME_DISCOUNTS.find(
+  // Get progress to next tier
+  const getProgressToNextTier = (currentCount: number) => {
+    const currentTierIndex = VOLUME_DISCOUNTS.findIndex(
       t => currentCount >= t.minAccounts && currentCount <= t.maxAccounts
     );
-    const nextTier = VOLUME_DISCOUNTS.find(
-      t => t.minAccounts > currentCount
-    );
+    const currentTier = VOLUME_DISCOUNTS[currentTierIndex];
+    const nextTier = VOLUME_DISCOUNTS[currentTierIndex + 1];
+    
+    if (!nextTier) {
+      return { percentage: 100, remaining: 0, nextDiscount: 50, currentDiscount: currentTier?.discount || 0, hasNextTier: false };
+    }
+    
+    const tierStart = currentTier?.minAccounts || 1;
+    const tierEnd = nextTier.minAccounts - 1;
+    const accountsInTier = currentCount - tierStart;
+    const tierSize = tierEnd - tierStart + 1;
+    const progress = ((accountsInTier + 1) / tierSize) * 100;
     
     return {
-      currentTier,
-      nextTier,
-      accountsToNext: nextTier ? nextTier.minAccounts - currentCount : 0,
-      currentDiscount: currentTier?.discount || 0,
-      nextDiscount: nextTier?.discount || 0,
+      percentage: Math.min(Math.max(progress, 5), 95),
+      remaining: nextTier.minAccounts - currentCount,
+      nextDiscount: Math.round(nextTier.discount * 100),
+      currentDiscount: Math.round((currentTier?.discount || 0) * 100),
+      hasNextTier: true,
     };
   };
   
-  const recommendation = getRecommendedTier(userAccountCount);
+  const progress = getProgressToNextTier(userAccountCount);
   
   // Calculate yearly savings for animated counter (using Pro plan as example)
   const yearlySavings = useMemo(() => {
-    const proBasePrice = 12; // Pro plan base price
+    const proBasePrice = 12;
     const annualData = calculateAnnualWithVolumeDiscount(proBasePrice, accountCount);
     return billingCycle === 'annual' ? annualData.totalSavingsYear : calculateSavings(proBasePrice, accountCount) * 12;
   }, [accountCount, billingCycle]);
   
   const animatedSavings = useAnimatedCounter(yearlySavings, 400);
+
+  // ROI Calculator
+  const roiData = useMemo(() => {
+    const proBasePrice = 12;
+    const discountedPrice = calculateDiscountedPrice(proBasePrice, accountCount);
+    const monthlySubscriptionCost = discountedPrice * accountCount;
+    const videosPerDay = 4; // Pro plan
+    const monthlyVideos = videosPerDay * 30 * accountCount;
+    const viewsNum = parseInt(avgViews) || 1000;
+    const cpm = parseFloat(cpmRate) || 3;
+    const monthlyViews = monthlyVideos * viewsNum;
+    const monthlyEarnings = (monthlyViews / 1000) * cpm;
+    const profit = monthlyEarnings - monthlySubscriptionCost;
+    const roi = monthlySubscriptionCost > 0 ? ((monthlyEarnings - monthlySubscriptionCost) / monthlySubscriptionCost) * 100 : 0;
+    
+    return {
+      monthlyVideos,
+      monthlyViews,
+      monthlyEarnings,
+      monthlySubscriptionCost,
+      profit,
+      roi,
+    };
+  }, [accountCount, avgViews, cpmRate]);
 
   // Get unique active plan IDs the user is subscribed to
   const currentPlanIds = new Set(
@@ -266,65 +299,6 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   // Get current discount percentage
   const currentDiscount = getDiscountPercentage(accountCount);
 
-  // Generate savings chart data
-  const savingsChartData = useMemo(() => {
-    return Array.from({ length: 15 }, (_, i) => {
-      const count = i + 1;
-      return {
-        accounts: count,
-        basic: calculateSavings(7, count),
-        pro: calculateSavings(12, count),
-        scale: calculateSavings(18, count),
-      };
-    });
-  }, []);
-
-  const chartConfig = {
-    basic: { label: 'Basic', color: 'hsl(var(--chart-1))' },
-    pro: { label: 'Pro', color: 'hsl(var(--chart-2))' },
-    scale: { label: 'Scale', color: 'hsl(var(--chart-3))' },
-  };
-
-  // Get dynamic badge info based on account count
-  const getDynamicBadge = (basePrice: number) => {
-    const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
-    
-    if (accountCount <= 2) {
-      const accountsNeeded = 3 - accountCount;
-      return {
-        icon: TrendingUp,
-        text: `Add ${accountsNeeded} more for 17% off`,
-        className: 'from-blue-500/10 to-blue-600/10 border-blue-500/20',
-        textClass: 'text-blue-600 dark:text-blue-400',
-        iconClass: 'text-blue-600 dark:text-blue-400',
-      };
-    } else if (accountCount <= 5) {
-      return {
-        icon: Percent,
-        text: `17% off: $${discountedPrice.toFixed(2)}/ea`,
-        className: 'from-green-500/10 to-green-600/10 border-green-500/20',
-        textClass: 'text-green-600 dark:text-green-400',
-        iconClass: 'text-green-600 dark:text-green-400',
-      };
-    } else if (accountCount <= 10) {
-      return {
-        icon: TrendingDown,
-        text: `33% off: $${discountedPrice.toFixed(2)}/ea`,
-        className: 'from-orange-500/10 to-orange-600/10 border-orange-500/20',
-        textClass: 'text-orange-600 dark:text-orange-400',
-        iconClass: 'text-orange-600 dark:text-orange-400',
-      };
-    } else {
-      return {
-        icon: Sparkles,
-        text: `MAX 50% OFF: $${discountedPrice.toFixed(2)}/ea`,
-        className: 'from-purple-500/10 to-amber-500/10 border-purple-500/20',
-        textClass: 'text-purple-600 dark:text-purple-400',
-        iconClass: 'text-purple-600 dark:text-purple-400',
-      };
-    }
-  };
-
   // Get all unique features from all plans
   const getAllFeatures = () => {
     if (!plans) return [];
@@ -347,65 +321,42 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2">
             <Rocket className="h-5 w-5 text-primary" />
             Upgrade Your Plan
           </DialogTitle>
-          <DialogDescription>
-            Choose a plan that fits your content creation needs
+          <DialogDescription className="text-xs">
+            Choose a plan that fits your needs
           </DialogDescription>
         </DialogHeader>
 
-        {/* How to Subscribe Section */}
-        <div className="bg-muted/50 rounded-lg p-4 border">
-          <div className="flex items-center gap-2 mb-3">
-            <MessageCircle className="h-5 w-5 text-green-500" />
-            <h3 className="font-semibold">How to Subscribe</h3>
-          </div>
-          <ol className="space-y-2 text-sm text-muted-foreground">
-            <li className="flex items-start gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">1</span>
-              <span>Add a TikTok account from the TikTok Accounts page</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">2</span>
-              <span>Click "Subscribe" on the account card to select a plan</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">3</span>
-              <span>Complete payment via WhatsApp</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">4</span>
-              <span>Your subscription will be activated after payment confirmation</span>
-            </li>
-          </ol>
-          <div className="mt-3 pt-3 border-t flex items-center gap-2">
+        {/* How to Subscribe - Compact */}
+        <div className="bg-muted/50 rounded-lg p-3 border text-sm">
+          <div className="flex items-center gap-2 mb-2">
             <MessageCircle className="h-4 w-4 text-green-500" />
-            <span className="text-sm font-medium">WhatsApp:</span>
-            <span className="text-sm text-muted-foreground">{WHATSAPP_DISPLAY}</span>
+            <span className="font-medium">How to Subscribe</span>
+            <span className="text-xs text-muted-foreground ml-auto">WhatsApp: {WHATSAPP_DISPLAY}</span>
+          </div>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>1. Add TikTok account</span>
+            <span>2. Click "Subscribe"</span>
+            <span>3. Pay via WhatsApp</span>
+            <span>4. Get activated</span>
           </div>
         </div>
 
-        <Separator />
+        <Separator className="my-2" />
 
-        {/* Plans Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Plans Grid - Compact */}
+        <div className="grid grid-cols-3 gap-3">
           {isLoading ? (
             Array.from({ length: 3 }).map((_, i) => (
               <Card key={i} className="animate-pulse">
-                <CardHeader className="pb-3">
-                  <div className="h-6 bg-muted rounded w-20" />
-                </CardHeader>
-                <CardContent>
-                  <div className="h-8 bg-muted rounded w-24 mb-4" />
-                  <div className="space-y-2">
-                    {Array.from({ length: 3 }).map((_, j) => (
-                      <div key={j} className="h-4 bg-muted rounded" />
-                    ))}
-                  </div>
+                <CardContent className="p-3">
+                  <div className="h-4 bg-muted rounded w-16 mb-2" />
+                  <div className="h-6 bg-muted rounded w-12" />
                 </CardContent>
               </Card>
             ))
@@ -422,104 +373,64 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
               return (
                 <Card
                   key={plan.id}
-                  className={`relative transition-all hover:shadow-lg ${
-                    isCurrent ? 'border-green-500 ring-2 ring-green-500/20' : 
-                    isPopular ? 'border-primary ring-2 ring-primary/20' : ''
+                  className={`relative transition-all hover:shadow-md ${
+                    isCurrent ? 'border-green-500 ring-1 ring-green-500/20' : 
+                    isPopular ? 'border-primary ring-1 ring-primary/20' : ''
                   }`}
                 >
                   {isCurrent && (
-                    <Badge className="absolute -top-2 right-2 bg-green-600 text-white">
-                      Current Plan
+                    <Badge className="absolute -top-2 right-2 bg-green-600 text-white text-[10px] px-1.5 py-0">
+                      Current
                     </Badge>
                   )}
                   {isPopular && !isCurrent && (
-                    <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">
-                      Most Popular
+                    <Badge className="absolute -top-2 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] px-1.5 py-0">
+                      Popular
                     </Badge>
                   )}
-                  <CardHeader className="pb-3 pt-5">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-2 rounded-lg bg-gradient-to-r ${gradient}`}>
-                        <Icon className="h-4 w-4 text-white" />
+                  <CardContent className="p-3 pt-4">
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <div className={`p-1.5 rounded bg-gradient-to-r ${gradient}`}>
+                        <Icon className="h-3 w-3 text-white" />
                       </div>
-                      <CardTitle className="text-lg capitalize">{plan.name}</CardTitle>
+                      <span className="font-medium capitalize text-sm">{plan.name}</span>
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <span className="text-3xl font-bold">${displayPrice}</span>
-                      <span className="text-muted-foreground">/month</span>
+                    <div className="mb-2">
+                      <span className="text-2xl font-bold">${displayPrice}</span>
+                      <span className="text-xs text-muted-foreground">/mo</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Video className="h-4 w-4 text-muted-foreground" />
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2">
+                      <Video className="h-3 w-3" />
                       <span>{plan.max_videos_per_day} videos/day</span>
                     </div>
-                    {planAction !== 'subscribe' && (
-                      <div className={`text-xs font-medium ${
-                        planAction === 'current' ? 'text-green-600' :
-                        planAction === 'upgrade' ? 'text-primary' : 'text-muted-foreground'
-                      }`}>
-                        {planAction === 'current' && '✓ Your active plan'}
-                        {planAction === 'upgrade' && '↑ Upgrade'}
-                        {planAction === 'downgrade' && '↓ Downgrade'}
-                      </div>
-                    )}
-                    <ul className="space-y-2">
-                      {features.map((feature, index) => (
-                        <li key={index} className="flex items-center gap-2 text-sm">
-                          <Check className="h-4 w-4 text-green-500 shrink-0" />
+                    <ul className="space-y-1 mb-3">
+                      {features.slice(0, 2).map((feature, index) => (
+                        <li key={index} className="flex items-center gap-1 text-xs">
+                          <Check className="h-3 w-3 text-green-500 shrink-0" />
                           <span className="text-muted-foreground">{feature}</span>
                         </li>
                       ))}
                     </ul>
                     
-                    {/* Dynamic Discount Badge */}
-                    {(() => {
-                      const badge = getDynamicBadge(displayPrice);
-                      const BadgeIcon = badge.icon;
-                      return (
-                        <div className={`flex items-center gap-1.5 p-2 bg-gradient-to-r ${badge.className} rounded-md border transition-all`}>
-                          <BadgeIcon className={`h-3.5 w-3.5 ${badge.iconClass}`} />
-                          <span className={`text-xs font-medium ${badge.textClass}`}>
-                            {badge.text}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                    
-                    {/* Action Button */}
-                    <div className="pt-2">
-                      {planAction === 'current' ? (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="w-full" 
-                          disabled
-                        >
-                          <Check className="h-4 w-4 mr-2" />
-                          Current Plan
-                        </Button>
-                      ) : planAction === 'subscribe' ? (
-                        <Button 
-                          size="sm" 
-                          className="w-full" 
-                          onClick={handleGoToAccounts}
-                        >
-                          Get Started
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                      ) : (
-                        <Button 
-                          size="sm" 
-                          className={`w-full ${planAction === 'upgrade' ? 'bg-primary hover:bg-primary/90' : ''}`}
-                          variant={planAction === 'upgrade' ? 'default' : 'secondary'}
-                          onClick={() => handleSwitchPlan(plan)}
-                        >
-                          <MessageCircle className="h-4 w-4 mr-2" />
-                          {planAction === 'upgrade' ? 'Upgrade Now' : 'Switch Plan'}
-                        </Button>
-                      )}
-                    </div>
+                    {planAction === 'current' ? (
+                      <Button variant="outline" size="sm" className="w-full h-7 text-xs" disabled>
+                        <Check className="h-3 w-3 mr-1" />
+                        Current
+                      </Button>
+                    ) : planAction === 'subscribe' ? (
+                      <Button size="sm" className="w-full h-7 text-xs" onClick={handleGoToAccounts}>
+                        Get Started
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        className="w-full h-7 text-xs"
+                        variant={planAction === 'upgrade' ? 'default' : 'secondary'}
+                        onClick={() => handleSwitchPlan(plan)}
+                      >
+                        {planAction === 'upgrade' ? 'Upgrade' : 'Switch'}
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               );
@@ -527,244 +438,128 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
           )}
         </div>
 
-        {/* Volume Discount Calculator */}
-        <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <Calculator className="h-5 w-5 text-primary" />
-            <h3 className="font-semibold">Volume Discount Calculator</h3>
+        <Separator className="my-2" />
+
+        {/* Volume Discount Calculator - Compact */}
+        <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-primary" />
+              <span className="font-medium text-sm">Volume Calculator</span>
+            </div>
             {currentDiscount > 0 && (
-              <Badge className="bg-green-500 text-white ml-auto">
-                {currentDiscount}% OFF
-              </Badge>
+              <Badge className="bg-green-500 text-white text-xs">{currentDiscount}% OFF</Badge>
             )}
           </div>
           
-          {/* Recommendation Banner - Shows if user has accounts */}
-          {userAccountCount > 0 && (
-            <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Lightbulb className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                <span className="text-sm font-medium text-blue-700 dark:text-blue-400">
-                  Based on your {userAccountCount} TikTok account{userAccountCount !== 1 ? 's' : ''}
+          {/* Progress Bar to Next Tier */}
+          {userAccountCount > 0 && progress.hasNextTier && (
+            <div className="mb-3 p-2 bg-background/50 rounded-md">
+              <div className="flex items-center justify-between text-xs mb-1.5">
+                <span className="text-muted-foreground flex items-center gap-1">
+                  <User className="h-3 w-3" />
+                  You: {userAccountCount} account{userAccountCount !== 1 ? 's' : ''} ({progress.currentDiscount}% tier)
+                </span>
+                <span className="font-medium text-primary">
+                  +{progress.remaining} → {progress.nextDiscount}% off
                 </span>
               </div>
-              
-              <p className="text-xs text-muted-foreground mb-2">
-                {recommendation.currentDiscount > 0 
-                  ? `✓ You're in the ${Math.round(recommendation.currentDiscount * 100)}% discount tier`
-                  : `You're at standard pricing`}
-              </p>
-              
-              {recommendation.nextTier && (
-                <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mb-2">
-                  → Add {recommendation.accountsToNext} more for {Math.round(recommendation.nextTier.discount * 100)}% off!
-                </p>
-              )}
-              
+              <Progress value={progress.percentage} className="h-2" />
               {accountCount !== userAccountCount && (
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="border-blue-500/30 text-blue-700 dark:text-blue-400 hover:bg-blue-500/10"
+                  className="h-6 text-xs mt-1.5 p-0 text-primary hover:text-primary/80"
                   onClick={() => setAccountCount(userAccountCount)}
                 >
-                  <User className="h-3 w-3 mr-1" />
-                  Use my account count ({userAccountCount})
+                  Use my count ({userAccountCount})
                 </Button>
               )}
             </div>
           )}
 
-          <p className="text-sm text-muted-foreground mb-4">
-            How many TikTok accounts do you want to manage?
-          </p>
-
-          {/* Account Counter */}
-          <div className="flex items-center justify-center gap-4 mb-4">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setAccountCount(Math.max(1, accountCount - 1))}
-              disabled={accountCount <= 1}
-            >
-              <Minus className="h-4 w-4" />
+          {/* Account Counter + Slider */}
+          <div className="flex items-center gap-3 mb-3">
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAccountCount(Math.max(1, accountCount - 1))} disabled={accountCount <= 1}>
+              <Minus className="h-3 w-3" />
             </Button>
-            <div className="flex flex-col items-center min-w-[100px]">
-              <span className="text-3xl font-bold">{accountCount}</span>
-              <span className="text-xs text-muted-foreground">account{accountCount !== 1 ? 's' : ''}</span>
+            <div className="flex-1">
+              <Slider value={[accountCount]} onValueChange={([value]) => setAccountCount(value)} min={1} max={15} step={1} />
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setAccountCount(Math.min(15, accountCount + 1))}
-              disabled={accountCount >= 15}
-            >
-              <Plus className="h-4 w-4" />
+            <Button variant="outline" size="icon" className="h-7 w-7" onClick={() => setAccountCount(Math.min(15, accountCount + 1))} disabled={accountCount >= 15}>
+              <Plus className="h-3 w-3" />
             </Button>
-          </div>
-
-          {/* Slider */}
-          <div className="mb-4 px-2">
-            <Slider
-              value={[accountCount]}
-              onValueChange={([value]) => setAccountCount(value)}
-              min={1}
-              max={15}
-              step={1}
-              className="w-full"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground mt-1">
-              <span>1</span>
-              <span>5</span>
-              <span>10</span>
-              <span>15</span>
+            <div className="text-center min-w-[50px]">
+              <span className="text-lg font-bold">{accountCount}</span>
+              <span className="text-[10px] text-muted-foreground block">accounts</span>
             </div>
           </div>
 
           {/* Billing Cycle Toggle */}
-          <div className="flex items-center justify-center gap-2 mb-4">
-            <Button
-              variant={billingCycle === 'monthly' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setBillingCycle('monthly')}
-              className="min-w-[100px]"
-            >
+          <div className="flex gap-2 mb-3">
+            <Button variant={billingCycle === 'monthly' ? 'default' : 'outline'} size="sm" onClick={() => setBillingCycle('monthly')} className="flex-1 h-7 text-xs">
               Monthly
             </Button>
-            <Button
-              variant={billingCycle === 'annual' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setBillingCycle('annual')}
-              className="min-w-[140px]"
-            >
+            <Button variant={billingCycle === 'annual' ? 'default' : 'outline'} size="sm" onClick={() => setBillingCycle('annual')} className="flex-1 h-7 text-xs">
               <Calendar className="h-3 w-3 mr-1" />
-              Annual (Save 20%)
+              Annual -20%
             </Button>
           </div>
 
-          {/* Discount Tier Breakdown */}
-          <div className="bg-muted/50 rounded-lg p-3 mb-4">
-            <p className="text-xs font-medium mb-2 text-center">Volume Discount Tiers (Pro Plan Example)</p>
-            <div className="grid grid-cols-4 gap-2 text-xs text-center">
-              {VOLUME_DISCOUNTS.map((tier, index) => {
-                const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
-                const isUserTier = userAccountCount >= tier.minAccounts && userAccountCount <= tier.maxAccounts;
-                const isNextTier = recommendation.nextTier && tier.minAccounts === recommendation.nextTier.minAccounts;
-                const priceExample = tier.discount === 0 ? 12 : Math.round(12 * (1 - tier.discount));
-                const tierLabel = tier.maxAccounts === Infinity ? `${tier.minAccounts}+` : `${tier.minAccounts}-${tier.maxAccounts}`;
-                
-                return (
-                  <div 
-                    key={index}
-                    className={`p-2 rounded transition-all relative ${
-                      isActive 
-                        ? 'bg-primary text-primary-foreground ring-2 ring-primary' 
-                        : 'bg-background'
-                    }`}
-                  >
-                    <div className="font-medium">{tierLabel}</div>
-                    <div className={isActive ? 'font-bold' : 'text-green-600 dark:text-green-400'}>
-                      ${priceExample}/ea
-                    </div>
-                    <div className={`text-[10px] ${isActive ? 'opacity-80' : 'text-muted-foreground'}`}>
-                      {tier.discount === 0 ? '0%' : `${Math.round(tier.discount * 100)}% off`}
-                    </div>
-                    {/* User position indicator */}
-                    {userAccountCount > 0 && isUserTier && !isActive && (
-                      <div className="absolute -top-2 left-1/2 -translate-x-1/2">
-                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-background border-blue-500 text-blue-600">
-                          <User className="h-2 w-2 mr-0.5" />You
-                        </Badge>
-                      </div>
-                    )}
-                    {/* Recommended next tier indicator */}
-                    {userAccountCount > 0 && isNextTier && !isActive && (
-                      <div className="absolute -bottom-2 left-1/2 -translate-x-1/2">
-                        <Badge variant="outline" className="text-[8px] px-1 py-0 bg-background border-amber-500 text-amber-600">
-                          <Star className="h-2 w-2 mr-0.5" />Next
-                        </Badge>
-                      </div>
-                    )}
+          {/* Tier Pills */}
+          <div className="flex gap-1 mb-3">
+            {VOLUME_DISCOUNTS.map((tier, index) => {
+              const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
+              const tierLabel = tier.maxAccounts === Infinity ? `${tier.minAccounts}+` : `${tier.minAccounts}-${tier.maxAccounts}`;
+              
+              return (
+                <div 
+                  key={index}
+                  className={`flex-1 text-center py-1.5 px-1 rounded text-xs transition-all ${
+                    isActive 
+                      ? 'bg-primary text-primary-foreground font-medium' 
+                      : 'bg-muted/50'
+                  }`}
+                >
+                  <div className="font-medium">{tierLabel}</div>
+                  <div className={`text-[10px] ${isActive ? 'opacity-80' : 'text-green-600'}`}>
+                    {tier.discount === 0 ? '0%' : `-${Math.round(tier.discount * 100)}%`}
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
 
-          {/* Animated Yearly Savings Display */}
+          {/* Savings Display */}
           {(currentDiscount > 0 || billingCycle === 'annual') && (
-            <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-lg p-4 mb-4 text-center">
-              <div className="flex items-center justify-center gap-2 mb-1">
-                <DollarSign className="h-5 w-5 text-green-600 dark:text-green-400" />
-                <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                  Total Yearly Savings
-                </span>
+            <div className="flex items-center justify-between p-2 bg-green-500/10 border border-green-500/20 rounded-md">
+              <div className="flex items-center gap-1.5">
+                <PiggyBank className="h-4 w-4 text-green-600" />
+                <span className="text-xs font-medium text-green-700 dark:text-green-400">Yearly Savings</span>
               </div>
-              
-              <div className="text-4xl font-bold text-green-600 dark:text-green-400 transition-all tabular-nums">
-                ${animatedSavings.toFixed(0)}
-              </div>
-              
-              <p className="text-xs text-muted-foreground mt-1">
-                Pro Plan × {accountCount} account{accountCount !== 1 ? 's' : ''} × {billingCycle === 'annual' ? 'Annual' : 'Monthly'} billing
-              </p>
+              <span className="text-lg font-bold text-green-600 tabular-nums">${animatedSavings.toFixed(0)}</span>
             </div>
           )}
 
-          {/* Pricing Grid */}
+          {/* Quick Price Grid */}
           {sortedPlans && (
-            <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="grid grid-cols-3 gap-2 mt-3">
               {sortedPlans.map((plan) => {
-                const Icon = planIcons[plan.id] || Zap;
                 const basePrice = Math.round(plan.price_monthly / 100);
-                const annualData = calculateAnnualWithVolumeDiscount(basePrice, accountCount);
                 const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
                 const totalPrice = calculateTotalPrice(basePrice, accountCount);
-                const savings = calculateSavings(basePrice, accountCount);
-                const hasDiscount = currentDiscount > 0;
-
+                const hasDiscount = currentDiscount > 0 || billingCycle === 'annual';
+                const annualData = calculateAnnualWithVolumeDiscount(basePrice, accountCount);
                 const displayPrice = billingCycle === 'monthly' ? discountedPrice : annualData.annualPerAccountPerMonth;
                 const displayTotal = billingCycle === 'monthly' ? totalPrice : annualData.totalAnnualPerMonth;
-                const displaySavings = billingCycle === 'monthly' ? savings : annualData.totalSavingsYear / 12;
 
                 return (
-                  <div
-                    key={plan.id}
-                    className="bg-background rounded-lg p-3 border text-center"
-                  >
-                    <div className="flex items-center justify-center gap-1 mb-2">
-                      <Icon className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium capitalize text-sm">{plan.name}</span>
-                    </div>
-                    <div className="space-y-1">
-                      {(hasDiscount || billingCycle === 'annual') && (
-                        <div className="text-muted-foreground line-through text-xs">
-                          ${basePrice}/each
-                        </div>
-                      )}
-                      <div className="text-lg font-bold text-primary">
-                        ${displayPrice.toFixed(2)}/each
-                      </div>
-                      <div className="text-sm">
-                        Total: <span className="font-semibold">${displayTotal.toFixed(2)}</span>/mo
-                      </div>
-                      {(hasDiscount || billingCycle === 'annual') && displaySavings > 0 && (
-                        <div className="text-xs text-green-600 font-medium">
-                          Save ${displaySavings.toFixed(2)}/mo
-                        </div>
-                      )}
-                      {billingCycle === 'annual' && (
-                        <div className="text-[10px] text-muted-foreground">
-                          (${annualData.totalAnnualYear.toFixed(0)}/year)
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="w-full mt-2"
-                      onClick={() => handleVolumeDiscountContact(plan)}
-                    >
+                  <div key={plan.id} className="bg-background rounded p-2 border text-center">
+                    <div className="text-xs font-medium capitalize mb-1">{plan.name}</div>
+                    {hasDiscount && <div className="text-[10px] text-muted-foreground line-through">${basePrice}/ea</div>}
+                    <div className="text-sm font-bold text-primary">${displayPrice.toFixed(2)}/ea</div>
+                    <div className="text-[10px] text-muted-foreground">${displayTotal.toFixed(0)}/mo total</div>
+                    <Button size="sm" variant="ghost" className="w-full h-6 text-[10px] mt-1" onClick={() => handleVolumeDiscountContact(plan)}>
                       <MessageCircle className="h-3 w-3 mr-1" />
                       Contact
                     </Button>
@@ -773,226 +568,157 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
               })}
             </div>
           )}
-
-          {/* Combined Savings Display for Annual */}
-          {billingCycle === 'annual' && currentDiscount > 0 && sortedPlans && (
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 mb-4">
-              <div className="flex items-center gap-2 justify-center mb-2">
-                <Percent className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-700 dark:text-green-400">
-                  Combined Discount Applied!
-                </span>
-              </div>
-              <p className="text-xs text-center text-muted-foreground">
-                Volume ({currentDiscount}%) + Annual ({Math.round(ANNUAL_DISCOUNT * 100)}%) = Maximum savings
-              </p>
-            </div>
-          )}
-
-          {/* Savings Growth Chart */}
-          <div className="bg-background rounded-lg p-4 border">
-            <div className="flex items-center gap-2 mb-3">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              <h4 className="text-sm font-medium">Savings Growth</h4>
-              <span className="text-xs text-muted-foreground ml-auto">
-                Monthly savings by account count
-              </span>
-            </div>
-            <ChartContainer config={chartConfig} className="h-[180px] w-full">
-              <AreaChart data={savingsChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="basicGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--chart-1))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--chart-1))" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="proGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--chart-2))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--chart-2))" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="scaleGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--chart-3))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--chart-3))" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis 
-                  dataKey="accounts" 
-                  tick={{ fontSize: 10 }} 
-                  tickLine={false}
-                  axisLine={false}
-                  className="fill-muted-foreground"
-                />
-                <YAxis 
-                  tick={{ fontSize: 10 }} 
-                  tickFormatter={(v) => `$${v}`}
-                  tickLine={false}
-                  axisLine={false}
-                  className="fill-muted-foreground"
-                  width={40}
-                />
-                <ChartTooltip 
-                  content={<ChartTooltipContent />}
-                  formatter={(value: number) => [`$${value.toFixed(2)}`, '']}
-                />
-                <ReferenceLine 
-                  x={accountCount} 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={2}
-                  strokeDasharray="4 4"
-                  label={{ 
-                    value: `${accountCount}`, 
-                    position: 'top',
-                    fill: 'hsl(var(--primary))',
-                    fontSize: 11,
-                    fontWeight: 600
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="basic"
-                  stroke="hsl(var(--chart-1))"
-                  fill="url(#basicGradient)"
-                  strokeWidth={2}
-                  name="Basic"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="pro"
-                  stroke="hsl(var(--chart-2))"
-                  fill="url(#proGradient)"
-                  strokeWidth={2}
-                  name="Pro"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="scale"
-                  stroke="hsl(var(--chart-3))"
-                  fill="url(#scaleGradient)"
-                  strokeWidth={2}
-                  name="Scale"
-                />
-              </AreaChart>
-            </ChartContainer>
-            <div className="flex justify-center gap-4 mt-2">
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-1))]" />
-                <span className="text-muted-foreground">Basic</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-2))]" />
-                <span className="text-muted-foreground">Pro</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-xs">
-                <div className="w-3 h-3 rounded-full bg-[hsl(var(--chart-3))]" />
-                <span className="text-muted-foreground">Scale</span>
-              </div>
-            </div>
-          </div>
-
-          <p className="text-xs text-muted-foreground text-center font-medium">
-            Scale more, pay less — up to 50% off per account
-          </p>
         </div>
 
+        {/* ROI Calculator - Collapsible */}
+        <Collapsible open={showROI} onOpenChange={setShowROI}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full h-8 text-xs gap-1">
+              <Target className="h-3 w-3" />
+              ROI Calculator
+              {showROI ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            <div className="bg-muted/30 rounded-lg p-3 border">
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">Avg views/video</label>
+                  <Select value={avgViews} onValueChange={setAvgViews}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="500">500</SelectItem>
+                      <SelectItem value="1000">1,000</SelectItem>
+                      <SelectItem value="5000">5,000</SelectItem>
+                      <SelectItem value="10000">10,000</SelectItem>
+                      <SelectItem value="50000">50,000</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground mb-1 block">CPM Rate ($)</label>
+                  <Select value={cpmRate} onValueChange={setCpmRate}>
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">$1 (Low)</SelectItem>
+                      <SelectItem value="3">$3 (Avg)</SelectItem>
+                      <SelectItem value="5">$5 (Good)</SelectItem>
+                      <SelectItem value="10">$10 (Great)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-        <div className="flex justify-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowComparison(!showComparison)}
-            className="gap-2"
-          >
-            {showComparison ? (
-              <>
-                <ChevronUp className="h-4 w-4" />
-                Hide Comparison
-              </>
-            ) : (
-              <>
-                <ChevronDown className="h-4 w-4" />
-                Compare All Features
-              </>
-            )}
-          </Button>
-        </div>
+              <div className="text-xs text-muted-foreground mb-2">
+                Pro Plan × {accountCount} accounts = {roiData.monthlyVideos.toLocaleString()} videos/mo
+              </div>
 
-        {/* Plan Comparison Table */}
-        {showComparison && sortedPlans && (
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/50">
-                  <TableHead className="font-semibold">Feature</TableHead>
-                  {sortedPlans.map((plan) => (
-                    <TableHead key={plan.id} className="text-center font-semibold capitalize">
-                      {plan.name}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* Videos per day row */}
-                <TableRow>
-                  <TableCell className="font-medium">Videos per Day</TableCell>
-                  {sortedPlans.map((plan) => (
-                    <TableCell key={plan.id} className="text-center font-semibold text-primary">
-                      {plan.max_videos_per_day}
-                    </TableCell>
-                  ))}
-                </TableRow>
-                {/* Monthly price row */}
-                <TableRow>
-                  <TableCell className="font-medium">Monthly Price</TableCell>
-                  {sortedPlans.map((plan) => (
-                    <TableCell key={plan.id} className="text-center font-semibold">
-                      ${Math.round(plan.price_monthly / 100)}
-                    </TableCell>
-                  ))}
-                </TableRow>
-                {/* Feature rows */}
-                {allFeatureKeys.map((featureKey) => (
-                  <TableRow key={featureKey}>
-                    <TableCell className="font-medium">
-                      {featureLabels[featureKey] || featureKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                    </TableCell>
-                    {sortedPlans.map((plan) => (
-                      <TableCell key={plan.id} className="text-center">
-                        {planHasFeature(plan.features, featureKey) ? (
-                          <Check className="h-5 w-5 text-green-500 mx-auto" />
-                        ) : (
-                          <X className="h-5 w-5 text-muted-foreground/40 mx-auto" />
-                        )}
-                      </TableCell>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-background rounded p-2">
+                  <div className="text-[10px] text-muted-foreground">Cost</div>
+                  <div className="text-sm font-bold">${roiData.monthlySubscriptionCost.toFixed(0)}</div>
+                </div>
+                <div className="bg-background rounded p-2">
+                  <div className="text-[10px] text-muted-foreground">Est. Earnings</div>
+                  <div className="text-sm font-bold text-green-600">${roiData.monthlyEarnings.toFixed(0)}</div>
+                </div>
+                <div className={`rounded p-2 ${roiData.roi > 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
+                  <div className="text-[10px] text-muted-foreground">ROI</div>
+                  <div className={`text-sm font-bold ${roiData.roi > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {roiData.roi > 0 ? '+' : ''}{roiData.roi.toFixed(0)}%
+                  </div>
+                </div>
+              </div>
+
+              {roiData.profit > 0 && (
+                <div className="mt-2 text-center text-xs text-green-600 font-medium">
+                  Potential profit: ${roiData.profit.toFixed(0)}/month
+                </div>
+              )}
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+
+        {/* Compare Features - Collapsible */}
+        <Collapsible open={showComparison} onOpenChange={setShowComparison}>
+          <CollapsibleTrigger asChild>
+            <Button variant="outline" size="sm" className="w-full h-8 text-xs gap-1">
+              Compare Features
+              {showComparison ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="mt-2">
+            {sortedPlans && (
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="font-medium text-xs py-2">Feature</TableHead>
+                      {sortedPlans.map((plan) => (
+                        <TableHead key={plan.id} className="text-center font-medium capitalize text-xs py-2">
+                          {plan.name}
+                        </TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell className="text-xs py-1.5">Videos/Day</TableCell>
+                      {sortedPlans.map((plan) => (
+                        <TableCell key={plan.id} className="text-center text-xs font-semibold text-primary py-1.5">
+                          {plan.max_videos_per_day}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    <TableRow>
+                      <TableCell className="text-xs py-1.5">Price</TableCell>
+                      {sortedPlans.map((plan) => (
+                        <TableCell key={plan.id} className="text-center text-xs font-semibold py-1.5">
+                          ${Math.round(plan.price_monthly / 100)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {allFeatureKeys.slice(0, 6).map((featureKey) => (
+                      <TableRow key={featureKey}>
+                        <TableCell className="text-xs py-1.5">
+                          {featureLabels[featureKey] || featureKey.replace(/_/g, ' ')}
+                        </TableCell>
+                        {sortedPlans.map((plan) => (
+                          <TableCell key={plan.id} className="text-center py-1.5">
+                            {planHasFeature(plan.features, featureKey) ? (
+                              <Check className="h-3.5 w-3.5 text-green-500 mx-auto" />
+                            ) : (
+                              <X className="h-3.5 w-3.5 text-muted-foreground/40 mx-auto" />
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
                     ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
 
         {/* Action Buttons */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <Button
-            variant="outline"
-            className="flex-1"
-            onClick={handleGoToAccounts}
-          >
-            <Video className="h-4 w-4 mr-2" />
-            Go to TikTok Accounts
-            <ArrowRight className="h-4 w-4 ml-2" />
+        <div className="flex gap-2 pt-1">
+          <Button variant="outline" size="sm" className="flex-1 h-8 text-xs" onClick={handleGoToAccounts}>
+            <Video className="h-3 w-3 mr-1" />
+            TikTok Accounts
           </Button>
-          <Button
-            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-            onClick={handleContactWhatsApp}
-          >
-            <MessageCircle className="h-4 w-4 mr-2" />
-            Contact on WhatsApp
+          <Button size="sm" className="flex-1 h-8 text-xs bg-green-600 hover:bg-green-700 text-white" onClick={handleContactWhatsApp}>
+            <MessageCircle className="h-3 w-3 mr-1" />
+            WhatsApp
           </Button>
         </div>
 
-        <p className="text-xs text-center text-muted-foreground">
-          Subscriptions are per TikTok account. Each account needs its own subscription.
+        <p className="text-[10px] text-center text-muted-foreground">
+          Subscriptions are per TikTok account.
         </p>
       </DialogContent>
     </Dialog>
