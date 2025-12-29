@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscriptionPlans, useUserSubscriptions } from '@/hooks/useSubscriptions';
-import { generateGeneralWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
+import { useAuth } from '@/contexts/AuthContext';
+import { generateGeneralWhatsAppLink, generateSwitchPlanWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
 import {
   Dialog,
   DialogContent,
@@ -76,6 +77,7 @@ const featureLabels: Record<string, string> = {
 
 export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogProps) {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: plans, isLoading } = useSubscriptionPlans();
   const { data: userSubscriptions } = useUserSubscriptions();
   const [showComparison, setShowComparison] = useState(false);
@@ -106,6 +108,27 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   const handleGoToAccounts = () => {
     onOpenChange(false);
     navigate('/dashboard/tiktok');
+  };
+
+  // Get current plan name for switch plan message
+  const getCurrentPlanName = () => {
+    if (currentPlanIds.size === 0) return null;
+    const planId = Array.from(currentPlanIds)[0];
+    return plans?.find(p => p.id === planId)?.name || 'current plan';
+  };
+
+  // Handle switch plan via WhatsApp
+  const handleSwitchPlan = (targetPlan: { id: string; name: string; price_monthly: number }) => {
+    const currentPlanName = getCurrentPlanName();
+    if (!currentPlanName) return;
+    
+    const link = generateSwitchPlanWhatsAppLink({
+      currentPlanName,
+      newPlanName: targetPlan.name,
+      newPlanPrice: Math.round(targetPlan.price_monthly / 100),
+      userEmail: user?.email,
+    });
+    window.open(link, '_blank');
   };
 
   // Get all unique features from all plans
@@ -255,6 +278,40 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
                         </li>
                       ))}
                     </ul>
+                    
+                    {/* Action Button */}
+                    <div className="pt-2">
+                      {planAction === 'current' ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="w-full" 
+                          disabled
+                        >
+                          <Check className="h-4 w-4 mr-2" />
+                          Current Plan
+                        </Button>
+                      ) : planAction === 'subscribe' ? (
+                        <Button 
+                          size="sm" 
+                          className="w-full" 
+                          onClick={handleGoToAccounts}
+                        >
+                          Get Started
+                          <ArrowRight className="h-4 w-4 ml-2" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          size="sm" 
+                          className={`w-full ${planAction === 'upgrade' ? 'bg-primary hover:bg-primary/90' : ''}`}
+                          variant={planAction === 'upgrade' ? 'default' : 'secondary'}
+                          onClick={() => handleSwitchPlan(plan)}
+                        >
+                          <MessageCircle className="h-4 w-4 mr-2" />
+                          {planAction === 'upgrade' ? 'Upgrade Now' : 'Switch Plan'}
+                        </Button>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );

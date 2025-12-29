@@ -38,3 +38,23 @@ export function generateGeneralWhatsAppLink(): string {
   const message = `Hi! I'm interested in subscribing to your TikTok to YouTube service. Please share the details.`;
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
+
+interface SwitchPlanParams {
+  currentPlanName: string;
+  newPlanName: string;
+  newPlanPrice: number;
+  userEmail?: string;
+}
+
+export function generateSwitchPlanWhatsAppLink(params: SwitchPlanParams): string {
+  const { currentPlanName, newPlanName, newPlanPrice, userEmail } = params;
+  
+  const message = `Hi! I want to switch my subscription plan.
+
+Current Plan: ${currentPlanName}
+New Plan: ${newPlanName} ($${newPlanPrice}/month)${userEmail ? `\nEmail: ${userEmail}` : ''}
+
+Please help me change my plan.`;
+  
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
