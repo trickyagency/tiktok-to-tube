@@ -101,19 +101,31 @@ async function downloadVideo(downloadUrl: string): Promise<Blob> {
   return blob;
 }
 
+// Parse tags string into array for YouTube API
+function parseTags(tagsString: string): string[] {
+  if (!tagsString) return [];
+  return tagsString
+    .split(/[,\n]+/)
+    .map(t => t.trim().replace(/^#/, ''))
+    .filter(t => t.length > 0)
+    .slice(0, 500); // YouTube max 500 tags
+}
+
 // Upload video to YouTube using resumable upload
 async function uploadToYouTube(
   accessToken: string,
   videoBlob: Blob,
   title: string,
   description: string,
+  tags: string[],
   privacyStatus: string,
   videoDuration: number
 ): Promise<{ videoId: string; videoUrl: string }> {
   console.log('Starting YouTube upload...');
+  console.log(`Tags: ${tags.length} items`);
 
   // Step 1: Initialize resumable upload
-  const metadata = {
+  const metadata: any = {
     snippet: {
       title: title.substring(0, 100), // YouTube title limit
       description: description.substring(0, 5000), // YouTube description limit
@@ -124,6 +136,11 @@ async function uploadToYouTube(
       selfDeclaredMadeForKids: false,
     },
   };
+
+  // Add tags if present
+  if (tags.length > 0) {
+    metadata.snippet.tags = tags;
+  }
 
   const initResponse = await fetch(
     'https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',
@@ -276,7 +293,7 @@ serve(async (req) => {
     const videoBlob = await downloadVideo(video.download_url);
 
     // Build video description with account settings
-    // Format: Title (3 times) + Account Description + Account Tags
+    // Format: Title (3 times) + Account Description (tags are now metadata)
     const videoTitle = body.title || video.title || 'TikTok Video';
     const accountDescription = tiktokAccount?.youtube_description || '';
     const accountTags = tiktokAccount?.youtube_tags || '';
@@ -285,9 +302,9 @@ serve(async (req) => {
     if (accountDescription) {
       finalDescription += `\n\n${accountDescription}`;
     }
-    if (accountTags) {
-      finalDescription += `\n\n${accountTags}`;
-    }
+
+    // Parse tags for YouTube metadata (not in description)
+    const parsedTags = parseTags(accountTags);
 
     const privacyStatus = body.privacy_status || 'public';
 
@@ -297,6 +314,7 @@ serve(async (req) => {
       videoBlob,
       videoTitle,
       finalDescription.trim(),
+      parsedTags,
       privacyStatus,
       video.duration || 0
     );

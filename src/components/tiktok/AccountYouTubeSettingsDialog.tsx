@@ -73,9 +73,13 @@ export function AccountYouTubeSettingsDialog({
 ${sampleTitle}
 ${sampleTitle}
 
-${description || '(Your description will appear here)'}
+${description || '(Your description will appear here)'}`.trim();
 
-${tags || '(Your tags will appear here)'}`.trim();
+  // Parse tags for preview
+  const parsedTags = tags
+    .split(/[,\n]+/)
+    .map(t => t.trim().replace(/^#/, ''))
+    .filter(t => t.length > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,13 +114,14 @@ ${tags || '(Your tags will appear here)'}`.trim();
 
           {/* Tags Input */}
           <div className="space-y-2">
-            <Label htmlFor="tags">Hashtags / Tags</Label>
+            <Label htmlFor="tags">YouTube Video Tags</Label>
             <p className="text-xs text-muted-foreground">
-              These tags will be added at the end of every video description.
+              These will appear in the Tags section of YouTube Studio (not in the description). 
+              Separate with commas or new lines. No hashtags needed.
             </p>
             <Textarea
               id="tags"
-              placeholder="#shorts #viral #trending #fyp #reels"
+              placeholder="shorts, viral, trending, fyp, reels, tiktok"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
               rows={2}
@@ -141,10 +146,25 @@ ${tags || '(Your tags will appear here)'}`.trim();
                   Video Title: "{sampleTitle}"
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <pre className="whitespace-pre-wrap text-sm font-sans text-foreground">
-                  {previewDescription}
-                </pre>
+              <CardContent className="space-y-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Description:</p>
+                  <pre className="whitespace-pre-wrap text-sm font-sans text-foreground">
+                    {previewDescription}
+                  </pre>
+                </div>
+                {parsedTags.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Tags (YouTube Studio):</p>
+                    <div className="flex flex-wrap gap-1">
+                      {parsedTags.map((tag, i) => (
+                        <span key={i} className="px-2 py-0.5 bg-primary/10 text-primary text-xs rounded">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
