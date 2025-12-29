@@ -70,11 +70,15 @@ const currentConfig = ENV_CONFIG[CURRENT_ENVIRONMENT];
 export const PLATFORM_NAME = 'RepostFlow';
 export const PLATFORM_DOMAIN = import.meta.env.VITE_PLATFORM_DOMAIN || ENV_CONFIG.production.domain;
 
-// Base URLs - always use production domain for external services
+// Base URLs
 export const PLATFORM_URL = `https://${PLATFORM_DOMAIN}`;
-export const API_BASE_URL = IS_DEVELOPMENT 
-  ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`
-  : `${PLATFORM_URL}/functions/v1`;
+
+// IMPORTANT: Edge functions are always called via Supabase URL (not custom domain)
+// Custom domain proxies work for browser redirects but NOT for JavaScript fetch() calls
+export const API_BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+
+// OAuth redirect URI uses the custom domain because Google redirects the browser
+// The custom domain's reverse proxy handles forwarding to Supabase
 
 // OAuth Configuration - always points to production
 export const OAUTH_REDIRECT_URI = `https://${ENV_CONFIG.production.domain}/functions/v1/youtube-oauth?action=callback`;
