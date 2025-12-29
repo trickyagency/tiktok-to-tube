@@ -866,6 +866,7 @@ export type Database = {
           account_count: number
           activated_at: string | null
           activated_by: string | null
+          billing_interval: string | null
           created_at: string
           expires_at: string | null
           id: string
@@ -883,6 +884,7 @@ export type Database = {
           account_count?: number
           activated_at?: string | null
           activated_by?: string | null
+          billing_interval?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -900,6 +902,7 @@ export type Database = {
           account_count?: number
           activated_at?: string | null
           activated_by?: string | null
+          billing_interval?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string

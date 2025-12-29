@@ -179,6 +179,7 @@ export default function SubscriptionManagement() {
       userId: selectedSubscription.user_id,
       planId: activateForm.planId,
       accountCount: activateForm.accountCount,
+      billingInterval: selectedSubscription.billing_interval || 'monthly',
       startsAt: new Date(activateForm.startsAt),
       expiresAt: new Date(activateForm.expiresAt),
       paymentNotes: activateForm.paymentNotes,

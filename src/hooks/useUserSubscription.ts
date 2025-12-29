@@ -9,6 +9,7 @@ export interface UserSubscription {
   user_id: string;
   plan_id: string;
   account_count: number;
+  billing_interval: 'monthly' | 'yearly';
   status: 'pending' | 'active' | 'expired' | 'cancelled';
   starts_at: string | null;
   expires_at: string | null;
@@ -139,6 +140,7 @@ export function useAssignUserSubscription() {
       userId,
       planId,
       accountCount,
+      billingInterval,
       startsAt,
       expiresAt,
       paymentNotes
@@ -146,6 +148,7 @@ export function useAssignUserSubscription() {
       userId: string;
       planId: string;
       accountCount: number;
+      billingInterval: 'monthly' | 'yearly';
       startsAt?: Date;
       expiresAt?: Date;
       paymentNotes?: string;
@@ -170,6 +173,7 @@ export function useAssignUserSubscription() {
         user_id: userId,
         plan_id: planId,
         account_count: accountCount,
+        billing_interval: billingInterval,
         status: 'active',
         starts_at: startsAt?.toISOString() || new Date().toISOString(),
         expires_at: expiresAt?.toISOString() || null,

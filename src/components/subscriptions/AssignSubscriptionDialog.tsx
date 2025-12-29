@@ -7,6 +7,8 @@ import {
   calculateTotalPrice,
   calculateSavings,
   getDiscountTierLabel,
+  ANNUAL_DISCOUNT,
+  calculateAnnualWithVolumeDiscount,
 } from '@/lib/pricing';
 import {
   Dialog,
@@ -50,13 +52,23 @@ export function AssignSubscriptionDialog({
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>('pro');
   const [accountCount, setAccountCount] = useState(1);
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [expiresAt, setExpiresAt] = useState<Date | undefined>(addMonths(new Date(), 1));
   const [paymentNotes, setPaymentNotes] = useState('');
+
+  // Update expiry when billing interval changes
+  useEffect(() => {
+    if (!currentSubscription) {
+      const months = billingInterval === 'yearly' ? 12 : 1;
+      setExpiresAt(addMonths(new Date(), months));
+    }
+  }, [billingInterval, currentSubscription]);
 
   useEffect(() => {
     if (currentSubscription) {
       setSelectedPlanId(currentSubscription.plan_id);
       setAccountCount(currentSubscription.account_count);
+      setBillingInterval(currentSubscription.billing_interval || 'monthly');
       if (currentSubscription.expires_at) {
         setExpiresAt(new Date(currentSubscription.expires_at));
       }
@@ -64,6 +76,7 @@ export function AssignSubscriptionDialog({
     } else {
       setSelectedPlanId('pro');
       setAccountCount(1);
+      setBillingInterval('monthly');
       setExpiresAt(addMonths(new Date(), 1));
       setPaymentNotes('');
     }
@@ -71,16 +84,35 @@ export function AssignSubscriptionDialog({
 
   const selectedPlan = plans?.find(p => p.id === selectedPlanId);
   const discountPercentage = getDiscountPercentage(accountCount);
-  const pricePerAccount = selectedPlan ? calculateDiscountedPrice(selectedPlan.price_monthly, accountCount) : 0;
-  const totalPrice = selectedPlan ? calculateTotalPrice(selectedPlan.price_monthly, accountCount) : 0;
-  const savings = selectedPlan ? calculateSavings(selectedPlan.price_monthly, accountCount) : 0;
   const discountLabel = getDiscountTierLabel(accountCount);
+
+  // Calculate pricing based on billing interval
+  const pricingDetails = selectedPlan 
+    ? calculateAnnualWithVolumeDiscount(selectedPlan.price_monthly, accountCount)
+    : null;
+
+  const pricePerAccount = billingInterval === 'yearly' 
+    ? pricingDetails?.annualPerAccountPerMonth || 0
+    : pricingDetails?.monthlyPerAccount || 0;
+
+  const totalMonthlyEquivalent = billingInterval === 'yearly'
+    ? pricingDetails?.totalAnnualPerMonth || 0
+    : pricingDetails?.totalMonthly || 0;
+
+  const totalCharge = billingInterval === 'yearly'
+    ? pricingDetails?.totalAnnualYear || 0
+    : pricingDetails?.totalMonthly || 0;
+
+  const totalSavings = billingInterval === 'yearly'
+    ? pricingDetails?.totalSavingsYear || 0
+    : calculateSavings(selectedPlan?.price_monthly || 0, accountCount);
 
   const handleSubmit = async () => {
     await assignSubscription.mutateAsync({
       userId: user.user_id,
       planId: selectedPlanId,
       accountCount,
+      billingInterval,
       startsAt: new Date(),
       expiresAt,
       paymentNotes: paymentNotes || undefined,
@@ -90,7 +122,7 @@ export function AssignSubscriptionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {currentSubscription ? 'Update Subscription' : 'Assign Subscription'}
@@ -141,6 +173,42 @@ export function AssignSubscriptionDialog({
               </RadioGroup>
             </div>
 
+            {/* Billing Interval Toggle */}
+            <div className="space-y-3">
+              <Label>Billing Period</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('monthly')}
+                  className={cn(
+                    "flex flex-col items-center justify-center rounded-lg border-2 p-4 transition-colors",
+                    billingInterval === 'monthly'
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <span className="font-medium">Monthly</span>
+                  <span className="text-xs text-muted-foreground">Billed every month</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('yearly')}
+                  className={cn(
+                    "relative flex flex-col items-center justify-center rounded-lg border-2 p-4 transition-colors",
+                    billingInterval === 'yearly'
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/50"
+                  )}
+                >
+                  <Badge className="absolute -top-2 right-2 bg-emerald-500 text-white text-xs">
+                    Save {Math.round(ANNUAL_DISCOUNT * 100)}%
+                  </Badge>
+                  <span className="font-medium">Yearly</span>
+                  <span className="text-xs text-muted-foreground">Billed annually</span>
+                </button>
+              </div>
+            </div>
+
             {/* Account Count */}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
@@ -163,7 +231,7 @@ export function AssignSubscriptionDialog({
             </div>
 
             {/* Pricing Summary */}
-            {selectedPlan && (
+            {selectedPlan && pricingDetails && (
               <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Plan</span>
@@ -172,26 +240,40 @@ export function AssignSubscriptionDialog({
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Price per account</span>
                   <span>
-                    {discountPercentage > 0 && (
+                    {(discountPercentage > 0 || billingInterval === 'yearly') && (
                       <span className="line-through text-muted-foreground mr-2">
                         ${selectedPlan.price_monthly}
                       </span>
                     )}
-                    <span className="font-medium">${pricePerAccount.toFixed(2)}</span>
+                    <span className="font-medium">${pricePerAccount.toFixed(2)}/mo</span>
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Accounts</span>
                   <span className="font-medium">{accountCount}</span>
                 </div>
-                <div className="border-t pt-2 flex justify-between">
-                  <span className="font-medium">Total Monthly</span>
-                  <span className="font-bold text-lg">${totalPrice.toFixed(2)}</span>
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Billing</span>
+                  <span className="font-medium capitalize">{billingInterval}</span>
                 </div>
-                {savings > 0 && (
+                <div className="border-t pt-2 flex justify-between">
+                  <span className="font-medium">
+                    {billingInterval === 'yearly' ? 'Total for 12 months' : 'Total Monthly'}
+                  </span>
+                  <span className="font-bold text-lg">${totalCharge.toFixed(2)}</span>
+                </div>
+                {billingInterval === 'yearly' && (
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>Monthly equivalent</span>
+                    <span>${totalMonthlyEquivalent.toFixed(2)}/mo</span>
+                  </div>
+                )}
+                {totalSavings > 0 && (
                   <div className="flex justify-between text-emerald-600 text-sm">
                     <span>You save</span>
-                    <span className="font-medium">${savings.toFixed(2)}/mo</span>
+                    <span className="font-medium">
+                      ${totalSavings.toFixed(2)}{billingInterval === 'yearly' ? '/year' : '/mo'}
+                    </span>
                   </div>
                 )}
               </div>
@@ -199,7 +281,12 @@ export function AssignSubscriptionDialog({
 
             {/* Expiry Date */}
             <div className="space-y-2">
-              <Label>Expiry Date</Label>
+              <div className="flex justify-between items-center">
+                <Label>Expiry Date</Label>
+                <span className="text-xs text-muted-foreground">
+                  Auto-set to {billingInterval === 'yearly' ? '12 months' : '1 month'}
+                </span>
+              </div>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
