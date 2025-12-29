@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSubscriptionPlans, useUserSubscriptions } from '@/hooks/useSubscriptions';
 import { useAuth } from '@/contexts/AuthContext';
-import { generateGeneralWhatsAppLink, generateSwitchPlanWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
+import { generateGeneralWhatsAppLink, generateSwitchPlanWhatsAppLink, generateVolumeDiscountWhatsAppLink, WHATSAPP_DISPLAY } from '@/lib/whatsapp';
+import { getDiscountPercentage, calculateDiscountedPrice, calculateTotalPrice, calculateSavings } from '@/lib/pricing';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Slider } from '@/components/ui/slider';
 import {
   Table,
   TableBody,
@@ -34,6 +36,9 @@ import {
   ChevronDown,
   ChevronUp,
   Percent,
+  Calculator,
+  Minus,
+  Plus,
 } from 'lucide-react';
 
 interface UpgradePlansDialogProps {
@@ -81,6 +86,7 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
   const { data: plans, isLoading } = useSubscriptionPlans();
   const { data: userSubscriptions } = useUserSubscriptions();
   const [showComparison, setShowComparison] = useState(false);
+  const [accountCount, setAccountCount] = useState(1);
 
   // Get unique active plan IDs the user is subscribed to
   const currentPlanIds = new Set(
@@ -130,6 +136,27 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
     });
     window.open(link, '_blank');
   };
+
+  // Handle volume discount WhatsApp contact
+  const handleVolumeDiscountContact = (plan: { id: string; name: string; price_monthly: number }) => {
+    const basePrice = Math.round(plan.price_monthly / 100);
+    const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
+    const totalPrice = calculateTotalPrice(basePrice, accountCount);
+    const discountPercentage = getDiscountPercentage(accountCount);
+    
+    const link = generateVolumeDiscountWhatsAppLink({
+      planName: plan.name,
+      accountCount,
+      pricePerAccount: discountedPrice,
+      totalPrice,
+      discountPercentage,
+      userEmail: user?.email,
+    });
+    window.open(link, '_blank');
+  };
+
+  // Get current discount percentage
+  const currentDiscount = getDiscountPercentage(accountCount);
 
   // Get all unique features from all plans
   const getAllFeatures = () => {
@@ -319,7 +346,122 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
           )}
         </div>
 
-        {/* Compare All Features Toggle */}
+        {/* Volume Discount Calculator */}
+        <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-4">
+            <Calculator className="h-5 w-5 text-primary" />
+            <h3 className="font-semibold">Volume Discount Calculator</h3>
+            {currentDiscount > 0 && (
+              <Badge className="bg-green-500 text-white ml-auto">
+                {currentDiscount}% OFF
+              </Badge>
+            )}
+          </div>
+          
+          <p className="text-sm text-muted-foreground mb-4">
+            How many TikTok accounts do you want to manage?
+          </p>
+
+          {/* Account Counter */}
+          <div className="flex items-center justify-center gap-4 mb-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setAccountCount(Math.max(1, accountCount - 1))}
+              disabled={accountCount <= 1}
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <div className="flex flex-col items-center min-w-[100px]">
+              <span className="text-3xl font-bold">{accountCount}</span>
+              <span className="text-xs text-muted-foreground">account{accountCount !== 1 ? 's' : ''}</span>
+            </div>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setAccountCount(Math.min(10, accountCount + 1))}
+              disabled={accountCount >= 10}
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+
+          {/* Slider */}
+          <div className="mb-6 px-2">
+            <Slider
+              value={[accountCount]}
+              onValueChange={([value]) => setAccountCount(value)}
+              min={1}
+              max={10}
+              step={1}
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground mt-1">
+              <span>1</span>
+              <span>5</span>
+              <span>10</span>
+            </div>
+          </div>
+
+          {/* Pricing Grid */}
+          {sortedPlans && (
+            <div className="grid grid-cols-3 gap-3 mb-4">
+              {sortedPlans.map((plan) => {
+                const Icon = planIcons[plan.id] || Zap;
+                const basePrice = Math.round(plan.price_monthly / 100);
+                const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
+                const totalPrice = calculateTotalPrice(basePrice, accountCount);
+                const savings = calculateSavings(basePrice, accountCount);
+                const hasDiscount = currentDiscount > 0;
+
+                return (
+                  <div
+                    key={plan.id}
+                    className="bg-background rounded-lg p-3 border text-center"
+                  >
+                    <div className="flex items-center justify-center gap-1 mb-2">
+                      <Icon className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium capitalize text-sm">{plan.name}</span>
+                    </div>
+                    <div className="space-y-1">
+                      {hasDiscount && (
+                        <div className="text-muted-foreground line-through text-xs">
+                          ${basePrice}/each
+                        </div>
+                      )}
+                      <div className="text-lg font-bold text-primary">
+                        ${discountedPrice.toFixed(2)}/each
+                      </div>
+                      <div className="text-sm">
+                        Total: <span className="font-semibold">${totalPrice.toFixed(2)}</span>/mo
+                      </div>
+                      {hasDiscount && (
+                        <div className="text-xs text-green-600 font-medium">
+                          Save ${savings.toFixed(2)}/mo
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full mt-2"
+                      onClick={() => handleVolumeDiscountContact(plan)}
+                    >
+                      <MessageCircle className="h-3 w-3 mr-1" />
+                      Contact
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground text-center">
+            5% discount per additional account, up to 20% off for 5+ accounts
+          </p>
+        </div>
+
+
         <div className="flex justify-center">
           <Button
             variant="outline"

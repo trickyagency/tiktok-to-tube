@@ -58,3 +58,28 @@ Please help me change my plan.`;
   
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
+
+interface VolumeDiscountParams {
+  planName: string;
+  accountCount: number;
+  pricePerAccount: number;
+  totalPrice: number;
+  discountPercentage: number;
+  userEmail?: string;
+}
+
+export function generateVolumeDiscountWhatsAppLink(params: VolumeDiscountParams): string {
+  const { planName, accountCount, pricePerAccount, totalPrice, discountPercentage, userEmail } = params;
+  
+  const message = `Hi! I'm interested in a multi-account subscription.
+
+Plan: ${planName}
+Number of Accounts: ${accountCount}
+Discount: ${discountPercentage}% off
+Price per Account: $${pricePerAccount}/month
+Total Monthly: $${totalPrice}/month${userEmail ? `\nEmail: ${userEmail}` : ''}
+
+Please help me set this up.`;
+  
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
