@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
@@ -143,23 +143,21 @@ export function AssignSubscriptionDialog({
 
             {/* Account Count */}
             <div className="space-y-3">
-              <div className="flex justify-between">
-                <Label>Number of Accounts</Label>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{accountCount}</span>
-                  {discountPercentage > 0 && (
-                    <Badge variant="secondary" className="text-emerald-600">
-                      {discountLabel}
-                    </Badge>
-                  )}
-                </div>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="accountCount">Number of Accounts</Label>
+                {discountPercentage > 0 && (
+                  <Badge variant="secondary" className="text-emerald-600">
+                    {discountLabel}
+                  </Badge>
+                )}
               </div>
-              <Slider
-                value={[accountCount]}
-                onValueChange={(v) => setAccountCount(v[0])}
+              <Input
+                id="accountCount"
+                type="number"
                 min={1}
-                max={20}
-                step={1}
+                value={accountCount}
+                onChange={(e) => setAccountCount(Math.max(1, parseInt(e.target.value) || 1))}
+                placeholder="Enter number of accounts"
                 className="w-full"
               />
             </div>
