@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -5,11 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Settings } from 'lucide-react';
 import { TikTokAccount, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { formatDistanceToNow } from 'date-fns';
+import { AccountYouTubeSettingsDialog } from './AccountYouTubeSettingsDialog';
 
 interface TikTokAccountCardProps {
   account: TikTokAccount;
@@ -18,12 +20,15 @@ interface TikTokAccountCardProps {
 }
 
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
+  const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
   const scrapeVideos = useScrapeVideos();
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
   const resetAccount = useResetTikTokAccount();
   const { data: publishedCount = 0 } = usePublishedVideosCount(account.id);
   const { data: limits } = useUserAccountLimits();
+  
+  const hasYouTubeSettings = !!(account.youtube_description || account.youtube_tags);
   
   const subscriptionStatus = limits?.subscriptionStatus ?? 'none';
   const subscriptionMessage = limits?.subscriptionMessage ?? '';
@@ -289,6 +294,15 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                 Open TikTok Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => setYoutubeSettingsOpen(true)}>
+                <Settings className="h-4 w-4 mr-2" />
+                YouTube Settings
+                {hasYouTubeSettings && (
+                  <Badge variant="secondary" className="ml-auto text-xs py-0 px-1">
+                    Configured
+                  </Badge>
+                )}
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={handleSyncProfile} disabled={isRefreshing || isScraping}>
                 {isRefreshing ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -317,6 +331,11 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
         </div>
       </CardContent>
 
+      <AccountYouTubeSettingsDialog
+        account={account}
+        open={youtubeSettingsOpen}
+        onOpenChange={setYoutubeSettingsOpen}
+      />
     </Card>
   );
 }

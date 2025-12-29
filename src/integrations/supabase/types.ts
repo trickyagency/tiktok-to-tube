@@ -678,6 +678,8 @@ export type Database = {
           user_id: string
           username: string
           video_count: number | null
+          youtube_description: string | null
+          youtube_tags: string | null
         }
         Insert: {
           account_status?: string
@@ -697,6 +699,8 @@ export type Database = {
           user_id: string
           username: string
           video_count?: number | null
+          youtube_description?: string | null
+          youtube_tags?: string | null
         }
         Update: {
           account_status?: string
@@ -716,6 +720,8 @@ export type Database = {
           user_id?: string
           username?: string
           video_count?: number | null
+          youtube_description?: string | null
+          youtube_tags?: string | null
         }
         Relationships: []
       }
