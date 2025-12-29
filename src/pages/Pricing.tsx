@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { pageSEO, updateMetaDescription, updateCanonicalUrl } from '@/lib/seo';
+import Header from '@/components/Header';
 import Footer from '@/components/Footer';
 import {
   Check,
@@ -112,34 +113,10 @@ export default function Pricing() {
 
   return (
     <main className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg">RepostFlow</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleWhatsAppContact}
-              className="hidden sm:flex gap-2 border-green-500/50 text-green-600 hover:bg-green-500/10"
-            >
-              <MessageCircle className="h-4 w-4" />
-              WhatsApp
-            </Button>
-            <Button variant="ghost" onClick={() => navigate('/auth')}>
-              Sign In
-            </Button>
-            <Button onClick={() => navigate('/auth')}>
-              Get Started
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Header />
+      
+      {/* Spacer for fixed header */}
+      <div className="h-16" />
 
       {/* Hero */}
       <section className="py-20 md:py-32">
