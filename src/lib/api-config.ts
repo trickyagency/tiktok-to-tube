@@ -37,7 +37,7 @@ const detectEnvironment = (): Environment => {
       return 'development';
     }
     
-    // Lovable preview = development
+    // Preview environment = development
     if (hostname.includes('lovableproject.com')) {
       return 'development';
     }
