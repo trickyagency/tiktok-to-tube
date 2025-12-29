@@ -16,6 +16,7 @@ import { useTestApifyKey, ApifyStatus } from '@/hooks/useApifyStatus';
 import { toast } from 'sonner';
 import EmailPreview from '@/components/settings/EmailPreview';
 import SecuritySettings from '@/components/settings/SecuritySettings';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,10 @@ const Settings = () => {
   const { testKey } = useTestApifyKey();
   const [hasSavedKey, setHasSavedKey] = useState(false);
   
+  // Profile state
+  const [fullName, setFullName] = useState('');
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  
   // Email branding state
   const [platformName, setPlatformName] = useState('RepostFlow');
   const [senderName, setSenderName] = useState('RepostFlow');
@@ -48,6 +53,13 @@ const Settings = () => {
   const [logoUrl, setLogoUrl] = useState('');
   const [primaryColor, setPrimaryColor] = useState('#18181b');
   const [accentColor, setAccentColor] = useState('#3b82f6');
+  
+  // Sync fullName from user metadata
+  useEffect(() => {
+    if (user?.user_metadata?.full_name) {
+      setFullName(user.user_metadata.full_name);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (isOwner && !isLoading) {
@@ -115,6 +127,23 @@ const Settings = () => {
     updateSetting('EMAIL_ACCENT_COLOR', accentColor);
   };
 
+  const handleUpdateProfile = async () => {
+    setIsUpdatingProfile(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { full_name: fullName.trim() }
+      });
+      
+      if (error) throw error;
+      toast.success('Profile updated successfully');
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      toast.error('Failed to update profile');
+    } finally {
+      setIsUpdatingProfile(false);
+    }
+  };
+
   const isValidHex = (color: string) => /^#[0-9A-Fa-f]{6}$/.test(color);
 
   return (
@@ -140,11 +169,17 @@ const Settings = () => {
               <Label htmlFor="name">Full Name</Label>
               <Input 
                 id="name" 
-                defaultValue={user?.user_metadata?.full_name || ''} 
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
                 placeholder="Your name"
               />
             </div>
-            <Button>Update Profile</Button>
+            <Button 
+              onClick={handleUpdateProfile} 
+              disabled={isUpdatingProfile}
+            >
+              {isUpdatingProfile ? 'Updating...' : 'Update Profile'}
+            </Button>
           </CardContent>
         </Card>
 
