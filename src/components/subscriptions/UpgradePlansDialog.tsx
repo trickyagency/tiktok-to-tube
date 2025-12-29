@@ -14,6 +14,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
   MessageCircle,
   Zap,
   Rocket,
@@ -21,6 +29,9 @@ import {
   Check,
   Video,
   ArrowRight,
+  X,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 
 interface UpgradePlansDialogProps {
@@ -46,9 +57,26 @@ const planFeatures: Record<string, string[]> = {
   scale: ['6 videos per day', 'Fastest processing', 'Premium support', 'Full analytics', 'Custom scheduling'],
 };
 
+// Human-readable labels for database feature keys
+const featureLabels: Record<string, string> = {
+  auto_upload: 'Auto Upload to YouTube',
+  watermark_free: 'Watermark-Free Downloads',
+  basic_seo: 'Basic SEO Optimization',
+  advanced_seo: 'Advanced SEO Optimization',
+  smart_seo: 'AI-Powered Smart SEO',
+  auto_scheduling: 'Auto Scheduling',
+  faster_processing: 'Faster Processing',
+  priority_processing: 'Priority Processing',
+  reupload_protection: 'Re-upload Protection',
+  best_posting_time: 'Best Posting Time Detection',
+  duplicate_detection: 'Duplicate Detection',
+  growth_optimization: 'Growth Optimization',
+};
+
 export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogProps) {
   const navigate = useNavigate();
   const { data: plans, isLoading } = useSubscriptionPlans();
+  const [showComparison, setShowComparison] = useState(false);
 
   const handleContactWhatsApp = () => {
     const link = generateGeneralWhatsAppLink();
@@ -59,6 +87,26 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
     onOpenChange(false);
     navigate('/dashboard/tiktok');
   };
+
+  // Get all unique features from all plans
+  const getAllFeatures = () => {
+    if (!plans) return [];
+    const allFeatureKeys = new Set<string>();
+    plans.forEach(plan => {
+      if (plan.features && typeof plan.features === 'object') {
+        Object.keys(plan.features as Record<string, boolean>).forEach(key => allFeatureKeys.add(key));
+      }
+    });
+    return Array.from(allFeatureKeys);
+  };
+
+  const planHasFeature = (planFeatures: unknown, featureKey: string): boolean => {
+    if (!planFeatures || typeof planFeatures !== 'object') return false;
+    return (planFeatures as Record<string, boolean>)[featureKey] === true;
+  };
+
+  const sortedPlans = plans?.slice().sort((a, b) => a.price_monthly - b.price_monthly);
+  const allFeatureKeys = getAllFeatures();
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -174,6 +222,83 @@ export function UpgradePlansDialog({ open, onOpenChange }: UpgradePlansDialogPro
             })
           )}
         </div>
+
+        {/* Compare All Features Toggle */}
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowComparison(!showComparison)}
+            className="gap-2"
+          >
+            {showComparison ? (
+              <>
+                <ChevronUp className="h-4 w-4" />
+                Hide Comparison
+              </>
+            ) : (
+              <>
+                <ChevronDown className="h-4 w-4" />
+                Compare All Features
+              </>
+            )}
+          </Button>
+        </div>
+
+        {/* Plan Comparison Table */}
+        {showComparison && sortedPlans && (
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/50">
+                  <TableHead className="font-semibold">Feature</TableHead>
+                  {sortedPlans.map((plan) => (
+                    <TableHead key={plan.id} className="text-center font-semibold capitalize">
+                      {plan.name}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {/* Videos per day row */}
+                <TableRow>
+                  <TableCell className="font-medium">Videos per Day</TableCell>
+                  {sortedPlans.map((plan) => (
+                    <TableCell key={plan.id} className="text-center font-semibold text-primary">
+                      {plan.max_videos_per_day}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                {/* Monthly price row */}
+                <TableRow>
+                  <TableCell className="font-medium">Monthly Price</TableCell>
+                  {sortedPlans.map((plan) => (
+                    <TableCell key={plan.id} className="text-center font-semibold">
+                      ${plan.price_monthly}
+                    </TableCell>
+                  ))}
+                </TableRow>
+                {/* Feature rows */}
+                {allFeatureKeys.map((featureKey) => (
+                  <TableRow key={featureKey}>
+                    <TableCell className="font-medium">
+                      {featureLabels[featureKey] || featureKey.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                    </TableCell>
+                    {sortedPlans.map((plan) => (
+                      <TableCell key={plan.id} className="text-center">
+                        {planHasFeature(plan.features, featureKey) ? (
+                          <Check className="h-5 w-5 text-green-500 mx-auto" />
+                        ) : (
+                          <X className="h-5 w-5 text-muted-foreground/40 mx-auto" />
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
