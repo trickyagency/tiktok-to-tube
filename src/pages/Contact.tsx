@@ -238,7 +238,7 @@ ${data.message}`;
                       </button>
 
                       <a
-                        href="mailto:support@repostflow.com"
+                        href="mailto:Support@digitalautomators.com"
                         className="flex items-start gap-4 w-full text-left p-4 rounded-lg bg-primary/10 hover:bg-primary/20 transition-colors"
                       >
                         <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
@@ -247,7 +247,7 @@ ${data.message}`;
                         <div>
                           <h3 className="font-semibold">Email</h3>
                           <p className="text-sm text-muted-foreground">
-                            support@repostflow.com
+                            Support@digitalautomators.com
                           </p>
                         </div>
                       </a>
