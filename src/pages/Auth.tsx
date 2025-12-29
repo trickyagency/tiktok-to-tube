@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { getProductionUrl } from '@/lib/auth-utils';
 import { Button } from '@/components/ui/button';
@@ -282,7 +282,10 @@ const Auth = () => {
           </Card>
 
           <p className="text-center text-xs text-muted-foreground">
-            By continuing, you agree to our Terms of Service and Privacy Policy
+            By continuing, you agree to our{' '}
+            <Link to="/terms" className="underline hover:text-foreground">Terms of Service</Link>
+            {' '}and{' '}
+            <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>
           </p>
         </div>
       </div>

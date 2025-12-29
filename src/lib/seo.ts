@@ -86,4 +86,12 @@ export const pageSEO = {
     title: 'Upload Analytics | RepostFlow',
     description: 'Detailed analytics for your video uploads.',
   },
+  privacy: {
+    title: 'Privacy Policy | RepostFlow',
+    description: 'Learn how RepostFlow collects, uses, and protects your data. Our privacy policy covers GDPR and CCPA compliance.',
+  },
+  terms: {
+    title: 'Terms of Service | RepostFlow',
+    description: 'Read the terms and conditions for using RepostFlow. Understand your rights and responsibilities.',
+  },
 } as const;
