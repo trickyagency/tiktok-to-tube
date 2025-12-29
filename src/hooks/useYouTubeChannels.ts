@@ -3,6 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
+const API_BASE_URL = 'https://repostflow.digitalautomators.com/functions/v1';
+
 export interface YouTubeChannel {
   id: string;
   user_id: string;
@@ -127,7 +129,7 @@ export function useYouTubeChannels() {
   const startOAuth = async (channelId: string) => {
     try {
       // Build the URL with query params for the OAuth flow
-      const oauthUrl = `https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=start-auth&channel_id=${channelId}`;
+      const oauthUrl = `${API_BASE_URL}/youtube-oauth?action=start-auth&channel_id=${channelId}`;
       
       const res = await fetch(oauthUrl);
       const data = await res.json();
@@ -157,7 +159,7 @@ export function useYouTubeChannels() {
 
   const refreshToken = async (channelId: string) => {
     try {
-      const refreshUrl = `https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=refresh-token&channel_id=${channelId}`;
+      const refreshUrl = `${API_BASE_URL}/youtube-oauth?action=refresh-token&channel_id=${channelId}`;
       
       const res = await fetch(refreshUrl);
       const data = await res.json();
@@ -178,7 +180,7 @@ export function useYouTubeChannels() {
 
   const checkForChannel = async (channelId: string): Promise<{ found: boolean; channelTitle?: string }> => {
     try {
-      const checkUrl = `https://qpufyeeqosvgipslwday.supabase.co/functions/v1/youtube-oauth?action=check-channel&channel_id=${channelId}`;
+      const checkUrl = `${API_BASE_URL}/youtube-oauth?action=check-channel&channel_id=${channelId}`;
       
       const res = await fetch(checkUrl);
       const data = await res.json();
