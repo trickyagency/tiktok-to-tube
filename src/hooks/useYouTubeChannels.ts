@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { OAUTH_REDIRECT_URI } from '@/lib/api-config';
 
 export interface YouTubeChannel {
   id: string;
@@ -66,7 +67,7 @@ export function useYouTubeChannels() {
           channel_id: '', // Will be filled after OAuth
           google_client_id: input.google_client_id,
           google_client_secret: input.google_client_secret,
-          google_redirect_uri: input.google_redirect_uri || null,
+          google_redirect_uri: input.google_redirect_uri || OAUTH_REDIRECT_URI,
           tiktok_account_id: input.tiktok_account_id || null,
           auth_status: 'pending',
           is_connected: false,
