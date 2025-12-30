@@ -52,24 +52,31 @@ const DashboardSidebar = () => {
   const isCollapsed = state === 'collapsed';
   const { mismatchedCount } = usePublishQueue();
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string | null>(null);
 
-  // Fetch user avatar
+  // Fetch user profile (avatar and name)
   useEffect(() => {
-    const fetchAvatar = async () => {
+    const fetchProfile = async () => {
       if (!user?.id) return;
       const { data } = await supabase
         .from('profiles')
-        .select('avatar_url')
+        .select('avatar_url, full_name')
         .eq('user_id', user.id)
         .single();
       if (data?.avatar_url) {
         setAvatarUrl(data.avatar_url);
       }
+      if (data?.full_name) {
+        setProfileName(data.full_name);
+      }
     };
-    fetchAvatar();
+    fetchProfile();
   }, [user?.id]);
 
   const getUserInitials = () => {
+    if (profileName) {
+      return profileName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
     if (user?.email) {
       return user.email.slice(0, 2).toUpperCase();
     }
@@ -263,7 +270,7 @@ const DashboardSidebar = () => {
           {!isCollapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {user?.email?.split('@')[0] || 'User'}
+                {profileName || user?.email?.split('@')[0] || 'User'}
               </p>
               <p className="text-xs text-muted-foreground truncate">
                 {user?.email}
