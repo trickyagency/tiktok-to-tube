@@ -1,14 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Home, Calendar, Youtube, Video, Settings } from 'lucide-react';
+import { Home, Calendar, Youtube, Video } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 const navItems = [
   { icon: Home, label: 'Home', path: '/dashboard' },
   { icon: Calendar, label: 'Queue', path: '/dashboard/queue' },
   { icon: Youtube, label: 'YouTube', path: '/dashboard/youtube' },
   { icon: Video, label: 'TikTok', path: '/dashboard/tiktok' },
-  { icon: Settings, label: 'Settings', path: '/dashboard/settings' },
 ];
 
 const triggerHaptic = () => {
@@ -21,6 +23,34 @@ const MobileBottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [profileName, setProfileName] = useState<string | null>(null);
+  const { user } = useAuth();
+
+  // Fetch user profile (avatar and name)
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (!user?.id) return;
+      const { data } = await supabase
+        .from('profiles')
+        .select('avatar_url, full_name')
+        .eq('user_id', user.id)
+        .single();
+      if (data?.avatar_url) setAvatarUrl(data.avatar_url);
+      if (data?.full_name) setProfileName(data.full_name);
+    };
+    fetchProfile();
+  }, [user?.id]);
+
+  const getUserInitials = () => {
+    if (profileName) {
+      return profileName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    }
+    if (user?.email) {
+      return user.email.slice(0, 2).toUpperCase();
+    }
+    return 'U';
+  };
 
   const isActive = (path: string) => {
     if (path === '/dashboard') {
@@ -109,6 +139,35 @@ const MobileBottomNav = () => {
               </button>
             );
           })}
+          
+          {/* Profile button */}
+          <button
+            onClick={() => handleNavClick('/dashboard/settings')}
+            className={cn(
+              'flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-all min-w-[4rem]',
+              isActive('/dashboard/settings')
+                ? 'text-primary'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <div className="relative">
+              <Avatar className="h-5 w-5">
+                {avatarUrl && <AvatarImage src={avatarUrl} alt="Profile" />}
+                <AvatarFallback className="text-[8px] bg-primary/10">
+                  {getUserInitials()}
+                </AvatarFallback>
+              </Avatar>
+              {isActive('/dashboard/settings') && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-primary" />
+              )}
+            </div>
+            <span className={cn(
+              'text-[10px] font-medium truncate max-w-[4rem]',
+              isActive('/dashboard/settings') ? 'text-primary' : 'text-muted-foreground'
+            )}>
+              {profileName?.split(' ')[0] || 'Profile'}
+            </span>
+          </button>
         </div>
       </div>
     </nav>
