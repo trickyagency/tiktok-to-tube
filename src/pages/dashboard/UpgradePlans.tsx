@@ -19,6 +19,7 @@ import {
   generateVolumeDiscountWhatsAppLink 
 } from '@/lib/whatsapp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -288,6 +289,22 @@ export default function UpgradePlans() {
                       step={1}
                       className="w-full"
                     />
+                    
+                    {/* Quick Preset Buttons */}
+                    <div className="flex gap-1.5 mt-3">
+                      {[5, 10, 15, 20].map((preset) => (
+                        <Button
+                          key={preset}
+                          variant={accountCount === preset ? "default" : "outline"}
+                          size="sm"
+                          className="flex-1 h-7 text-xs px-0"
+                          onClick={() => updatePlanAccounts(plan.id, preset)}
+                        >
+                          {preset}
+                        </Button>
+                      ))}
+                    </div>
+                    
                     <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
                       {hasDiscount && (
                         <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 text-xs">
@@ -406,9 +423,67 @@ export default function UpgradePlans() {
               </div>
             </CardContent>
           </Card>
-        </div>
+          </div>
 
-        {/* WhatsApp Contact Banner */}
+          {/* Feature Comparison Table */}
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold">Compare All Plans</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                See exactly what's included in each plan
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="min-w-[180px]">Feature</TableHead>
+                      <TableHead className="text-center">Basic</TableHead>
+                      <TableHead className="text-center">Pro</TableHead>
+                      <TableHead className="text-center">Scale</TableHead>
+                      <TableHead className="text-center">Agency</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {[
+                      { name: 'Videos per day (per account)', basic: '2', pro: '4', scale: '6', agency: 'Custom' },
+                      { name: 'TikTok accounts', basic: '1-20', pro: '1-20', scale: '1-20', agency: '21+' },
+                      { name: 'Basic scheduling', basic: true, pro: true, scale: true, agency: true },
+                      { name: 'Advanced scheduling', basic: false, pro: true, scale: true, agency: true },
+                      { name: 'Unlimited scheduling', basic: false, pro: false, scale: true, agency: true },
+                      { name: 'Email support', basic: true, pro: true, scale: true, agency: true },
+                      { name: 'Priority support', basic: false, pro: true, scale: true, agency: true },
+                      { name: 'Dedicated support', basic: false, pro: false, scale: true, agency: true },
+                      { name: 'Analytics dashboard', basic: false, pro: true, scale: true, agency: true },
+                      { name: 'Advanced analytics', basic: false, pro: false, scale: true, agency: true },
+                      { name: 'Dedicated account manager', basic: false, pro: false, scale: false, agency: true },
+                      { name: 'Priority response (< 2hr)', basic: false, pro: false, scale: false, agency: true },
+                      { name: 'White-label options', basic: false, pro: false, scale: false, agency: true },
+                      { name: 'Volume discounts', basic: true, pro: true, scale: true, agency: true },
+                    ].map((feature, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="font-medium">{feature.name}</TableCell>
+                        {(['basic', 'pro', 'scale', 'agency'] as const).map((plan) => (
+                          <TableCell key={plan} className="text-center">
+                            {feature[plan] === true ? (
+                              <Check className="h-4 w-4 text-emerald-500 mx-auto" />
+                            ) : feature[plan] === false ? (
+                              <span className="text-muted-foreground">—</span>
+                            ) : (
+                              <span className="text-sm">{feature[plan]}</span>
+                            )}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* WhatsApp Contact Banner */}
         <Card className="mb-8 border-green-500/50 bg-green-500/5">
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
