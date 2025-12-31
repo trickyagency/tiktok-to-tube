@@ -63,14 +63,15 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
   // Only show connected YouTube channels
   const connectedChannels = youtubeChannels.filter(c => c.auth_status === 'connected');
 
-  // Get channels that already have an active schedule
-  const channelsWithActiveSchedule = existingSchedules
-    .filter(s => s.is_active)
-    .map(s => s.youtube_channel_id);
+  // Get channels that already have ANY schedule (active or paused)
+  const channelsWithSchedule = existingSchedules.map(s => ({
+    channelId: s.youtube_channel_id,
+    isActive: s.is_active
+  }));
 
-  // Available channels are those without active schedules
+  // Available channels are those without ANY schedule
   const availableChannels = connectedChannels.filter(
-    c => !channelsWithActiveSchedule.includes(c.id)
+    c => !channelsWithSchedule.some(s => s.channelId === c.id)
   );
 
   const canAddMoreTimes = publishTimes.length < maxVideosPerDay;
@@ -190,12 +191,16 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
                 ))}
                 {/* Show channels with existing schedules as disabled */}
                 {connectedChannels
-                  .filter(c => channelsWithActiveSchedule.includes(c.id))
-                  .map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id} disabled>
-                      {channel.channel_title || 'Unnamed Channel'} (Schedule exists)
-                    </SelectItem>
-                  ))}
+                  .filter(c => channelsWithSchedule.some(s => s.channelId === c.id))
+                  .map((channel) => {
+                    const schedule = channelsWithSchedule.find(s => s.channelId === channel.id);
+                    const status = schedule?.isActive ? 'Active' : 'Paused';
+                    return (
+                      <SelectItem key={channel.id} value={channel.id} disabled>
+                        {channel.channel_title || 'Unnamed Channel'} ({status} schedule exists)
+                      </SelectItem>
+                    );
+                  })}
               </SelectContent>
             </Select>
             {connectedChannels.length === 0 && (
@@ -206,7 +211,7 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
             {connectedChannels.length > 0 && availableChannels.length === 0 && (
               <p className="text-xs text-amber-600 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
-                All channels have active schedules. You can only have one schedule per channel.
+                All channels have schedules. Activate or edit an existing schedule instead.
               </p>
             )}
           </div>
