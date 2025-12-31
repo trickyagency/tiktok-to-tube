@@ -53,3 +53,6 @@ verify_jwt = false
 
 [functions.send-welcome-email]
 verify_jwt = false
+
+[functions.signup-confirmation]
+verify_jwt = false
