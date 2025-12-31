@@ -43,6 +43,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScheduleHistoryDialog } from './ScheduleHistoryDialog';
 import { SchedulePreviewDialog } from './SchedulePreviewDialog';
@@ -54,9 +55,12 @@ import { formatDistanceToNow } from 'date-fns';
 interface ScheduleCardProps {
   schedule: PublishSchedule;
   onEdit?: () => void;
+  isSelected?: boolean;
+  onToggleSelect?: () => void;
+  showCheckbox?: boolean;
 }
 
-export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
+export function ScheduleCard({ schedule, onEdit, isSelected, onToggleSelect, showCheckbox }: ScheduleCardProps) {
   const { toggleSchedule, deleteSchedule, isDeleting } = usePublishSchedules();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youtubeChannels } = useYouTubeChannels();
@@ -127,8 +131,17 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
       schedule.is_active 
         ? 'bg-gradient-to-br from-background via-background to-primary/5 border-primary/20 shadow-sm' 
         : 'opacity-70 hover:opacity-100'
-    } ${exceedsLimit ? 'border-warning/50' : ''}`}>
+    } ${exceedsLimit ? 'border-warning/50' : ''} ${isSelected ? 'ring-2 ring-primary/50' : ''}`}>
       <CardContent className="p-5">
+        <div className="flex gap-3">
+          {showCheckbox && (
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={onToggleSelect}
+              className="mt-1"
+            />
+          )}
+          <div className="flex-1 min-w-0">
         {/* Subscription Limit Warning Banner */}
         {exceedsLimit && (
           <Alert variant="default" className="mb-4 border-warning/50 bg-warning/10">
@@ -393,6 +406,8 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
             onOpenChange={setYoutubeSettingsOpen}
           />
         )}
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
