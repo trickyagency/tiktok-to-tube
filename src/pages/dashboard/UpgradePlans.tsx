@@ -85,7 +85,8 @@ export default function UpgradePlans() {
   const planFeatures: Record<string, string[]> = {
     basic: ['2 videos per day', 'Basic scheduling', 'Email support'],
     pro: ['4 videos per day', 'Advanced scheduling', 'Priority support', 'Analytics dashboard'],
-    scale: ['6 videos per day', 'Unlimited scheduling', 'Dedicated support', 'Advanced analytics', 'API access'],
+    scale: ['6 videos per day', 'Unlimited scheduling', 'Dedicated support', 'Advanced analytics'],
+    agency: ['Custom videos per day', 'Custom account limits', 'Dedicated account manager', 'Priority support (< 2hr response)', 'White-label options'],
   };
 
   // WhatsApp contact handlers
@@ -212,15 +213,87 @@ export default function UpgradePlans() {
           </div>
         </div>
 
+        {/* Account Selection Section */}
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h3 className="font-semibold">How many accounts do you need?</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Select your account count to see personalized pricing with discounts
+                  </p>
+                </div>
+                <Badge variant="secondary" className="text-lg px-4 py-2">
+                  {accountCount} {accountCount === 1 ? 'account' : 'accounts'}
+                </Badge>
+              </div>
+              
+              <Slider
+                value={[accountCount]}
+                onValueChange={(v) => setAccountCount(v[0])}
+                min={1}
+                max={20}
+                step={1}
+                className="w-full"
+              />
+              
+              {/* Discount tier badges */}
+              <div className="flex gap-2 flex-wrap">
+                {VOLUME_DISCOUNTS.filter(t => t.maxAccounts <= 20).map((tier) => {
+                  const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
+                  const rangeLabel = `${tier.minAccounts}-${tier.maxAccounts}`;
+                  return (
+                    <Badge 
+                      key={tier.tier}
+                      variant={isActive ? "default" : "outline"}
+                      className={isActive ? "bg-primary" : ""}
+                    >
+                      {rangeLabel}: {tier.label}
+                    </Badge>
+                  );
+                })}
+              </div>
+              
+              {/* Upgrade nudge */}
+              {(() => {
+                const nextTier = getNextTierInfo(accountCount);
+                if (!nextTier || accountCount >= 20) return null;
+                return (
+                  <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                    <TrendingUp className="h-4 w-4 text-amber-600" />
+                    <span className="text-sm">
+                      Add {nextTier.accountsNeeded} more to unlock {nextTier.nextLabel}!
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => setAccountCount(Math.min(20, accountCount + nextTier.accountsNeeded))}
+                    >
+                      Preview
+                    </Button>
+                  </div>
+                );
+              })()}
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Plan Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {activePlans.map((plan) => {
             const isRecommended = plan.id === 'pro';
             const isCurrentPlan = currentSubscription?.plan_id === plan.id;
             const features = planFeatures[plan.id] || [];
-            const price = billingCycle === 'annual' 
-              ? (plan.price_monthly * 0.8).toFixed(0) 
-              : plan.price_monthly;
+            
+            // Calculate price with volume discount
+            const basePrice = plan.price_monthly;
+            const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
+            const hasDiscount = getDiscountPercentage(accountCount) > 0;
+            const monthlyPrice = billingCycle === 'annual' 
+              ? (discountedPrice * 0.75).toFixed(2) 
+              : discountedPrice.toFixed(2);
+            const totalMonthly = parseFloat(monthlyPrice) * accountCount;
 
             return (
               <Card 
@@ -251,9 +324,27 @@ export default function UpgradePlans() {
                 <CardHeader className="text-center pb-4">
                   <CardTitle className="text-xl font-semibold capitalize">{plan.name}</CardTitle>
                   <div className="mt-4">
-                    <span className="text-4xl font-bold">${price}</span>
-                    <span className="text-muted-foreground">/month</span>
+                    {hasDiscount && (
+                      <span className="text-sm text-muted-foreground line-through mr-2">
+                        ${basePrice}
+                      </span>
+                    )}
+                    <span className="text-4xl font-bold">${monthlyPrice}</span>
+                    <span className="text-muted-foreground">/mo/account</span>
                   </div>
+                  {accountCount > 1 && (
+                    <div className="mt-2 text-sm">
+                      <span className="font-medium text-primary">
+                        ${totalMonthly.toFixed(2)}/mo total
+                      </span>
+                      <span className="text-muted-foreground"> for {accountCount} accounts</span>
+                    </div>
+                  )}
+                  {hasDiscount && (
+                    <Badge className="mt-2 bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
+                      {getDiscountTierLabel(accountCount)}
+                    </Badge>
+                  )}
                   <p className="text-sm text-muted-foreground mt-2">
                     {plan.max_videos_per_day} videos per day
                   </p>
@@ -302,6 +393,47 @@ export default function UpgradePlans() {
               </Card>
             );
           })}
+
+          {/* Agency Tier Card */}
+          <Card className="relative flex flex-col border-purple-500/50 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
+            <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+              <span className="bg-purple-600 text-white text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
+                <Crown className="h-3 w-3" />
+                Enterprise
+              </span>
+            </div>
+            
+            <CardHeader className="text-center pb-4">
+              <CardTitle className="text-xl font-semibold">Agency</CardTitle>
+              <div className="mt-4">
+                <span className="text-4xl font-bold">Custom</span>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                21+ accounts • Custom videos/day
+              </p>
+            </CardHeader>
+            
+            <CardContent className="flex-1 flex flex-col">
+              <ul className="space-y-3 mb-6 flex-1">
+                {planFeatures.agency.map((feature, idx) => (
+                  <li key={idx} className="flex items-start gap-3 text-sm">
+                    <Sparkles className="h-4 w-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              
+              <div className="pt-3 border-t">
+                <Button 
+                  onClick={handleContactWhatsApp}
+                  className="w-full bg-purple-600 hover:bg-purple-700"
+                >
+                  <MessageCircle className="h-4 w-4 mr-2" />
+                  Contact for Pricing
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* WhatsApp Contact Banner */}
@@ -325,15 +457,16 @@ export default function UpgradePlans() {
           </CardContent>
         </Card>
 
-        {/* Volume Discounts */}
+        {/* Volume Discounts Reference */}
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">Volume discounts</CardTitle>
-            <p className="text-sm text-muted-foreground">Save more with multiple accounts</p>
+            <CardTitle className="text-lg font-semibold">Volume Discounts</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              The more accounts you add, the more you save
+            </p>
           </CardHeader>
-          <CardContent className="space-y-6">
-            {/* Discount Tiers */}
-            <div className="flex gap-2">
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
               {VOLUME_DISCOUNTS.map((tier) => {
                 const rangeLabel = tier.maxAccounts === Infinity 
                   ? `${tier.minAccounts}+` 
@@ -342,125 +475,21 @@ export default function UpgradePlans() {
                 
                 return (
                   <div 
-                    key={rangeLabel}
-                    className={`flex-1 text-center py-3 px-2 rounded-lg border transition-colors ${
-                      isActive
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border'
+                    key={tier.tier}
+                    className={`text-center p-4 rounded-lg border transition-colors ${
+                      isActive ? 'border-primary bg-primary/5' : 'border-border'
                     }`}
                   >
-                    <div className="text-sm font-medium">{rangeLabel}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="font-semibold">{rangeLabel}</div>
+                    <div className="text-sm text-muted-foreground capitalize">{tier.tier}</div>
+                    <div className={`text-lg font-bold ${tier.discount > 0 ? 'text-emerald-600' : ''}`}>
                       {tier.label}
                     </div>
                   </div>
                 );
               })}
             </div>
-
-            {/* Slider */}
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Number of accounts</span>
-                <span className="font-medium">{accountCount}</span>
-              </div>
-              <Slider
-                value={[accountCount]}
-                onValueChange={(v) => setAccountCount(v[0])}
-                min={1}
-                max={30}
-                step={1}
-                className="w-full"
-              />
-            </div>
-
-            {/* Pricing Summary */}
-            {proPlan && (
-              <div className="flex items-center justify-between py-4 px-4 bg-muted/50 rounded-lg">
-                <div>
-                  <span className="font-medium">{proPlan.name}</span>
-                  <span className="text-muted-foreground"> × {accountCount} accounts</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-semibold">
-                    ${(calculateDiscountedPrice(proPlan.price_monthly, accountCount) * accountCount).toFixed(2)}/mo
-                  </div>
-                  {getDiscountPercentage(accountCount) > 0 && (
-                    <div className="text-sm text-emerald-600">
-                      Save ${((proPlan.price_monthly * accountCount) - (calculateDiscountedPrice(proPlan.price_monthly, accountCount) * accountCount)).toFixed(2)}/mo
-                    </div>
-                  )}
-                </div>
-                </div>
-              )}
-
-              {/* Upgrade Nudge - Shows when user can unlock next tier */}
-              {(() => {
-                const nextTier = getNextTierInfo(accountCount);
-                if (!nextTier) return null;
-                
-                return (
-                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-lg">
-                    <div className="flex-shrink-0">
-                      <TrendingUp className="h-5 w-5 text-amber-600" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium">
-                        Add {nextTier.accountsNeeded} more account{nextTier.accountsNeeded > 1 ? 's' : ''} to unlock {nextTier.nextLabel}!
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Save {Math.round(nextTier.nextDiscount * 100)}% on every account
-                      </p>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setAccountCount(accountCount + nextTier.accountsNeeded)}
-                      className="border-amber-500/30 hover:bg-amber-500/10"
-                    >
-                      Preview
-                    </Button>
-                  </div>
-                );
-              })()}
-
-              {/* Agency Tier Benefits - Shows when user qualifies for 21+ accounts */}
-              {isAgencyTier(accountCount) && (
-                <Card className="border-purple-500/50 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
-                      <Crown className="h-5 w-5 text-purple-500" />
-                      Agency Tier Benefits
-                      <Badge className="bg-purple-500/20 text-purple-600 border-purple-500/30">
-                        Exclusive
-                      </Badge>
-                    </CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      Unlock premium features with 21+ accounts
-                    </p>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      {AGENCY_BENEFITS.map((benefit, idx) => (
-                        <div key={idx} className="flex items-center gap-2 text-sm">
-                          <Sparkles className="h-4 w-4 text-purple-500 flex-shrink-0" />
-                          <span>{benefit}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 pt-4 border-t">
-                      <Button 
-                        onClick={handleContactWhatsApp}
-                        className="w-full bg-purple-600 hover:bg-purple-700"
-                      >
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        Contact for Agency Pricing
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </CardContent>
+          </CardContent>
         </Card>
 
         {/* Annual Savings */}
