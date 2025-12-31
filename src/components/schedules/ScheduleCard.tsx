@@ -12,11 +12,17 @@ import {
   Video,
   Pencil,
   Film,
-  Youtube
+  Youtube,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  XCircle,
+  Activity
 } from 'lucide-react';
 import { PublishSchedule, usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { useScheduleStats } from '@/hooks/useScheduleAnalytics';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
@@ -29,10 +35,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { ScheduleHistoryDialog } from './ScheduleHistoryDialog';
 import { SchedulePreviewDialog } from './SchedulePreviewDialog';
+import { ScheduleAnalyticsDialog } from './ScheduleAnalyticsDialog';
 import { AccountYouTubeSettingsDialog } from '@/components/tiktok/AccountYouTubeSettingsDialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { formatDistanceToNow } from 'date-fns';
 
 interface ScheduleCardProps {
   schedule: PublishSchedule;
@@ -44,6 +53,9 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youtubeChannels } = useYouTubeChannels();
   const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
+  
+  const { data: stats } = useScheduleStats(schedule.id);
 
   const tiktokAccount = tikTokAccounts.find(a => a.id === schedule.tiktok_account_id);
   const youtubeChannel = youtubeChannels.find(c => c.id === schedule.youtube_channel_id);
@@ -64,6 +76,23 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
       return count || 0;
     },
   });
+
+  const formatDuration = (ms: number): string => {
+    if (ms === 0) return '-';
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes > 0) {
+      return `${minutes}m ${remainingSeconds}s`;
+    }
+    return `${seconds}s`;
+  };
+
+  const getSuccessRateColor = (rate: number) => {
+    if (rate >= 90) return 'text-green-600 dark:text-green-400';
+    if (rate >= 70) return 'text-yellow-600 dark:text-yellow-400';
+    return 'text-destructive';
+  };
 
   const handleToggle = async () => {
     await toggleSchedule({ id: schedule.id, is_active: !schedule.is_active });
@@ -131,6 +160,7 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
 
           {/* Actions */}
           <div className="flex items-center gap-2">
+            <ScheduleAnalyticsDialog schedule={schedule} />
             <SchedulePreviewDialog schedule={schedule} />
             <ScheduleHistoryDialog schedule={schedule} />
             
@@ -191,6 +221,68 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
             </AlertDialog>
           </div>
         </div>
+        
+        {/* Inline Analytics */}
+        {stats && stats.totalUploads > 0 && (
+          <Collapsible open={analyticsOpen} onOpenChange={setAnalyticsOpen}>
+            <CollapsibleTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full mt-3 text-muted-foreground hover:text-foreground"
+              >
+                <Activity className="h-3.5 w-3.5 mr-2" />
+                Analytics
+                {analyticsOpen ? (
+                  <ChevronUp className="h-3.5 w-3.5 ml-auto" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5 ml-auto" />
+                )}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                <div className="p-2 rounded-md bg-muted/50">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Activity className="h-3 w-3" />
+                    Total
+                  </div>
+                  <p className="font-semibold">{stats.totalUploads}</p>
+                </div>
+                <div className="p-2 rounded-md bg-muted/50">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Success
+                  </div>
+                  <p className={`font-semibold ${getSuccessRateColor(stats.successRate)}`}>
+                    {stats.successRate.toFixed(0)}%
+                  </p>
+                </div>
+                <div className="p-2 rounded-md bg-muted/50">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <XCircle className="h-3 w-3" />
+                    Failed
+                  </div>
+                  <p className={`font-semibold ${stats.failedUploads > 0 ? 'text-destructive' : ''}`}>
+                    {stats.failedUploads}
+                  </p>
+                </div>
+                <div className="p-2 rounded-md bg-muted/50">
+                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
+                    <Clock className="h-3 w-3" />
+                    Avg Time
+                  </div>
+                  <p className="font-semibold">{formatDuration(stats.avgUploadDuration)}</p>
+                </div>
+              </div>
+              {stats.lastUploadAt && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Last upload: {formatDistanceToNow(new Date(stats.lastUploadAt), { addSuffix: true })}
+                </p>
+              )}
+            </CollapsibleContent>
+          </Collapsible>
+        )}
         
         {tiktokAccount && (
           <AccountYouTubeSettingsDialog

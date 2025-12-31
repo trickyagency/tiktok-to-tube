@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
+import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 
 const Schedules = () => {
   const { schedules, isLoading, refetch } = usePublishSchedules();
+  const { data: overviewStats, isLoading: statsLoading } = useScheduleAnalytics();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youTubeChannels } = useYouTubeChannels();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
@@ -65,6 +67,77 @@ const Schedules = () => {
           <CreateScheduleDialog />
         </div>
       </div>
+
+      {/* Overview Stats */}
+      {(statsLoading || (overviewStats && overviewStats.totalSchedules > 0)) && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {statsLoading ? (
+            <>
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-24" />
+              ))}
+            </>
+          ) : overviewStats && (
+            <>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <Calendar className="h-4 w-4" />
+                    <span className="text-xs font-medium">Active Schedules</span>
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {overviewStats.activeSchedules}
+                    <span className="text-sm font-normal text-muted-foreground ml-1">
+                      / {overviewStats.totalSchedules}
+                    </span>
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <Activity className="h-4 w-4" />
+                    <span className="text-xs font-medium">Uploads This Month</span>
+                  </div>
+                  <p className="text-2xl font-bold">{overviewStats.totalUploadsThisMonth}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="text-xs font-medium">Avg Success Rate</span>
+                  </div>
+                  <p className={`text-2xl font-bold ${
+                    overviewStats.avgSuccessRate >= 90 
+                      ? 'text-green-600 dark:text-green-400' 
+                      : overviewStats.avgSuccessRate >= 70 
+                        ? 'text-yellow-600 dark:text-yellow-400'
+                        : 'text-destructive'
+                  }`}>
+                    {overviewStats.avgSuccessRate.toFixed(1)}%
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
+                    <TrendingUp className="h-4 w-4" />
+                    <span className="text-xs font-medium">Status</span>
+                  </div>
+                  <p className="text-lg font-semibold">
+                    {overviewStats.activeSchedules > 0 ? (
+                      <span className="text-green-600 dark:text-green-400">Running</span>
+                    ) : (
+                      <span className="text-muted-foreground">Paused</span>
+                    )}
+                  </p>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Schedules List */}
       <Card>
