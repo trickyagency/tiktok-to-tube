@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Clock, 
@@ -17,7 +18,9 @@ import {
   ChevronUp,
   CheckCircle2,
   XCircle,
-  Activity
+  Activity,
+  BarChart3,
+  Settings2
 } from 'lucide-react';
 import { PublishSchedule, usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
@@ -89,8 +92,8 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
   };
 
   const getSuccessRateColor = (rate: number) => {
-    if (rate >= 90) return 'text-green-600 dark:text-green-400';
-    if (rate >= 70) return 'text-yellow-600 dark:text-yellow-400';
+    if (rate >= 90) return 'text-success';
+    if (rate >= 70) return 'text-warning';
     return 'text-destructive';
   };
 
@@ -109,116 +112,185 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
   };
 
   return (
-    <Card className={`overflow-hidden ${!schedule.is_active ? 'opacity-60' : ''}`}>
-      <CardContent className="p-4">
+    <Card className={`overflow-hidden transition-all duration-200 ${
+      schedule.is_active 
+        ? 'bg-gradient-to-br from-background via-background to-primary/5 border-primary/20 shadow-sm' 
+        : 'opacity-70 hover:opacity-100'
+    }`}>
+      <CardContent className="p-5">
         <div className="flex items-start justify-between gap-4">
+          {/* Left side - Main content */}
           <div className="flex-1 min-w-0">
-            {/* Header */}
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="font-semibold truncate">{schedule.schedule_name}</h3>
-              <Badge variant={schedule.is_active ? 'default' : 'secondary'}>
+            {/* Header with name and status */}
+            <div className="flex items-center gap-3 mb-4">
+              <h3 className="text-lg font-semibold truncate">{schedule.schedule_name}</h3>
+              <Badge 
+                variant={schedule.is_active ? 'default' : 'secondary'}
+                className={schedule.is_active ? 'bg-success hover:bg-success/90' : ''}
+              >
+                {schedule.is_active && <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-white animate-pulse" />}
                 {schedule.is_active ? 'Active' : 'Paused'}
               </Badge>
-            </div>
-
-            {/* Source → Destination */}
-            <div className="flex items-center gap-2 text-sm mb-3">
-              <span className="text-muted-foreground">
-                @{tiktokAccount?.username || 'Unknown'}
-              </span>
               {hasYouTubeSettings && (
-                <Badge variant="outline" className="text-xs text-green-600 border-green-600/50">
+                <Badge variant="outline" className="text-xs border-success/50 text-success">
+                  <Settings2 className="h-3 w-3 mr-1" />
                   Configured
                 </Badge>
               )}
-              <ArrowRight className="h-4 w-4 text-muted-foreground" />
-              <span className="text-muted-foreground">
-                {youtubeChannel?.channel_title || 'Unknown Channel'}
-              </span>
+            </div>
+
+            {/* Source → Destination with avatars */}
+            <div className="flex items-center gap-3 mb-4 p-3 rounded-lg bg-muted/50">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8 border">
+                  <AvatarImage src={tiktokAccount?.avatar_url || ''} />
+                  <AvatarFallback className="text-xs bg-primary/10">
+                    {tiktokAccount?.username?.charAt(0)?.toUpperCase() || 'T'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-sm">
+                  <p className="font-medium">@{tiktokAccount?.username || 'Unknown'}</p>
+                  <p className="text-xs text-muted-foreground">TikTok</p>
+                </div>
+              </div>
+              
+              <ArrowRight className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8 border">
+                  <AvatarImage src={youtubeChannel?.channel_thumbnail || ''} />
+                  <AvatarFallback className="text-xs bg-destructive/10">
+                    <Youtube className="h-4 w-4" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="text-sm">
+                  <p className="font-medium truncate max-w-[150px]">
+                    {youtubeChannel?.channel_title || 'Unknown Channel'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">YouTube</p>
+                </div>
+              </div>
             </div>
 
             {/* Schedule Details */}
-            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <Video className="h-3.5 w-3.5" />
-                {schedule.publish_times.length} video{schedule.publish_times.length > 1 ? 's' : ''}/day
-              </span>
-              <span className="flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
-                {formatTimes(schedule.publish_times)}
-              </span>
-              <span className="flex items-center gap-1">
-                <Calendar className="h-3.5 w-3.5" />
-                {schedule.timezone}
-              </span>
-              <span className="flex items-center gap-1">
-                <Film className="h-3.5 w-3.5" />
-                {remainingCount} remaining
-              </span>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-md bg-muted/50">
+                <Video className="h-3.5 w-3.5 text-primary" />
+                <span>{schedule.publish_times.length} video{schedule.publish_times.length > 1 ? 's' : ''}/day</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-md bg-muted/50">
+                <Clock className="h-3.5 w-3.5 text-primary" />
+                <span>{formatTimes(schedule.publish_times)}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-md bg-muted/50">
+                <Calendar className="h-3.5 w-3.5 text-primary" />
+                <span>{schedule.timezone}</span>
+              </div>
+              <div className="flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-md bg-muted/50">
+                <Film className="h-3.5 w-3.5 text-primary" />
+                <span className={remainingCount === 0 ? 'text-warning' : ''}>
+                  {remainingCount} remaining
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            <ScheduleAnalyticsDialog schedule={schedule} />
-            <SchedulePreviewDialog schedule={schedule} />
-            <ScheduleHistoryDialog schedule={schedule} />
-            
-            {tiktokAccount && (
+          {/* Right side - Actions */}
+          <div className="flex flex-col items-end gap-3">
+            <div className="flex items-center gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
-                    onClick={() => setYoutubeSettingsOpen(true)}
-                    className={hasYouTubeSettings ? 'text-red-600' : ''}
-                  >
-                    <Youtube className="h-4 w-4" />
-                  </Button>
+                  <span>
+                    <ScheduleAnalyticsDialog schedule={schedule} />
+                  </span>
                 </TooltipTrigger>
-                <TooltipContent>
-                  YouTube description & tags
-                </TooltipContent>
+                <TooltipContent>Analytics</TooltipContent>
               </Tooltip>
-            )}
-            
-            {onEdit && (
-              <Button size="icon" variant="ghost" onClick={onEdit}>
-                <Pencil className="h-4 w-4" />
-              </Button>
-            )}
-            
-            <Switch
-              checked={schedule.is_active}
-              onCheckedChange={handleToggle}
-            />
-            
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Schedule?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will delete "{schedule.schedule_name}". 
-                    Queued videos from this schedule will remain in the queue.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => deleteSchedule(schedule.id)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <SchedulePreviewDialog schedule={schedule} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Preview Queue</TooltipContent>
+              </Tooltip>
+              
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <ScheduleHistoryDialog schedule={schedule} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>History</TooltipContent>
+              </Tooltip>
+              
+              {tiktokAccount && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      size="icon" 
+                      variant="ghost" 
+                      onClick={() => setYoutubeSettingsOpen(true)}
+                      className={hasYouTubeSettings ? 'text-destructive' : ''}
+                    >
+                      <Youtube className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>YouTube Settings</TooltipContent>
+                </Tooltip>
+              )}
+              
+              {onEdit && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" variant="ghost" onClick={onEdit}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">
+                  {schedule.is_active ? 'Active' : 'Paused'}
+                </span>
+                <Switch
+                  checked={schedule.is_active}
+                  onCheckedChange={handleToggle}
+                />
+              </div>
+              
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button size="icon" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete Schedule?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will delete "{schedule.schedule_name}". 
+                      Queued videos from this schedule will remain in the queue.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={() => deleteSchedule(schedule.id)}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? 'Deleting...' : 'Delete'}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </div>
           </div>
         </div>
         
@@ -229,54 +301,54 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="w-full mt-3 text-muted-foreground hover:text-foreground"
+                className="w-full mt-4 text-muted-foreground hover:text-foreground border border-dashed border-border/50 hover:border-border"
               >
-                <Activity className="h-3.5 w-3.5 mr-2" />
-                Analytics
+                <BarChart3 className="h-4 w-4 mr-2" />
+                View Analytics
                 {analyticsOpen ? (
-                  <ChevronUp className="h-3.5 w-3.5 ml-auto" />
+                  <ChevronUp className="h-4 w-4 ml-auto" />
                 ) : (
-                  <ChevronDown className="h-3.5 w-3.5 ml-auto" />
+                  <ChevronDown className="h-4 w-4 ml-auto" />
                 )}
               </Button>
             </CollapsibleTrigger>
-            <CollapsibleContent className="pt-3">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
-                <div className="p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
-                    <Activity className="h-3 w-3" />
-                    Total
+            <CollapsibleContent className="pt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="p-3 rounded-lg bg-gradient-to-br from-primary/5 to-primary/10 border border-primary/10">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                    <Activity className="h-3.5 w-3.5" />
+                    Total Uploads
                   </div>
-                  <p className="font-semibold">{stats.totalUploads}</p>
+                  <p className="text-xl font-bold">{stats.totalUploads}</p>
                 </div>
-                <div className="p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    Success
+                <div className="p-3 rounded-lg bg-gradient-to-br from-success/5 to-success/10 border border-success/10">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Success Rate
                   </div>
-                  <p className={`font-semibold ${getSuccessRateColor(stats.successRate)}`}>
+                  <p className={`text-xl font-bold ${getSuccessRateColor(stats.successRate)}`}>
                     {stats.successRate.toFixed(0)}%
                   </p>
                 </div>
-                <div className="p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
-                    <XCircle className="h-3 w-3" />
+                <div className="p-3 rounded-lg bg-gradient-to-br from-destructive/5 to-destructive/10 border border-destructive/10">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                    <XCircle className="h-3.5 w-3.5" />
                     Failed
                   </div>
-                  <p className={`font-semibold ${stats.failedUploads > 0 ? 'text-destructive' : ''}`}>
+                  <p className={`text-xl font-bold ${stats.failedUploads > 0 ? 'text-destructive' : ''}`}>
                     {stats.failedUploads}
                   </p>
                 </div>
-                <div className="p-2 rounded-md bg-muted/50">
-                  <div className="flex items-center justify-center gap-1 text-muted-foreground text-xs mb-1">
-                    <Clock className="h-3 w-3" />
+                <div className="p-3 rounded-lg bg-gradient-to-br from-info/5 to-info/10 border border-info/10">
+                  <div className="flex items-center gap-1.5 text-muted-foreground text-xs mb-1">
+                    <Clock className="h-3.5 w-3.5" />
                     Avg Time
                   </div>
-                  <p className="font-semibold">{formatDuration(stats.avgUploadDuration)}</p>
+                  <p className="text-xl font-bold">{formatDuration(stats.avgUploadDuration)}</p>
                 </div>
               </div>
               {stats.lastUploadAt && (
-                <p className="text-xs text-muted-foreground text-center mt-2">
+                <p className="text-xs text-muted-foreground text-center mt-3 pt-3 border-t border-border/50">
                   Last upload: {formatDistanceToNow(new Date(stats.lastUploadAt), { addSuffix: true })}
                 </p>
               )}

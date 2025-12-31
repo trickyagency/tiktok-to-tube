@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Calendar, RefreshCw, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Calendar, RefreshCw, TrendingUp, Activity, CheckCircle2, Play, ListVideo, Plus, Zap, Clock } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
 import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
+import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -10,15 +12,19 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
+import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 
 const Schedules = () => {
   const { schedules, isLoading, refetch } = usePublishSchedules();
   const { data: overviewStats, isLoading: statsLoading } = useScheduleAnalytics();
+  const { queue } = usePublishQueue();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youTubeChannels } = useYouTubeChannels();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
 
   useEffect(() => {
+    document.title = "Publishing Schedules | RepostFlow";
     refetch();
   }, []);
 
@@ -44,17 +50,21 @@ const Schedules = () => {
     };
   });
 
+  // Separate active and paused schedules
+  const activeSchedules = enrichedSchedules.filter(s => s.is_active);
+  const pausedSchedules = enrichedSchedules.filter(s => !s.is_active);
+
+  // Count videos in queue
+  const queuedCount = queue?.filter(q => q.status === 'queued' || q.status === 'processing').length || 0;
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Publishing Schedules</h1>
-          <p className="text-muted-foreground">
-            Automate your video publishing with scheduled uploads
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+    <DashboardLayout
+      title="Publishing Schedules"
+      description="Automate your video publishing with scheduled uploads"
+    >
+      <div className="space-y-6">
+        {/* Header Actions */}
+        <div className="flex items-center justify-end gap-2">
           <Button 
             variant="outline" 
             size="sm"
@@ -66,131 +76,178 @@ const Schedules = () => {
           </Button>
           <CreateScheduleDialog />
         </div>
-      </div>
 
-      {/* Overview Stats */}
-      {(statsLoading || (overviewStats && overviewStats.totalSchedules > 0)) && (
+        {/* Overview Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {statsLoading ? (
             <>
               {[1, 2, 3, 4].map(i => (
-                <Skeleton key={i} className="h-24" />
+                <Skeleton key={i} className="h-[120px]" />
               ))}
             </>
-          ) : overviewStats && (
+          ) : (
             <>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Calendar className="h-4 w-4" />
-                    <span className="text-xs font-medium">Active Schedules</span>
-                  </div>
-                  <p className="text-2xl font-bold">
-                    {overviewStats.activeSchedules}
-                    <span className="text-sm font-normal text-muted-foreground ml-1">
-                      / {overviewStats.totalSchedules}
-                    </span>
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <Activity className="h-4 w-4" />
-                    <span className="text-xs font-medium">Uploads This Month</span>
-                  </div>
-                  <p className="text-2xl font-bold">{overviewStats.totalUploadsThisMonth}</p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-xs font-medium">Avg Success Rate</span>
-                  </div>
-                  <p className={`text-2xl font-bold ${
-                    overviewStats.avgSuccessRate >= 90 
-                      ? 'text-green-600 dark:text-green-400' 
-                      : overviewStats.avgSuccessRate >= 70 
-                        ? 'text-yellow-600 dark:text-yellow-400'
-                        : 'text-destructive'
-                  }`}>
-                    {overviewStats.avgSuccessRate.toFixed(1)}%
-                  </p>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 text-muted-foreground mb-1">
-                    <TrendingUp className="h-4 w-4" />
-                    <span className="text-xs font-medium">Status</span>
-                  </div>
-                  <p className="text-lg font-semibold">
-                    {overviewStats.activeSchedules > 0 ? (
-                      <span className="text-green-600 dark:text-green-400">Running</span>
-                    ) : (
-                      <span className="text-muted-foreground">Paused</span>
-                    )}
-                  </p>
-                </CardContent>
-              </Card>
+              <AnimatedStatCard
+                title="Active Schedules"
+                value={overviewStats?.activeSchedules || 0}
+                icon={Calendar}
+                description={`${overviewStats?.totalSchedules || 0} total schedules`}
+                gradientClass="stat-gradient-1"
+              />
+              <AnimatedStatCard
+                title="Uploads This Month"
+                value={overviewStats?.totalUploadsThisMonth || 0}
+                icon={Activity}
+                description="Videos published"
+                gradientClass="stat-gradient-2"
+                href="/dashboard/history"
+              />
+              <AnimatedStatCard
+                title="Success Rate"
+                value={Math.round(overviewStats?.avgSuccessRate || 0)}
+                icon={CheckCircle2}
+                description="Average success rate"
+                gradientClass="stat-gradient-3"
+              />
+              <AnimatedStatCard
+                title="Videos Queued"
+                value={queuedCount}
+                icon={ListVideo}
+                description="Waiting to upload"
+                gradientClass="stat-gradient-4"
+                href="/dashboard/queue"
+              />
             </>
           )}
         </div>
-      )}
 
-      {/* Schedules List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Your Schedules
-          </CardTitle>
-          <CardDescription>
-            Manage your automated publishing schedules
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-32 w-full" />
-              ))}
+        {/* Quick Actions */}
+        <Card className="border-dashed">
+          <CardContent className="p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
+              <CreateScheduleDialog 
+                trigger={
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    New Schedule
+                  </Button>
+                }
+              />
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <Link to="/dashboard/queue">
+                  <ListVideo className="h-4 w-4" />
+                  View Queue
+                </Link>
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <Link to="/dashboard/tiktok">
+                  <Zap className="h-4 w-4" />
+                  Scrape Videos
+                </Link>
+              </Button>
             </div>
-          ) : enrichedSchedules.length === 0 ? (
-            <div className="text-center py-12">
-              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">No schedules yet</h3>
-              <p className="text-muted-foreground mb-4">
-                Create your first schedule to start automating your video uploads
-              </p>
-              <CreateScheduleDialog />
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {enrichedSchedules.map((schedule) => (
-                <ScheduleCard
-                  key={schedule.id}
-                  schedule={schedule}
-                  onEdit={() => handleEditSchedule(schedule)}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Edit Schedule Dialog */}
-      <EditScheduleDialog
-        schedule={editingSchedule}
-        isOpen={!!editingSchedule}
-        onClose={() => setEditingSchedule(null)}
-        onSuccess={() => {
-          setEditingSchedule(null);
-          refetch();
-        }}
-      />
-    </div>
+        {/* Active Schedules Section */}
+        {isLoading ? (
+          <Card>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-32 w-full" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : enrichedSchedules.length === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-16">
+              <div className="text-center">
+                <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                  <Calendar className="h-8 w-8 text-primary" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">No schedules yet</h3>
+                <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                  Create your first schedule to start automating your video uploads from TikTok to YouTube
+                </p>
+                <div className="flex flex-col items-center gap-4">
+                  <CreateScheduleDialog />
+                  <div className="text-sm text-muted-foreground space-y-1">
+                    <p className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs">1</span>
+                      Connect a YouTube channel
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs">2</span>
+                      Add a TikTok account to scrape
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs">3</span>
+                      Create a schedule and let it run
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Active Schedules */}
+            {activeSchedules.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                  <h2 className="text-lg font-semibold">Active Schedules</h2>
+                  <span className="text-sm text-muted-foreground">({activeSchedules.length})</span>
+                </div>
+                <div className="space-y-4">
+                  {activeSchedules.map((schedule) => (
+                    <ScheduleCard
+                      key={schedule.id}
+                      schedule={schedule}
+                      onEdit={() => handleEditSchedule(schedule)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Paused Schedules */}
+            {pausedSchedules.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground" />
+                  <h2 className="text-lg font-semibold">Paused Schedules</h2>
+                  <span className="text-sm text-muted-foreground">({pausedSchedules.length})</span>
+                </div>
+                <div className="space-y-4">
+                  {pausedSchedules.map((schedule) => (
+                    <ScheduleCard
+                      key={schedule.id}
+                      schedule={schedule}
+                      onEdit={() => handleEditSchedule(schedule)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+
+        {/* Edit Schedule Dialog */}
+        <EditScheduleDialog
+          schedule={editingSchedule}
+          isOpen={!!editingSchedule}
+          onClose={() => setEditingSchedule(null)}
+          onSuccess={() => {
+            setEditingSchedule(null);
+            refetch();
+          }}
+        />
+      </div>
+    </DashboardLayout>
   );
 };
 
