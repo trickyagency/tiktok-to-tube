@@ -1,31 +1,30 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, TrendingUp, Activity, CheckCircle2, Play, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Calendar, Activity, CheckCircle2, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
 import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
+import { NextScheduledUpload } from '@/components/schedules/NextScheduledUpload';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 
 const Schedules = () => {
   const { schedules, isLoading, refetch } = usePublishSchedules();
   const { data: overviewStats, isLoading: statsLoading } = useScheduleAnalytics();
-  const { queue } = usePublishQueue();
+  const { queue, isLoading: queueLoading } = usePublishQueue();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youTubeChannels } = useYouTubeChannels();
   const { data: subscription } = useCurrentUserSubscription();
-  const navigate = useNavigate();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
 
   // Check subscription limits
@@ -142,6 +141,9 @@ const Schedules = () => {
             </>
           )}
         </div>
+
+        {/* Next Scheduled Upload Countdown */}
+        <NextScheduledUpload queuedItems={queue || []} isLoading={queueLoading} />
 
         {/* View Publishing Queue Widget */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
