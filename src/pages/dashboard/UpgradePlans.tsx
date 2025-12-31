@@ -41,33 +41,39 @@ export default function UpgradePlans() {
   const { data: currentSubscription } = useCurrentUserSubscription();
   const { isOwner, user } = useAuth();
   
-  const [accountCount, setAccountCount] = useState(1);
+  // Per-plan account counts
+  const [planAccountCounts, setPlanAccountCounts] = useState<Record<string, number>>({
+    basic: 1,
+    pro: 1,
+    scale: 1,
+  });
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [roiExpanded, setRoiExpanded] = useState(false);
   const [avgViews, setAvgViews] = useState(10000);
   const [cpmRate, setCpmRate] = useState(2);
   const [selectedPlanId, setSelectedPlanId] = useState<string>('pro');
+  const [roiAccountCount, setRoiAccountCount] = useState(1);
+
+  const updatePlanAccounts = (planId: string, count: number) => {
+    setPlanAccountCounts(prev => ({ ...prev, [planId]: count }));
+  };
 
   const activePlans = subscriptionPlans?.filter(p => p.is_active) || [];
   
   const proPlan = activePlans.find(p => p.id === 'pro');
   const selectedPlan = activePlans.find(p => p.id === selectedPlanId) || proPlan;
-  
-  const yearlySavings = proPlan 
-    ? calculateAnnualWithVolumeDiscount(proPlan.price_monthly, accountCount).totalSavingsYear
-    : 0;
 
   // Fixed ROI calculation that accounts for videos per day and account count
   const roiData = useMemo(() => {
     if (!selectedPlan) return { monthlyEarnings: '0', subscriptionCost: '0', profit: '0', roi: '0' };
     
     const videosPerDay = selectedPlan.max_videos_per_day;
-    const monthlyVideos = videosPerDay * 30 * accountCount;
+    const monthlyVideos = videosPerDay * 30 * roiAccountCount;
     const monthlyViews = monthlyVideos * avgViews;
     const monthlyEarnings = (monthlyViews / 1000) * cpmRate;
     
-    const discountedPrice = calculateDiscountedPrice(selectedPlan.price_monthly, accountCount);
-    const monthlySubscriptionCost = discountedPrice * accountCount;
+    const discountedPrice = calculateDiscountedPrice(selectedPlan.price_monthly, roiAccountCount);
+    const monthlySubscriptionCost = discountedPrice * roiAccountCount;
     
     const profit = monthlyEarnings - monthlySubscriptionCost;
     const roi = monthlySubscriptionCost > 0 
@@ -80,7 +86,7 @@ export default function UpgradePlans() {
       profit: profit.toFixed(0),
       roi: roi.toFixed(0),
     };
-  }, [selectedPlan, accountCount, avgViews, cpmRate]);
+  }, [selectedPlan, roiAccountCount, avgViews, cpmRate]);
 
   const planFeatures: Record<string, string[]> = {
     basic: ['2 videos per day', 'Basic scheduling', 'Email support'],
@@ -94,15 +100,15 @@ export default function UpgradePlans() {
     window.open(generateGeneralWhatsAppLink(), '_blank');
   };
 
-  const handleSelectPlan = (plan: SubscriptionPlan) => {
+  const handleSelectPlan = (plan: SubscriptionPlan, accounts: number) => {
     const basePrice = plan.price_monthly;
-    const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
-    const totalPrice = discountedPrice * accountCount;
-    const discountPercentage = getDiscountPercentage(accountCount);
+    const discountedPrice = calculateDiscountedPrice(basePrice, accounts);
+    const totalPrice = discountedPrice * accounts;
+    const discountPercentage = getDiscountPercentage(accounts);
     
     const link = generateVolumeDiscountWhatsAppLink({
       planName: plan.name,
-      accountCount,
+      accountCount: accounts,
       pricePerAccount: discountedPrice,
       totalPrice,
       discountPercentage,
@@ -213,71 +219,6 @@ export default function UpgradePlans() {
           </div>
         </div>
 
-        {/* Account Selection Section */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <h3 className="font-semibold">How many accounts do you need?</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Select your account count to see personalized pricing with discounts
-                  </p>
-                </div>
-                <Badge variant="secondary" className="text-lg px-4 py-2">
-                  {accountCount} {accountCount === 1 ? 'account' : 'accounts'}
-                </Badge>
-              </div>
-              
-              <Slider
-                value={[accountCount]}
-                onValueChange={(v) => setAccountCount(v[0])}
-                min={1}
-                max={20}
-                step={1}
-                className="w-full"
-              />
-              
-              {/* Discount tier badges */}
-              <div className="flex gap-2 flex-wrap">
-                {VOLUME_DISCOUNTS.filter(t => t.maxAccounts <= 20).map((tier) => {
-                  const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
-                  const rangeLabel = `${tier.minAccounts}-${tier.maxAccounts}`;
-                  return (
-                    <Badge 
-                      key={tier.tier}
-                      variant={isActive ? "default" : "outline"}
-                      className={isActive ? "bg-primary" : ""}
-                    >
-                      {rangeLabel}: {tier.label}
-                    </Badge>
-                  );
-                })}
-              </div>
-              
-              {/* Upgrade nudge */}
-              {(() => {
-                const nextTier = getNextTierInfo(accountCount);
-                if (!nextTier || accountCount >= 20) return null;
-                return (
-                  <div className="flex items-center gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                    <TrendingUp className="h-4 w-4 text-amber-600" />
-                    <span className="text-sm">
-                      Add {nextTier.accountsNeeded} more to unlock {nextTier.nextLabel}!
-                    </span>
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={() => setAccountCount(Math.min(20, accountCount + nextTier.accountsNeeded))}
-                    >
-                      Preview
-                    </Button>
-                  </div>
-                );
-              })()}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Plan Cards */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -285,6 +226,8 @@ export default function UpgradePlans() {
             const isRecommended = plan.id === 'pro';
             const isCurrentPlan = currentSubscription?.plan_id === plan.id;
             const features = planFeatures[plan.id] || [];
+            const accountCount = planAccountCounts[plan.id] || 1;
+            const nextTier = getNextTierInfo(accountCount);
             
             // Calculate price with volume discount
             const basePrice = plan.price_monthly;
@@ -321,40 +264,69 @@ export default function UpgradePlans() {
                   </div>
                 )}
                 
-                <CardHeader className="text-center pb-4">
+                <CardHeader className="text-center pb-2">
                   <CardTitle className="text-xl font-semibold capitalize">{plan.name}</CardTitle>
-                  <div className="mt-4">
-                    {hasDiscount && (
-                      <span className="text-sm text-muted-foreground line-through mr-2">
-                        ${basePrice}
-                      </span>
-                    )}
-                    <span className="text-4xl font-bold">${monthlyPrice}</span>
-                    <span className="text-muted-foreground">/mo/account</span>
-                  </div>
-                  {accountCount > 1 && (
-                    <div className="mt-2 text-sm">
-                      <span className="font-medium text-primary">
-                        ${totalMonthly.toFixed(2)}/mo total
-                      </span>
-                      <span className="text-muted-foreground"> for {accountCount} accounts</span>
-                    </div>
-                  )}
-                  {hasDiscount && (
-                    <Badge className="mt-2 bg-emerald-500/20 text-emerald-600 border-emerald-500/30">
-                      {getDiscountTierLabel(accountCount)}
-                    </Badge>
-                  )}
-                  <p className="text-sm text-muted-foreground mt-2">
+                  <p className="text-sm text-muted-foreground">
                     {plan.max_videos_per_day} videos per day
                   </p>
                 </CardHeader>
                 
                 <CardContent className="flex-1 flex flex-col">
-                  <ul className="space-y-3 mb-6 flex-1">
+                  {/* Account Selector Widget */}
+                  <div className="bg-muted/30 rounded-lg p-4 mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="text-sm text-muted-foreground">Accounts</span>
+                      <Badge variant="secondary" className="font-semibold">
+                        {accountCount}
+                      </Badge>
+                    </div>
+                    <Slider
+                      value={[accountCount]}
+                      onValueChange={(v) => updatePlanAccounts(plan.id, v[0])}
+                      min={1}
+                      max={20}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex items-center justify-between mt-3 gap-2 flex-wrap">
+                      {hasDiscount && (
+                        <Badge className="bg-emerald-500/20 text-emerald-600 border-emerald-500/30 text-xs">
+                          {getDiscountTierLabel(accountCount)}
+                        </Badge>
+                      )}
+                      {nextTier && accountCount < 20 && (
+                        <span className="text-xs text-amber-600">
+                          +{nextTier.accountsNeeded} = {nextTier.nextLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Pricing Display */}
+                  <div className="text-center mb-4">
+                    {hasDiscount && (
+                      <span className="text-sm text-muted-foreground line-through mr-2">
+                        ${basePrice}
+                      </span>
+                    )}
+                    <span className="text-3xl font-bold">${monthlyPrice}</span>
+                    <span className="text-sm text-muted-foreground">/mo/account</span>
+                    
+                    <div className="mt-2 p-2 bg-primary/5 rounded-lg">
+                      <div className="text-lg font-semibold text-primary">
+                        ${totalMonthly.toFixed(2)}/mo
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        total for {accountCount} {accountCount === 1 ? 'account' : 'accounts'}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Features List */}
+                  <ul className="space-y-2 mb-4 flex-1">
                     {features.map((feature, idx) => (
-                      <li key={idx} className="flex items-start gap-3 text-sm">
-                        <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                      <li key={idx} className="flex items-start gap-2 text-sm">
+                        <Check className="h-3 w-3 text-primary mt-1 flex-shrink-0" />
                         <span>{feature}</span>
                       </li>
                     ))}
@@ -382,7 +354,7 @@ export default function UpgradePlans() {
                         variant={isRecommended ? "default" : "outline"} 
                         size="sm" 
                         className="w-full"
-                        onClick={() => handleSelectPlan(plan)}
+                        onClick={() => handleSelectPlan(plan, accountCount)}
                       >
                         <MessageCircle className="h-4 w-4 mr-2" />
                         Get {plan.name}
@@ -471,14 +443,11 @@ export default function UpgradePlans() {
                 const rangeLabel = tier.maxAccounts === Infinity 
                   ? `${tier.minAccounts}+` 
                   : `${tier.minAccounts}-${tier.maxAccounts}`;
-                const isActive = accountCount >= tier.minAccounts && accountCount <= tier.maxAccounts;
                 
                 return (
                   <div 
                     key={tier.tier}
-                    className={`text-center p-4 rounded-lg border transition-colors ${
-                      isActive ? 'border-primary bg-primary/5' : 'border-border'
-                    }`}
+                    className="text-center p-4 rounded-lg border border-border"
                   >
                     <div className="font-semibold">{rangeLabel}</div>
                     <div className="text-sm text-muted-foreground capitalize">{tier.tier}</div>
@@ -492,15 +461,6 @@ export default function UpgradePlans() {
           </CardContent>
         </Card>
 
-        {/* Annual Savings */}
-        {billingCycle === 'annual' && yearlySavings > 0 && (
-          <div className="text-center mb-8">
-            <p className="text-emerald-600 font-medium">
-              Your annual savings: ${yearlySavings.toFixed(0)}
-            </p>
-          </div>
-        )}
-
         {/* ROI Calculator */}
         <Collapsible open={roiExpanded} onOpenChange={setRoiExpanded}>
           <Card>
@@ -513,19 +473,37 @@ export default function UpgradePlans() {
             <CollapsibleContent>
               <CardContent className="space-y-6">
                 {/* Plan Selector for ROI */}
-                <div>
-                  <label className="text-sm text-muted-foreground mb-2 block">Calculate for plan</label>
-                  <div className="flex flex-wrap gap-2">
-                    {activePlans.map(plan => (
-                      <Button
-                        key={plan.id}
-                        variant={selectedPlanId === plan.id ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedPlanId(plan.id)}
-                      >
-                        {plan.name}
-                      </Button>
-                    ))}
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-2 block">Calculate for plan</label>
+                    <div className="flex flex-wrap gap-2">
+                      {activePlans.map(plan => (
+                        <Button
+                          key={plan.id}
+                          variant={selectedPlanId === plan.id ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setSelectedPlanId(plan.id)}
+                        >
+                          {plan.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm text-muted-foreground mb-2 block">Number of accounts</label>
+                    <div className="flex items-center gap-3">
+                      <Slider
+                        value={[roiAccountCount]}
+                        onValueChange={(v) => setRoiAccountCount(v[0])}
+                        min={1}
+                        max={20}
+                        step={1}
+                        className="flex-1"
+                      />
+                      <Badge variant="secondary" className="font-semibold min-w-[40px] justify-center">
+                        {roiAccountCount}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
 
@@ -562,9 +540,9 @@ export default function UpgradePlans() {
                 {selectedPlan && (
                   <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
                     Based on: <span className="font-medium">{selectedPlan.max_videos_per_day} videos/day</span> × 
-                    <span className="font-medium"> {accountCount} accounts</span> × 
+                    <span className="font-medium"> {roiAccountCount} accounts</span> × 
                     <span className="font-medium"> 30 days</span> = 
-                    <span className="font-medium text-foreground"> {selectedPlan.max_videos_per_day * accountCount * 30} videos/month</span>
+                    <span className="font-medium text-foreground"> {selectedPlan.max_videos_per_day * roiAccountCount * 30} videos/month</span>
                   </div>
                 )}
 
