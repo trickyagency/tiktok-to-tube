@@ -160,6 +160,22 @@ export function usePublishSchedules() {
 
   const toggleScheduleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      // If trying to activate, check for active subscription first
+      if (is_active) {
+        const { data: subscription, error: subError } = await supabase
+          .from('user_subscriptions')
+          .select('status')
+          .eq('user_id', user?.id ?? '')
+          .eq('status', 'active')
+          .maybeSingle();
+
+        if (subError) throw subError;
+
+        if (!subscription) {
+          throw new Error('You need an active subscription to activate schedules. Please subscribe or renew your subscription.');
+        }
+      }
+
       const { data, error } = await supabase
         .from('publish_schedules')
         .update({ is_active })
