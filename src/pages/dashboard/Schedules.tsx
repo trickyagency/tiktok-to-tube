@@ -1,14 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, RefreshCw, TrendingUp, Activity, CheckCircle2, Play, ListVideo, Plus, Zap, Clock } from 'lucide-react';
+import { Calendar, RefreshCw, TrendingUp, Activity, CheckCircle2, Play, ListVideo, Plus, Zap, Clock, AlertTriangle, ArrowUpRight } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
 import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
@@ -21,7 +23,14 @@ const Schedules = () => {
   const { queue } = usePublishQueue();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youTubeChannels } = useYouTubeChannels();
+  const { data: subscription } = useCurrentUserSubscription();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
+
+  // Check subscription limits
+  const maxVideosPerDay = subscription?.plan?.max_videos_per_day || 2;
+  const schedulesExceedingLimit = schedules.filter(
+    s => (s.publish_times?.length || 0) > maxVideosPerDay
+  );
 
   useEffect(() => {
     document.title = "Publishing Schedules | RepostFlow";
@@ -63,6 +72,26 @@ const Schedules = () => {
       description="Automate your video publishing with scheduled uploads"
     >
       <div className="space-y-6">
+        {/* Subscription Limit Warning */}
+        {schedulesExceedingLimit.length > 0 && (
+          <Alert variant="default" className="border-warning/50 bg-warning/10">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <AlertTitle className="text-warning">Subscription Limit Exceeded</AlertTitle>
+            <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+              <span>
+                {schedulesExceedingLimit.length} schedule{schedulesExceedingLimit.length > 1 ? 's' : ''} exceed{schedulesExceedingLimit.length === 1 ? 's' : ''} your 
+                plan's limit of {maxVideosPerDay} videos/day. Some uploads may not be processed.
+              </span>
+              <Button variant="outline" size="sm" asChild className="border-warning/50 hover:bg-warning/10">
+                <Link to="/dashboard/upgrade" className="gap-1">
+                  Upgrade Plan
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Header Actions */}
         <div className="flex items-center justify-end gap-2">
           <Button 

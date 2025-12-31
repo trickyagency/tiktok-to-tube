@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useQuery } from '@tanstack/react-query';
 import { 
   Clock, 
@@ -20,12 +22,15 @@ import {
   XCircle,
   Activity,
   BarChart3,
-  Settings2
+  Settings2,
+  AlertTriangle,
+  ArrowUpRight
 } from 'lucide-react';
 import { PublishSchedule, usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useScheduleStats } from '@/hooks/useScheduleAnalytics';
+import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
 import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
@@ -55,6 +60,7 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
   const { toggleSchedule, deleteSchedule, isDeleting } = usePublishSchedules();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youtubeChannels } = useYouTubeChannels();
+  const { data: subscription } = useCurrentUserSubscription();
   const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
   
@@ -64,6 +70,11 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
   const youtubeChannel = youtubeChannels.find(c => c.id === schedule.youtube_channel_id);
   
   const hasYouTubeSettings = !!(tiktokAccount?.youtube_description || tiktokAccount?.youtube_tags);
+
+  // Check if schedule exceeds subscription limit
+  const maxVideosPerDay = subscription?.plan?.max_videos_per_day || 2;
+  const scheduleVideosPerDay = schedule.publish_times?.length || 0;
+  const exceedsLimit = scheduleVideosPerDay > maxVideosPerDay;
 
   // Fetch count of remaining unpublished videos
   const { data: remainingCount = 0 } = useQuery({
@@ -116,8 +127,27 @@ export function ScheduleCard({ schedule, onEdit }: ScheduleCardProps) {
       schedule.is_active 
         ? 'bg-gradient-to-br from-background via-background to-primary/5 border-primary/20 shadow-sm' 
         : 'opacity-70 hover:opacity-100'
-    }`}>
+    } ${exceedsLimit ? 'border-warning/50' : ''}`}>
       <CardContent className="p-5">
+        {/* Subscription Limit Warning Banner */}
+        {exceedsLimit && (
+          <Alert variant="default" className="mb-4 border-warning/50 bg-warning/10">
+            <AlertTriangle className="h-4 w-4 text-warning" />
+            <AlertDescription className="flex items-center justify-between gap-2 flex-wrap">
+              <span className="text-sm">
+                This schedule has <strong>{scheduleVideosPerDay} videos/day</strong> but your plan allows <strong>{maxVideosPerDay}/day</strong>. 
+                Uploads beyond your limit may not be processed.
+              </span>
+              <Button variant="outline" size="sm" asChild className="border-warning/50 hover:bg-warning/10">
+                <Link to="/dashboard/upgrade" className="gap-1">
+                  Upgrade Plan
+                  <ArrowUpRight className="h-3 w-3" />
+                </Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-start justify-between gap-4">
           {/* Left side - Main content */}
           <div className="flex-1 min-w-0">
