@@ -74,6 +74,23 @@ Deno.serve(async (req) => {
       } else {
         console.log(`Reset account limits for ${userIds.length} users`);
       }
+
+      // Pause all active schedules for users with expired subscriptions
+      const { data: pausedSchedules, error: schedulesError } = await supabase
+        .from('publish_schedules')
+        .update({ 
+          is_active: false,
+          updated_at: now
+        })
+        .in('user_id', userIds)
+        .eq('is_active', true)
+        .select('id');
+
+      if (schedulesError) {
+        console.error('Error pausing schedules:', schedulesError);
+      } else {
+        console.log(`Paused ${pausedSchedules?.length || 0} active schedules for users with expired subscriptions`);
+      }
     }
 
     return new Response(

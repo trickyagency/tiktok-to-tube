@@ -80,6 +80,9 @@ export function ScheduleCard({ schedule, onEdit, isSelected, onToggleSelect, sho
   const scheduleVideosPerDay = schedule.publish_times?.length || 0;
   const exceedsLimit = scheduleVideosPerDay > maxVideosPerDay;
 
+  // Check if user has active subscription
+  const hasActiveSubscription = subscription?.status === 'active';
+
   // Fetch count of remaining unpublished videos
   const { data: remainingCount = 0 } = useQuery({
     queryKey: ['schedule-remaining', schedule.tiktok_account_id],
@@ -178,6 +181,12 @@ export function ScheduleCard({ schedule, onEdit, isSelected, onToggleSelect, sho
                 <Badge variant="outline" className="text-xs border-success/50 text-success">
                   <Settings2 className="h-3 w-3 mr-1" />
                   Configured
+                </Badge>
+              )}
+              {!schedule.is_active && !hasActiveSubscription && (
+                <Badge variant="outline" className="text-xs border-warning/50 text-warning">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Subscription Required
                 </Badge>
               )}
             </div>
@@ -301,10 +310,22 @@ export function ScheduleCard({ schedule, onEdit, isSelected, onToggleSelect, sho
                 <span className="text-xs text-muted-foreground">
                   {schedule.is_active ? 'Active' : 'Paused'}
                 </span>
-                <Switch
-                  checked={schedule.is_active}
-                  onCheckedChange={handleToggle}
-                />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Switch
+                        checked={schedule.is_active}
+                        onCheckedChange={handleToggle}
+                        disabled={!schedule.is_active && !hasActiveSubscription}
+                      />
+                    </span>
+                  </TooltipTrigger>
+                  {!schedule.is_active && !hasActiveSubscription && (
+                    <TooltipContent>
+                      <p>Active subscription required to enable schedules</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               </div>
               
               <AlertDialog>
