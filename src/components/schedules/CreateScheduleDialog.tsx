@@ -74,6 +74,17 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
     c => !channelsWithSchedule.some(s => s.channelId === c.id)
   );
 
+  // Get TikTok accounts that already have ANY schedule (active or paused)
+  const tiktokAccountsWithSchedule = existingSchedules.map(s => ({
+    accountId: s.tiktok_account_id,
+    isActive: s.is_active
+  }));
+
+  // Available TikTok accounts are those without ANY schedule
+  const availableTikTokAccounts = tikTokAccounts.filter(
+    a => !tiktokAccountsWithSchedule.some(s => s.accountId === a.id)
+  );
+
   const canAddMoreTimes = publishTimes.length < maxVideosPerDay;
 
   const addTimeSlot = () => {
@@ -162,16 +173,35 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
                 <SelectValue placeholder="Select TikTok account" />
               </SelectTrigger>
               <SelectContent>
-                {tikTokAccounts.map((account) => (
+                {/* Show available TikTok accounts (no schedule) */}
+                {availableTikTokAccounts.map((account) => (
                   <SelectItem key={account.id} value={account.id}>
                     @{account.username}
                   </SelectItem>
                 ))}
+                {/* Show accounts with existing schedules as disabled */}
+                {tikTokAccounts
+                  .filter(a => tiktokAccountsWithSchedule.some(s => s.accountId === a.id))
+                  .map((account) => {
+                    const schedule = tiktokAccountsWithSchedule.find(s => s.accountId === account.id);
+                    const status = schedule?.isActive ? 'Active' : 'Paused';
+                    return (
+                      <SelectItem key={account.id} value={account.id} disabled>
+                        @{account.username} ({status} schedule exists)
+                      </SelectItem>
+                    );
+                  })}
               </SelectContent>
             </Select>
             {tikTokAccounts.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 No TikTok accounts added yet
+              </p>
+            )}
+            {tikTokAccounts.length > 0 && availableTikTokAccounts.length === 0 && (
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                All TikTok accounts have schedules. Edit an existing schedule instead.
               </p>
             )}
           </div>
