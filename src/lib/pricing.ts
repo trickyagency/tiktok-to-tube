@@ -3,7 +3,7 @@ export const VOLUME_DISCOUNTS = [
   { minAccounts: 3, maxAccounts: 5, discount: 0.15, label: '15% off', tier: 'growth' },
   { minAccounts: 6, maxAccounts: 10, discount: 0.25, label: '25% off', tier: 'business' },
   { minAccounts: 11, maxAccounts: 20, discount: 0.35, label: '35% off', tier: 'enterprise' },
-  { minAccounts: 21, maxAccounts: Infinity, discount: 0.40, label: '40% off', tier: 'agency' },
+  { minAccounts: 21, maxAccounts: Infinity, discount: 0.50, label: '50% off', tier: 'agency' },
 ];
 
 export const ANNUAL_DISCOUNT = 0.25; // 25% off for annual plans
