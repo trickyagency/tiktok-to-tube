@@ -11,21 +11,40 @@ import {
   Play, 
   Pause,
   Video,
-  ArrowRight
+  ArrowRight,
+  FlaskConical
 } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
+import { useABTests } from '@/hooks/useABTests';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 import { SchedulingHeatmap } from '@/components/schedules/SchedulingHeatmap';
+import { CreateABTestDialog } from '@/components/schedules/CreateABTestDialog';
+import { ABTestCard } from '@/components/schedules/ABTestCard';
 
 const Schedules = () => {
   const { schedules, isLoading, toggleSchedule } = usePublishSchedules();
+  const { abTests, isLoading: isLoadingTests } = useABTests();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
+  
+  // Controlled state for CreateScheduleDialog
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedHeatmapTime, setSelectedHeatmapTime] = useState<{ hour: number; dayOfWeek: number } | null>(null);
 
-  useEffect(() => {
-    document.title = "Schedules | RepostFlow";
-  }, []);
+  // Handle heatmap time selection
+  const handleHeatmapTimeSelect = (hour: number, dayOfWeek: number) => {
+    setSelectedHeatmapTime({ hour, dayOfWeek });
+    setIsCreateDialogOpen(true);
+  };
+
+  // Reset selected time when dialog closes
+  const handleDialogOpenChange = (open: boolean) => {
+    setIsCreateDialogOpen(open);
+    if (!open) {
+      setSelectedHeatmapTime(null);
+    }
+  };
 
   const activeSchedules = schedules.filter(s => s.is_active);
   const totalVideosPerDay = schedules
@@ -97,7 +116,7 @@ const Schedules = () => {
         </div>
 
         {/* Scheduling Heatmap */}
-        <SchedulingHeatmap />
+        <SchedulingHeatmap onSelectTime={handleHeatmapTimeSelect} />
 
         {/* Main Schedules Card */}
         <Card>
@@ -126,8 +145,12 @@ const Schedules = () => {
                     </Button>
                   )}
                 </>
-              )}
-              <CreateScheduleDialog />
+                )}
+              <CreateScheduleDialog 
+                isOpen={isCreateDialogOpen}
+                onOpenChange={handleDialogOpenChange}
+                initialTime={selectedHeatmapTime}
+              />
             </div>
           </CardHeader>
           <CardContent>
@@ -153,6 +176,44 @@ const Schedules = () => {
                     schedule={schedule} 
                     onEdit={() => setEditingSchedule(schedule)}
                   />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* A/B Testing Section */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FlaskConical className="h-5 w-5" />
+                A/B Testing
+              </CardTitle>
+              <CardDescription>
+                Compare different posting times to optimize engagement
+              </CardDescription>
+            </div>
+            <CreateABTestDialog />
+          </CardHeader>
+          <CardContent>
+            {isLoadingTests ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : abTests.length === 0 ? (
+              <div className="text-center py-8">
+                <FlaskConical className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
+                <h3 className="font-medium mb-1">No A/B tests yet</h3>
+                <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                  Create an A/B test to find the best posting times for your audience.
+                </p>
+                <CreateABTestDialog />
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {abTests.map((test) => (
+                  <ABTestCard key={test.id} test={test} />
                 ))}
               </div>
             )}

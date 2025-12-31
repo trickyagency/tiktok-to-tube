@@ -14,6 +14,45 @@ export type Database = {
   }
   public: {
     Tables: {
+      ab_test_uploads: {
+        Row: {
+          ab_test_id: string
+          created_at: string | null
+          id: string
+          upload_log_id: string
+          variant: string
+        }
+        Insert: {
+          ab_test_id: string
+          created_at?: string | null
+          id?: string
+          upload_log_id: string
+          variant: string
+        }
+        Update: {
+          ab_test_id?: string
+          created_at?: string | null
+          id?: string
+          upload_log_id?: string
+          variant?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ab_test_uploads_ab_test_id_fkey"
+            columns: ["ab_test_id"]
+            isOneToOne: false
+            referencedRelation: "schedule_ab_tests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ab_test_uploads_upload_log_id_fkey"
+            columns: ["upload_log_id"]
+            isOneToOne: false
+            referencedRelation: "upload_logs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       account_subscriptions: {
         Row: {
           activated_at: string | null
@@ -441,6 +480,71 @@ export type Database = {
           },
           {
             foreignKeyName: "publish_schedules_youtube_channel_id_fkey"
+            columns: ["youtube_channel_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      schedule_ab_tests: {
+        Row: {
+          created_at: string | null
+          end_date: string | null
+          id: string
+          start_date: string | null
+          status: string | null
+          success_rate_a: number | null
+          success_rate_b: number | null
+          test_name: string
+          total_uploads_a: number | null
+          total_uploads_b: number | null
+          updated_at: string | null
+          user_id: string
+          variant_a_times: Json
+          variant_b_times: Json
+          winner: string | null
+          youtube_channel_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          status?: string | null
+          success_rate_a?: number | null
+          success_rate_b?: number | null
+          test_name: string
+          total_uploads_a?: number | null
+          total_uploads_b?: number | null
+          updated_at?: string | null
+          user_id: string
+          variant_a_times?: Json
+          variant_b_times?: Json
+          winner?: string | null
+          youtube_channel_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string | null
+          id?: string
+          start_date?: string | null
+          status?: string | null
+          success_rate_a?: number | null
+          success_rate_b?: number | null
+          test_name?: string
+          total_uploads_a?: number | null
+          total_uploads_b?: number | null
+          updated_at?: string | null
+          user_id?: string
+          variant_a_times?: Json
+          variant_b_times?: Json
+          winner?: string | null
+          youtube_channel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "schedule_ab_tests_youtube_channel_id_fkey"
             columns: ["youtube_channel_id"]
             isOneToOne: false
             referencedRelation: "youtube_channels"

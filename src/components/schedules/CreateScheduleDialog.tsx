@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,10 +41,23 @@ const TIMEZONES = [
 interface CreateScheduleDialogProps {
   onSuccess?: () => void;
   trigger?: React.ReactNode;
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  initialTime?: { hour: number; dayOfWeek: number } | null;
 }
 
-export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialogProps) {
-  const [open, setOpen] = useState(false);
+export function CreateScheduleDialog({ 
+  onSuccess, 
+  trigger, 
+  isOpen, 
+  onOpenChange,
+  initialTime 
+}: CreateScheduleDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Use controlled state if provided, otherwise use internal state
+  const open = isOpen !== undefined ? isOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
   const [scheduleName, setScheduleName] = useState('');
   const [tiktokAccountId, setTiktokAccountId] = useState('');
   const [youtubeChannelId, setYoutubeChannelId] = useState('');
@@ -58,6 +71,14 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
 
   // Only show connected YouTube channels
   const connectedChannels = youtubeChannels.filter(c => c.auth_status === 'connected');
+
+  // Apply initial time when provided
+  useEffect(() => {
+    if (initialTime && open) {
+      const formattedTime = `${initialTime.hour.toString().padStart(2, '0')}:00`;
+      setPublishTimes([formattedTime]);
+    }
+  }, [initialTime, open]);
 
   const addTimeSlot = () => {
     if (publishTimes.length < 10) {
