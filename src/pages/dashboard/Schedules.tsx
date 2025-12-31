@@ -17,6 +17,7 @@ import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedule
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
+import { SchedulingHeatmap } from '@/components/schedules/SchedulingHeatmap';
 
 const Schedules = () => {
   const { schedules, isLoading, toggleSchedule } = usePublishSchedules();
@@ -94,6 +95,9 @@ const Schedules = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Scheduling Heatmap */}
+        <SchedulingHeatmap />
 
         {/* Main Schedules Card */}
         <Card>
