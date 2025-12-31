@@ -95,14 +95,22 @@ const Auth = () => {
       });
 
       if (error) {
+        // Handle edge function invocation errors
         toast.error(error.message || 'Failed to create account');
       } else if (data?.error) {
-        toast.error(data.error);
-      } else {
+        // Handle errors returned from the edge function
+        if (data.error.toLowerCase().includes('already exists')) {
+          toast.error('An account with this email already exists. Please sign in instead.');
+        } else {
+          toast.error(data.error);
+        }
+      } else if (data?.success) {
         toast.success('Check your email to confirm your account!');
         setEmail('');
         setPassword('');
         setFullName('');
+      } else {
+        toast.error('An unexpected error occurred. Please try again.');
       }
     } catch (err: any) {
       toast.error(err.message || 'An unexpected error occurred');
