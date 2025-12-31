@@ -5,14 +5,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Users, Loader2, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Users, Loader2, CheckCircle2, XCircle, AlertTriangle, Ban, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 
 interface ImportResult {
   username: string;
-  status: 'pending' | 'success' | 'error' | 'duplicate';
+  status: 'pending' | 'success' | 'error' | 'duplicate' | 'limit_reached';
   message?: string;
 }
 
@@ -23,6 +25,10 @@ export const BulkAccountImport = () => {
   const [results, setResults] = useState<ImportResult[]>([]);
   const [progress, setProgress] = useState(0);
   const queryClient = useQueryClient();
+  const { data: limits, isLoading: limitsLoading } = useUserAccountLimits();
+
+  const canAdd = limits?.canAddTikTokAccount ?? false;
+  const remainingSlots = limits?.remainingTikTokSlots ?? 0;
 
   const parseUsernames = (text: string): string[] => {
     const tokens = text.split(/[\n,\s]+/).filter(Boolean);
@@ -32,24 +38,48 @@ export const BulkAccountImport = () => {
 
   const usernames = parseUsernames(inputText);
   const usernameCount = usernames.length;
+  const maxImportable = Math.min(usernameCount, remainingSlots);
+  const willExceedLimit = usernameCount > remainingSlots && remainingSlots > 0;
+
+  const getStatusDisplay = () => {
+    const status = limits?.subscriptionStatus;
+    switch (status) {
+      case 'none':
+        return { icon: Ban, message: 'No subscription assigned. Contact administrator.' };
+      case 'pending':
+        return { icon: Clock, message: 'Subscription pending activation.' };
+      case 'expired':
+        return { icon: XCircle, message: 'Subscription expired. Contact administrator to renew.' };
+      case 'cancelled':
+        return { icon: XCircle, message: 'Subscription cancelled. Contact administrator.' };
+      default:
+        return { icon: AlertTriangle, message: `Account limit reached (${limits?.maxTikTokAccounts})` };
+    }
+  };
 
   const handleImport = async () => {
-    if (usernameCount === 0) return;
+    if (usernameCount === 0 || !canAdd) return;
     if (usernameCount > 50) {
       toast.error('Maximum 50 accounts at a time');
       return;
     }
 
+    const usernamesToImport = usernames.slice(0, maxImportable);
+    const skippedUsernames = usernames.slice(maxImportable);
+
     setIsImporting(true);
     setProgress(0);
-    setResults(usernames.map(u => ({ username: u, status: 'pending' })));
+    setResults([
+      ...usernamesToImport.map(u => ({ username: u, status: 'pending' as const })),
+      ...skippedUsernames.map(u => ({ username: u, status: 'limit_reached' as const, message: 'Account limit reached' }))
+    ]);
 
     let successCount = 0;
     let duplicateCount = 0;
     let failedCount = 0;
 
-    for (let i = 0; i < usernames.length; i++) {
-      const username = usernames[i];
+    for (let i = 0; i < usernamesToImport.length; i++) {
+      const username = usernamesToImport[i];
       
       try {
         const { data, error } = await supabase.functions.invoke('tikwm-profile', {
@@ -77,17 +107,19 @@ export const BulkAccountImport = () => {
         failedCount++;
       }
 
-      setProgress(((i + 1) / usernames.length) * 100);
+      setProgress(((i + 1) / usernamesToImport.length) * 100);
 
       // Small delay between requests to avoid rate limiting
-      if (i < usernames.length - 1) {
+      if (i < usernamesToImport.length - 1) {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     }
 
     await queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
+    await queryClient.invalidateQueries({ queryKey: ['user-account-limits'] });
 
-    toast.success(`Import complete: ${successCount} added, ${duplicateCount} duplicates, ${failedCount} failed`);
+    const limitMessage = skippedUsernames.length > 0 ? `, ${skippedUsernames.length} skipped (limit)` : '';
+    toast.success(`Import complete: ${successCount} added, ${duplicateCount} duplicates, ${failedCount} failed${limitMessage}`);
     setIsImporting(false);
   };
 
@@ -105,6 +137,28 @@ export const BulkAccountImport = () => {
   const successResults = results.filter(r => r.status === 'success');
   const duplicateResults = results.filter(r => r.status === 'duplicate');
   const failedResults = results.filter(r => r.status === 'error');
+  const limitReachedResults = results.filter(r => r.status === 'limit_reached');
+
+  // If user cannot add accounts, show disabled button with tooltip
+  if (!canAdd && !limitsLoading) {
+    const { icon: StatusIcon, message } = getStatusDisplay();
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button variant="outline" size="sm" disabled className="opacity-60">
+            <Users className="h-4 w-4 mr-2" />
+            Bulk Add
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>
+          <div className="flex items-center gap-2">
+            <StatusIcon className="h-4 w-4" />
+            <p>{message}</p>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -151,6 +205,16 @@ export const BulkAccountImport = () => {
             </Alert>
           )}
 
+          {willExceedLimit && usernameCount <= 50 && (
+            <Alert className="border-amber-500/50 bg-amber-500/10">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-700 dark:text-amber-300">
+                You have {remainingSlots} slot{remainingSlots !== 1 ? 's' : ''} remaining. 
+                Only the first {remainingSlots} account{remainingSlots !== 1 ? 's' : ''} will be added.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {isImporting && (
             <div className="space-y-2">
               <Progress value={progress} className="h-2" />
@@ -181,6 +245,12 @@ export const BulkAccountImport = () => {
                     {failedResults.length} failed
                   </span>
                 )}
+                {limitReachedResults.length > 0 && (
+                  <span className="flex items-center gap-1 text-muted-foreground">
+                    <Ban className="h-4 w-4" />
+                    {limitReachedResults.length} skipped
+                  </span>
+                )}
               </div>
 
               {failedResults.length > 0 && (
@@ -203,7 +273,7 @@ export const BulkAccountImport = () => {
             {(!results.length || isImporting) && (
               <Button 
                 onClick={handleImport} 
-                disabled={usernameCount === 0 || usernameCount > 50 || isImporting}
+                disabled={usernameCount === 0 || usernameCount > 50 || isImporting || maxImportable === 0}
               >
                 {isImporting ? (
                   <>
@@ -211,7 +281,7 @@ export const BulkAccountImport = () => {
                     Importing...
                   </>
                 ) : (
-                  <>Add {usernameCount} Account{usernameCount !== 1 ? 's' : ''}</>
+                  <>Add {maxImportable} Account{maxImportable !== 1 ? 's' : ''}</>
                 )}
               </Button>
             )}

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, ExternalLink, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Plus, ExternalLink, AlertTriangle, AlertCircle, Ban, Clock, XCircle } from 'lucide-react';
 import { useYouTubeChannels, CreateChannelInput } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
@@ -65,7 +65,24 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
     setSelectedTikTokAccount('');
   };
 
+  const getStatusDisplay = () => {
+    const status = limits?.subscriptionStatus;
+    switch (status) {
+      case 'none':
+        return { icon: Ban, message: 'No subscription assigned. Contact administrator.' };
+      case 'pending':
+        return { icon: Clock, message: 'Subscription pending activation.' };
+      case 'expired':
+        return { icon: XCircle, message: 'Subscription expired. Contact administrator to renew.' };
+      case 'cancelled':
+        return { icon: XCircle, message: 'Subscription cancelled. Contact administrator.' };
+      default:
+        return { icon: AlertCircle, message: `You've reached your YouTube channel limit (${limits?.maxYouTubeChannels})` };
+    }
+  };
+
   if (!canAdd && !limitsLoading) {
+    const { icon: StatusIcon, message } = getStatusDisplay();
     return (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -75,7 +92,10 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
           </Button>
         </TooltipTrigger>
         <TooltipContent>
-          <p>You've reached your YouTube channel limit ({limits?.maxYouTubeChannels})</p>
+          <div className="flex items-center gap-2">
+            <StatusIcon className="h-4 w-4" />
+            <p>{message}</p>
+          </div>
         </TooltipContent>
       </Tooltip>
     );
