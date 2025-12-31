@@ -1,11 +1,22 @@
 export const VOLUME_DISCOUNTS = [
-  { minAccounts: 1, maxAccounts: 2, discount: 0, label: 'Standard' },
-  { minAccounts: 3, maxAccounts: 5, discount: 0.1667, label: '17% off' },
-  { minAccounts: 6, maxAccounts: 10, discount: 0.3333, label: '33% off' },
-  { minAccounts: 11, maxAccounts: Infinity, discount: 0.50, label: '50% off' },
+  { minAccounts: 1, maxAccounts: 2, discount: 0, label: 'Standard', tier: 'starter' },
+  { minAccounts: 3, maxAccounts: 5, discount: 0.15, label: '15% off', tier: 'growth' },
+  { minAccounts: 6, maxAccounts: 10, discount: 0.25, label: '25% off', tier: 'business' },
+  { minAccounts: 11, maxAccounts: 20, discount: 0.35, label: '35% off', tier: 'enterprise' },
+  { minAccounts: 21, maxAccounts: Infinity, discount: 0.40, label: '40% off', tier: 'agency' },
 ];
 
-export const ANNUAL_DISCOUNT = 0.20; // 20% off for annual plans
+export const ANNUAL_DISCOUNT = 0.25; // 25% off for annual plans
+
+// Agency tier special benefits
+export const AGENCY_BENEFITS = [
+  'Dedicated account manager',
+  'Priority support (< 2hr response)',
+  'Custom API access',
+  'White-label options',
+  'Bulk import tools',
+  'Advanced analytics dashboard',
+];
 
 export function getVolumeDiscount(accountCount: number): number {
   const tier = VOLUME_DISCOUNTS.find(
@@ -23,6 +34,36 @@ export function getDiscountTierLabel(accountCount: number): string {
     t => accountCount >= t.minAccounts && accountCount <= t.maxAccounts
   );
   return tier?.label || 'Standard';
+}
+
+export function getDiscountTierName(accountCount: number): string {
+  const tier = VOLUME_DISCOUNTS.find(
+    t => accountCount >= t.minAccounts && accountCount <= t.maxAccounts
+  );
+  return tier?.tier || 'starter';
+}
+
+export function isAgencyTier(accountCount: number): boolean {
+  return accountCount >= 21;
+}
+
+export function getNextTierInfo(accountCount: number): { 
+  accountsNeeded: number; 
+  nextDiscount: number; 
+  nextLabel: string;
+} | null {
+  const currentTierIndex = VOLUME_DISCOUNTS.findIndex(
+    t => accountCount >= t.minAccounts && accountCount <= t.maxAccounts
+  );
+  
+  const nextTier = VOLUME_DISCOUNTS[currentTierIndex + 1];
+  if (!nextTier) return null;
+  
+  return {
+    accountsNeeded: nextTier.minAccounts - accountCount,
+    nextDiscount: nextTier.discount,
+    nextLabel: nextTier.label,
+  };
 }
 
 export function calculateDiscountedPrice(basePrice: number, accountCount: number): number {
