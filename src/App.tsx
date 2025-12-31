@@ -36,6 +36,7 @@ import KeyboardShortcutsHelp from "@/components/dashboard/KeyboardShortcutsHelp"
 import KeyboardShortcutIndicator from "@/components/dashboard/KeyboardShortcutIndicator";
 import { useKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { PWAInstallPrompt, PWAUpdatePrompt, OfflineIndicator } from "@/components/pwa";
+import { ScrollToTop } from "@/components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const AppContent = () => {
 
   return (
     <>
+      <ScrollToTop />
       <OfflineIndicator />
       <PWAUpdatePrompt />
       <PWAInstallPrompt />
