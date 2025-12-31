@@ -12,7 +12,6 @@ export const ANNUAL_DISCOUNT = 0.25; // 25% off for annual plans
 export const AGENCY_BENEFITS = [
   'Dedicated account manager',
   'Priority support (< 2hr response)',
-  'Custom API access',
   'White-label options',
   'Bulk import tools',
   'Advanced analytics dashboard',
