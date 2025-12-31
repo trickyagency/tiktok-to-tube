@@ -1,4 +1,6 @@
 import { useMemo, useState, useEffect, useCallback, memo } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { useCronJobs } from '@/hooks/useCronJobs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -65,7 +67,13 @@ const HistoryTableRow = memo(({
 HistoryTableRow.displayName = 'HistoryTableRow';
 
 const CronMonitor = () => {
+  const { isOwner, loading: authLoading } = useAuth();
   const { jobs, history, isLoading, isFetching, refetch } = useCronJobs();
+
+  // Redirect non-owners to dashboard
+  if (!authLoading && !isOwner) {
+    return <Navigate to="/dashboard" replace />;
+  }
   const [selectedJob, setSelectedJob] = useState<string>('all');
   const [refreshCountdown, setRefreshCountdown] = useState(AUTO_REFRESH_INTERVAL);
   const [currentPage, setCurrentPage] = useState(1);
