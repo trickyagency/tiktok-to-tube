@@ -7,6 +7,9 @@ import {
   getDiscountPercentage, 
   calculateDiscountedPrice, 
   getDiscountTierLabel,
+  getNextTierInfo,
+  isAgencyTier,
+  AGENCY_BENEFITS,
   calculateAnnualWithVolumeDiscount,
   VOLUME_DISCOUNTS
 } from '@/lib/pricing';
@@ -21,7 +24,7 @@ import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Check, ChevronDown, HelpCircle, Info, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Crown, HelpCircle, Info, MessageCircle, Sparkles, TrendingUp } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface SubscriptionPlan {
@@ -204,7 +207,7 @@ export default function UpgradePlans() {
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
-              Annual · Save 20%
+              Annual · Save 25%
             </button>
           </div>
         </div>
@@ -365,7 +368,7 @@ export default function UpgradePlans() {
                 value={[accountCount]}
                 onValueChange={(v) => setAccountCount(v[0])}
                 min={1}
-                max={20}
+                max={30}
                 step={1}
                 className="w-full"
               />
@@ -388,9 +391,76 @@ export default function UpgradePlans() {
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-          </CardContent>
+                </div>
+              )}
+
+              {/* Upgrade Nudge - Shows when user can unlock next tier */}
+              {(() => {
+                const nextTier = getNextTierInfo(accountCount);
+                if (!nextTier) return null;
+                
+                return (
+                  <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-lg">
+                    <div className="flex-shrink-0">
+                      <TrendingUp className="h-5 w-5 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">
+                        Add {nextTier.accountsNeeded} more account{nextTier.accountsNeeded > 1 ? 's' : ''} to unlock {nextTier.nextLabel}!
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Save {Math.round(nextTier.nextDiscount * 100)}% on every account
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setAccountCount(accountCount + nextTier.accountsNeeded)}
+                      className="border-amber-500/30 hover:bg-amber-500/10"
+                    >
+                      Preview
+                    </Button>
+                  </div>
+                );
+              })()}
+
+              {/* Agency Tier Benefits - Shows when user qualifies for 21+ accounts */}
+              {isAgencyTier(accountCount) && (
+                <Card className="border-purple-500/50 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                      <Crown className="h-5 w-5 text-purple-500" />
+                      Agency Tier Benefits
+                      <Badge className="bg-purple-500/20 text-purple-600 border-purple-500/30">
+                        Exclusive
+                      </Badge>
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Unlock premium features with 21+ accounts
+                    </p>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid sm:grid-cols-2 gap-3">
+                      {AGENCY_BENEFITS.map((benefit, idx) => (
+                        <div key={idx} className="flex items-center gap-2 text-sm">
+                          <Sparkles className="h-4 w-4 text-purple-500 flex-shrink-0" />
+                          <span>{benefit}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4 pt-4 border-t">
+                      <Button 
+                        onClick={handleContactWhatsApp}
+                        className="w-full bg-purple-600 hover:bg-purple-700"
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Contact for Agency Pricing
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </CardContent>
         </Card>
 
         {/* Annual Savings */}
@@ -548,8 +618,13 @@ export default function UpgradePlans() {
               <AccordionItem value="volume">
                 <AccordionTrigger className="text-left">What are volume discounts?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Volume discounts reduce your per-account cost as you add more accounts. 3-5 accounts 
-                  get 17% off, 6-10 accounts get 33% off, and 11+ accounts get 50% off the base price.
+                  Volume discounts reduce your per-account cost as you add more accounts:
+                  <ul className="mt-2 space-y-1 list-disc list-inside">
+                    <li>3-5 accounts: 15% off</li>
+                    <li>6-10 accounts: 25% off</li>
+                    <li>11-20 accounts: 35% off</li>
+                    <li>21+ accounts: 40% off + Agency benefits</li>
+                  </ul>
                 </AccordionContent>
               </AccordionItem>
 
