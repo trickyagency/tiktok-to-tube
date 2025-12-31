@@ -58,17 +58,17 @@ export function usePublishSchedules() {
     mutationFn: async (input: CreateScheduleInput) => {
       if (!user?.id) throw new Error('User not authenticated');
 
-      // Check if an active schedule already exists for this YouTube channel
+      // Check if ANY schedule already exists for this YouTube channel (active or paused)
       const { data: existingSchedule } = await supabase
         .from('publish_schedules')
-        .select('id')
+        .select('id, is_active')
         .eq('youtube_channel_id', input.youtube_channel_id)
         .eq('user_id', user.id)
-        .eq('is_active', true)
         .maybeSingle();
 
       if (existingSchedule) {
-        throw new Error('A schedule already exists for this YouTube channel. You can only have one active schedule per channel.');
+        const status = existingSchedule.is_active ? 'active' : 'paused';
+        throw new Error(`A ${status} schedule already exists for this YouTube channel. Please ${existingSchedule.is_active ? 'edit' : 'activate or edit'} the existing schedule instead.`);
       }
 
       // Check subscription limit for videos per day

@@ -64,14 +64,17 @@ export function EditScheduleDialog({ schedule, isOpen, onClose, onSuccess }: Edi
   // Only show connected YouTube channels
   const connectedChannels = youtubeChannels.filter(c => c.auth_status === 'connected');
 
-  // Get channels that already have an active schedule (excluding current schedule being edited)
-  const channelsWithActiveSchedule = existingSchedules
-    .filter(s => s.is_active && s.id !== schedule?.id)
-    .map(s => s.youtube_channel_id);
+  // Get channels that already have ANY schedule (excluding current schedule being edited)
+  const channelsWithSchedule = existingSchedules
+    .filter(s => s.id !== schedule?.id)
+    .map(s => ({
+      channelId: s.youtube_channel_id,
+      isActive: s.is_active
+    }));
 
-  // Available channels are those without active schedules + current schedule's channel
+  // Available channels are those without ANY schedule + current schedule's channel
   const availableChannels = connectedChannels.filter(
-    c => !channelsWithActiveSchedule.includes(c.id)
+    c => !channelsWithSchedule.some(s => s.channelId === c.id)
   );
 
   const canAddMoreTimes = publishTimes.length < maxVideosPerDay;
@@ -186,12 +189,16 @@ export function EditScheduleDialog({ schedule, isOpen, onClose, onSuccess }: Edi
                 ))}
                 {/* Show channels with existing schedules as disabled */}
                 {connectedChannels
-                  .filter(c => channelsWithActiveSchedule.includes(c.id))
-                  .map((channel) => (
-                    <SelectItem key={channel.id} value={channel.id} disabled>
-                      {channel.channel_title || 'Unnamed Channel'} (Schedule exists)
-                    </SelectItem>
-                  ))}
+                  .filter(c => channelsWithSchedule.some(s => s.channelId === c.id))
+                  .map((channel) => {
+                    const existingSchedule = channelsWithSchedule.find(s => s.channelId === channel.id);
+                    const status = existingSchedule?.isActive ? 'Active' : 'Paused';
+                    return (
+                      <SelectItem key={channel.id} value={channel.id} disabled>
+                        {channel.channel_title || 'Unnamed Channel'} ({status} schedule exists)
+                      </SelectItem>
+                    );
+                  })}
               </SelectContent>
             </Select>
           </div>
