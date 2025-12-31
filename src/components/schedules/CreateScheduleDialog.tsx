@@ -18,10 +18,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, X, Clock } from 'lucide-react';
+import { Plus, X, Clock, Sparkles } from 'lucide-react';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { usePublishSchedules } from '@/hooks/usePublishSchedules';
+import { SmartTimeSuggestions } from './SmartTimeSuggestions';
 
 const TIMEZONES = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -49,6 +50,7 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
   const [youtubeChannelId, setYoutubeChannelId] = useState('');
   const [publishTimes, setPublishTimes] = useState<string[]>(['10:00']);
   const [timezone, setTimezone] = useState('America/New_York');
+  const [showSmartSuggestions, setShowSmartSuggestions] = useState(false);
 
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youtubeChannels } = useYouTubeChannels();
@@ -73,6 +75,18 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
     const updated = [...publishTimes];
     updated[index] = value;
     setPublishTimes(updated);
+  };
+
+  const handleApplySmartTime = (time: string) => {
+    if (!publishTimes.includes(time) && publishTimes.length < 10) {
+      setPublishTimes([...publishTimes, time]);
+    }
+  };
+
+  const handleApplyAllSmartTimes = (times: string[]) => {
+    const newTimes = times.filter((t) => !publishTimes.includes(t));
+    const combined = [...publishTimes, ...newTimes].slice(0, 10);
+    setPublishTimes(combined);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -102,6 +116,7 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
     setYoutubeChannelId('');
     setPublishTimes(['10:00']);
     setTimezone('America/New_York');
+    setShowSmartSuggestions(false);
   };
 
   return (
@@ -178,6 +193,31 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
               </p>
             )}
           </div>
+
+          {/* Smart Scheduling Toggle */}
+          {youtubeChannelId && (
+            <div className="space-y-2">
+              {!showSmartSuggestions ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full border-primary/30 hover:bg-primary/10"
+                  onClick={() => setShowSmartSuggestions(true)}
+                >
+                  <Sparkles className="h-4 w-4 mr-2 text-primary" />
+                  Get Smart Suggestions
+                </Button>
+              ) : (
+                <SmartTimeSuggestions
+                  youtubeChannelId={youtubeChannelId}
+                  onApplyTime={handleApplySmartTime}
+                  onApplyAll={handleApplyAllSmartTimes}
+                  currentTimes={publishTimes}
+                />
+              )}
+            </div>
+          )}
 
           {/* Publish Times */}
           <div className="space-y-2">
