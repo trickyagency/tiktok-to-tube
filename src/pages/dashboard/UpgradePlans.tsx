@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useSubscriptionPlans } from '@/hooks/useSubscriptions';
 import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
@@ -10,42 +10,113 @@ import {
   calculateAnnualWithVolumeDiscount,
   VOLUME_DISCOUNTS
 } from '@/lib/pricing';
+import { 
+  generateGeneralWhatsAppLink, 
+  generateSwitchPlanWhatsAppLink, 
+  generateVolumeDiscountWhatsAppLink 
+} from '@/lib/whatsapp';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Check, ChevronDown, HelpCircle, Info } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, HelpCircle, Info, MessageCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+
+interface SubscriptionPlan {
+  id: string;
+  name: string;
+  price_monthly: number;
+  max_videos_per_day: number;
+  features: any;
+  is_active: boolean;
+}
 
 export default function UpgradePlans() {
   const { data: subscriptionPlans, isLoading: plansLoading } = useSubscriptionPlans();
   const { data: currentSubscription } = useCurrentUserSubscription();
-  const { isOwner } = useAuth();
+  const { isOwner, user } = useAuth();
   
   const [accountCount, setAccountCount] = useState(1);
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
   const [roiExpanded, setRoiExpanded] = useState(false);
   const [avgViews, setAvgViews] = useState(10000);
   const [cpmRate, setCpmRate] = useState(2);
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('pro');
 
   const activePlans = subscriptionPlans?.filter(p => p.is_active) || [];
   
   const proPlan = activePlans.find(p => p.id === 'pro');
+  const selectedPlan = activePlans.find(p => p.id === selectedPlanId) || proPlan;
+  
   const yearlySavings = proPlan 
     ? calculateAnnualWithVolumeDiscount(proPlan.price_monthly, accountCount).totalSavingsYear
     : 0;
 
-  const roiData = {
-    monthlyEarnings: (avgViews * (cpmRate / 1000) * 30).toFixed(0),
-    subscriptionCost: proPlan ? (proPlan.price_monthly * accountCount).toFixed(0) : '0',
-    roi: proPlan ? (((avgViews * (cpmRate / 1000) * 30) / (proPlan.price_monthly * accountCount)) * 100).toFixed(0) : '0',
-  };
+  // Fixed ROI calculation that accounts for videos per day and account count
+  const roiData = useMemo(() => {
+    if (!selectedPlan) return { monthlyEarnings: '0', subscriptionCost: '0', profit: '0', roi: '0' };
+    
+    const videosPerDay = selectedPlan.max_videos_per_day;
+    const monthlyVideos = videosPerDay * 30 * accountCount;
+    const monthlyViews = monthlyVideos * avgViews;
+    const monthlyEarnings = (monthlyViews / 1000) * cpmRate;
+    
+    const discountedPrice = calculateDiscountedPrice(selectedPlan.price_monthly, accountCount);
+    const monthlySubscriptionCost = discountedPrice * accountCount;
+    
+    const profit = monthlyEarnings - monthlySubscriptionCost;
+    const roi = monthlySubscriptionCost > 0 
+      ? ((profit / monthlySubscriptionCost) * 100) 
+      : 0;
+    
+    return {
+      monthlyEarnings: monthlyEarnings.toFixed(0),
+      subscriptionCost: monthlySubscriptionCost.toFixed(0),
+      profit: profit.toFixed(0),
+      roi: roi.toFixed(0),
+    };
+  }, [selectedPlan, accountCount, avgViews, cpmRate]);
 
   const planFeatures: Record<string, string[]> = {
     basic: ['2 videos per day', 'Basic scheduling', 'Email support'],
     pro: ['4 videos per day', 'Advanced scheduling', 'Priority support', 'Analytics dashboard'],
     scale: ['6 videos per day', 'Unlimited scheduling', 'Dedicated support', 'Advanced analytics', 'API access'],
+  };
+
+  // WhatsApp contact handlers
+  const handleContactWhatsApp = () => {
+    window.open(generateGeneralWhatsAppLink(), '_blank');
+  };
+
+  const handleSelectPlan = (plan: SubscriptionPlan) => {
+    const basePrice = plan.price_monthly;
+    const discountedPrice = calculateDiscountedPrice(basePrice, accountCount);
+    const totalPrice = discountedPrice * accountCount;
+    const discountPercentage = getDiscountPercentage(accountCount);
+    
+    const link = generateVolumeDiscountWhatsAppLink({
+      planName: plan.name,
+      accountCount,
+      pricePerAccount: discountedPrice,
+      totalPrice,
+      discountPercentage,
+      userEmail: user?.email,
+    });
+    window.open(link, '_blank');
+  };
+
+  const handleSwitchPlan = (plan: SubscriptionPlan) => {
+    if (!currentSubscription) return;
+    
+    const link = generateSwitchPlanWhatsAppLink({
+      currentPlanName: currentSubscription.plan?.name || currentSubscription.plan_id,
+      newPlanName: plan.name,
+      newPlanPrice: plan.price_monthly,
+      userEmail: user?.email,
+    });
+    window.open(link, '_blank');
   };
 
   if (plansLoading) {
@@ -139,7 +210,7 @@ export default function UpgradePlans() {
         </div>
 
         {/* Plan Cards */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
+        <div className="grid md:grid-cols-3 gap-6 mb-8">
           {activePlans.map((plan) => {
             const isRecommended = plan.id === 'pro';
             const isCurrentPlan = currentSubscription?.plan_id === plan.id;
@@ -195,15 +266,61 @@ export default function UpgradePlans() {
                     ))}
                   </ul>
                   
-                  {/* No action buttons - subscriptions managed by owner */}
-                  <div className="text-center text-sm text-muted-foreground py-3 border-t">
-                    {isCurrentPlan ? 'Currently active' : 'Contact admin to subscribe'}
+                  {/* Action Buttons */}
+                  <div className="pt-3 border-t">
+                    {isCurrentPlan ? (
+                      <Button variant="secondary" size="sm" className="w-full" disabled>
+                        <Check className="h-4 w-4 mr-2" />
+                        Current Plan
+                      </Button>
+                    ) : currentSubscription ? (
+                      <Button 
+                        variant={isRecommended ? "default" : "outline"} 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => handleSwitchPlan(plan)}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Switch to {plan.name}
+                      </Button>
+                    ) : (
+                      <Button 
+                        variant={isRecommended ? "default" : "outline"} 
+                        size="sm" 
+                        className="w-full"
+                        onClick={() => handleSelectPlan(plan)}
+                      >
+                        <MessageCircle className="h-4 w-4 mr-2" />
+                        Get {plan.name}
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             );
           })}
         </div>
+
+        {/* WhatsApp Contact Banner */}
+        <Card className="mb-8 border-green-500/50 bg-green-500/5">
+          <CardContent className="pt-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-lg">Need help choosing?</h3>
+                <p className="text-sm text-muted-foreground">
+                  Contact us on WhatsApp for personalized recommendations
+                </p>
+              </div>
+              <Button 
+                onClick={handleContactWhatsApp}
+                className="bg-green-500 hover:bg-green-600 text-white"
+              >
+                <MessageCircle className="h-4 w-4 mr-2" />
+                Chat on WhatsApp
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Volume Discounts */}
         <Card className="mb-8">
@@ -296,6 +413,23 @@ export default function UpgradePlans() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent className="space-y-6">
+                {/* Plan Selector for ROI */}
+                <div>
+                  <label className="text-sm text-muted-foreground mb-2 block">Calculate for plan</label>
+                  <div className="flex flex-wrap gap-2">
+                    {activePlans.map(plan => (
+                      <Button
+                        key={plan.id}
+                        variant={selectedPlanId === plan.id ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setSelectedPlanId(plan.id)}
+                      >
+                        {plan.name}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="grid sm:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <div className="flex justify-between text-sm">
@@ -325,18 +459,37 @@ export default function UpgradePlans() {
                   </div>
                 </div>
 
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <div className="p-4 bg-muted/50 rounded-lg text-center">
-                    <div className="text-2xl font-bold">${roiData.monthlyEarnings}</div>
-                    <div className="text-sm text-muted-foreground">Est. monthly earnings</div>
+                {/* Calculation Info */}
+                {selectedPlan && (
+                  <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                    Based on: <span className="font-medium">{selectedPlan.max_videos_per_day} videos/day</span> × 
+                    <span className="font-medium"> {accountCount} accounts</span> × 
+                    <span className="font-medium"> 30 days</span> = 
+                    <span className="font-medium text-foreground"> {selectedPlan.max_videos_per_day * accountCount * 30} videos/month</span>
                   </div>
+                )}
+
+                {/* Stats Grid */}
+                <div className="grid sm:grid-cols-4 gap-4">
                   <div className="p-4 bg-muted/50 rounded-lg text-center">
                     <div className="text-2xl font-bold">${roiData.subscriptionCost}</div>
-                    <div className="text-sm text-muted-foreground">Subscription cost</div>
+                    <div className="text-sm text-muted-foreground">Monthly cost</div>
                   </div>
                   <div className="p-4 bg-muted/50 rounded-lg text-center">
-                    <div className="text-2xl font-bold text-emerald-600">{roiData.roi}%</div>
-                    <div className="text-sm text-muted-foreground">Return on investment</div>
+                    <div className="text-2xl font-bold text-emerald-600">${roiData.monthlyEarnings}</div>
+                    <div className="text-sm text-muted-foreground">Est. earnings</div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg text-center">
+                    <div className={`text-2xl font-bold ${parseInt(roiData.profit) >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                      ${roiData.profit}
+                    </div>
+                    <div className="text-sm text-muted-foreground">Est. profit</div>
+                  </div>
+                  <div className="p-4 bg-muted/50 rounded-lg text-center">
+                    <div className={`text-2xl font-bold ${parseInt(roiData.roi) >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+                      {roiData.roi}%
+                    </div>
+                    <div className="text-sm text-muted-foreground">ROI</div>
                   </div>
                 </div>
 
@@ -379,33 +532,32 @@ export default function UpgradePlans() {
               <AccordionItem value="upgrade">
                 <AccordionTrigger className="text-left">How do I upgrade my plan?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Subscriptions are managed by your account administrator. Contact them to request 
-                  a plan upgrade, add more accounts, or extend your subscription period.
+                  Click the "Get" or "Switch to" button on any plan to contact us via WhatsApp. 
+                  We'll help you upgrade or switch your plan quickly.
                 </AccordionContent>
               </AccordionItem>
               
               <AccordionItem value="cancel">
                 <AccordionTrigger className="text-left">Can subscriptions be cancelled?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Yes, administrators can cancel subscriptions at any time. When cancelled, access 
+                  Yes, subscriptions can be cancelled at any time. When cancelled, access 
                   continues until the current subscription period ends.
                 </AccordionContent>
               </AccordionItem>
               
               <AccordionItem value="volume">
-                <AccordionTrigger className="text-left">How do volume discounts work?</AccordionTrigger>
+                <AccordionTrigger className="text-left">What are volume discounts?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Volume discounts are automatically applied based on the number of accounts in your 
-                  subscription: 3-5 accounts get 17% off, 6-10 accounts get 33% off, and 11+ accounts 
-                  get 50% off the per-account price.
+                  Volume discounts reduce your per-account cost as you add more accounts. 3-5 accounts 
+                  get 17% off, 6-10 accounts get 33% off, and 11+ accounts get 50% off the base price.
                 </AccordionContent>
               </AccordionItem>
-              
+
               <AccordionItem value="payment">
                 <AccordionTrigger className="text-left">What payment methods are accepted?</AccordionTrigger>
                 <AccordionContent className="text-muted-foreground">
-                  Payment is handled directly with your administrator. They can accept various 
-                  payment methods based on your arrangement.
+                  We accept various payment methods. Contact us on WhatsApp to discuss the best 
+                  payment option for you.
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
