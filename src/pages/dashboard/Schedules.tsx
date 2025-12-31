@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, RefreshCw, TrendingUp, Activity, CheckCircle2, Play, ListVideo, Plus, Zap, Clock, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { Calendar, TrendingUp, Activity, CheckCircle2, Play, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
 import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
@@ -24,6 +25,7 @@ const Schedules = () => {
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youTubeChannels } = useYouTubeChannels();
   const { data: subscription } = useCurrentUserSubscription();
+  const navigate = useNavigate();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
 
   // Check subscription limits
@@ -94,15 +96,6 @@ const Schedules = () => {
 
         {/* Header Actions */}
         <div className="flex items-center justify-end gap-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => refetch()}
-            disabled={isLoading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
           <CreateScheduleDialog />
         </div>
 
@@ -150,29 +143,26 @@ const Schedules = () => {
           )}
         </div>
 
-        {/* Quick Actions */}
-        <Card className="border-dashed">
+        {/* View Publishing Queue Widget */}
+        <Card className="bg-card/50 backdrop-blur-sm border-border/50">
           <CardContent className="p-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground">Quick Actions:</span>
-              <CreateScheduleDialog 
-                trigger={
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    New Schedule
-                  </Button>
-                }
-              />
-              <Button variant="outline" size="sm" className="gap-2" asChild>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+                  <Calendar className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground">View Publishing Queue</h3>
+                  <p className="text-sm text-muted-foreground">See all videos scheduled to be uploaded</p>
+                </div>
+              </div>
+              <Button 
+                variant="outline"
+                asChild
+              >
                 <Link to="/dashboard/queue">
-                  <ListVideo className="h-4 w-4" />
                   View Queue
-                </Link>
-              </Button>
-              <Button variant="outline" size="sm" className="gap-2" asChild>
-                <Link to="/dashboard/tiktok">
-                  <Zap className="h-4 w-4" />
-                  Scrape Videos
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
             </div>
