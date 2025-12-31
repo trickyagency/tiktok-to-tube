@@ -57,6 +57,15 @@ const planFeatures: Record<string, string[]> = {
   ]
 };
 
+const ownerFeatures = [
+  'Unlimited TikTok accounts',
+  'Unlimited YouTube channels',
+  'Unlimited videos per day',
+  'Full automation & priority processing',
+  'Complete platform management access',
+  'All premium features included'
+];
+
 const planIcons: Record<string, typeof Package> = {
   basic: Package,
   pro: Zap,
@@ -118,9 +127,10 @@ export default function MySubscriptions() {
   const usagePercentage = Math.min((usedAccounts / maxAccounts) * 100, 100);
   const remainingSlots = Math.max(maxAccounts - usedAccounts, 0);
 
-  const planId = subscription?.plan_id || 'basic';
-  const PlanIcon = planIcons[planId] || Package;
-  const features = planFeatures[planId] || planFeatures.basic;
+  // For owner, always show Scale plan with owner features
+  const planId = isOwner ? 'scale' : (subscription?.plan_id || 'basic');
+  const PlanIcon = isOwner ? Crown : (planIcons[planId] || Package);
+  const features = isOwner ? ownerFeatures : (planFeatures[planId] || planFeatures.basic);
 
   // Determine subscription status for display
   const getStatusBadge = () => {
@@ -204,9 +214,11 @@ export default function MySubscriptions() {
                         <PlanIcon className="h-6 w-6 text-primary" />
                       </div>
                       <div>
-                        <h3 className="text-xl font-bold">{subscription?.plan?.name || 'No Plan'}</h3>
+                        <h3 className="text-xl font-bold">
+                          {isOwner ? 'Scale (Owner)' : (subscription?.plan?.name || 'No Plan')}
+                        </h3>
                         <p className="text-sm text-muted-foreground">
-                          {maxAccounts} account{maxAccounts !== 1 ? 's' : ''} included
+                          {isOwner ? 'Unlimited accounts included' : `${maxAccounts} account${maxAccounts !== 1 ? 's' : ''} included`}
                         </p>
                       </div>
                     </div>
