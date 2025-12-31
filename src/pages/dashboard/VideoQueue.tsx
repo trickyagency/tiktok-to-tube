@@ -14,6 +14,7 @@ import { usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { TestUploadDialog } from '@/components/queue/TestUploadDialog';
 import { ProcessQueueButton } from '@/components/queue/ProcessQueueButton';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
+import { NextScheduledUpload } from '@/components/schedules/NextScheduledUpload';
 
 const VideoQueue = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -137,6 +138,9 @@ const VideoQueue = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Next Scheduled Upload Countdown */}
+        <NextScheduledUpload queuedItems={queue || []} isLoading={isLoadingQueue} />
 
         {/* Queue Section */}
         <Card>

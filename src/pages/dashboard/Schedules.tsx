@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Activity, CheckCircle2, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight } from 'lucide-react';
+import { Calendar, Activity, CheckCircle2, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight, Play, Pause } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
 import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
@@ -11,21 +11,24 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Checkbox } from '@/components/ui/checkbox';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
-import { NextScheduledUpload } from '@/components/schedules/NextScheduledUpload';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
+import { toast } from 'sonner';
 
 const Schedules = () => {
-  const { schedules, isLoading, refetch } = usePublishSchedules();
+  const { schedules, isLoading, refetch, toggleSchedule } = usePublishSchedules();
   const { data: overviewStats, isLoading: statsLoading } = useScheduleAnalytics();
-  const { queue, isLoading: queueLoading } = usePublishQueue();
+  const { queue } = usePublishQueue();
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youTubeChannels } = useYouTubeChannels();
   const { data: subscription } = useCurrentUserSubscription();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
+  const [selectedSchedules, setSelectedSchedules] = useState<Set<string>>(new Set());
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
 
   // Check subscription limits
   const maxVideosPerDay = subscription?.plan?.max_videos_per_day || 2;
@@ -40,6 +43,55 @@ const Schedules = () => {
 
   const handleEditSchedule = (schedule: PublishSchedule) => {
     setEditingSchedule(schedule);
+  };
+
+  // Bulk selection helpers
+  const toggleSelection = (id: string) => {
+    const newSelection = new Set(selectedSchedules);
+    if (newSelection.has(id)) {
+      newSelection.delete(id);
+    } else {
+      newSelection.add(id);
+    }
+    setSelectedSchedules(newSelection);
+  };
+
+  const clearSelection = () => setSelectedSchedules(new Set());
+
+  const toggleSelectAllActive = () => {
+    const activeIds = new Set(activeSchedules.map(s => s.id));
+    const allActiveSelected = activeSchedules.every(s => selectedSchedules.has(s.id));
+    if (allActiveSelected) {
+      setSelectedSchedules(new Set([...selectedSchedules].filter(id => !activeIds.has(id))));
+    } else {
+      setSelectedSchedules(new Set([...selectedSchedules, ...activeIds]));
+    }
+  };
+
+  const toggleSelectAllPaused = () => {
+    const pausedIds = new Set(pausedSchedules.map(s => s.id));
+    const allPausedSelected = pausedSchedules.every(s => selectedSchedules.has(s.id));
+    if (allPausedSelected) {
+      setSelectedSchedules(new Set([...selectedSchedules].filter(id => !pausedIds.has(id))));
+    } else {
+      setSelectedSchedules(new Set([...selectedSchedules, ...pausedIds]));
+    }
+  };
+
+  const handleBulkToggle = async (activate: boolean) => {
+    setIsBulkUpdating(true);
+    try {
+      const promises = Array.from(selectedSchedules).map(id => 
+        toggleSchedule({ id, is_active: activate })
+      );
+      await Promise.all(promises);
+      clearSelection();
+      toast.success(`${selectedSchedules.size} schedule${selectedSchedules.size > 1 ? 's' : ''} ${activate ? 'activated' : 'paused'}`);
+    } catch (error) {
+      toast.error('Failed to update some schedules');
+    } finally {
+      setIsBulkUpdating(false);
+    }
   };
 
   // Enrich schedules with account and channel data
@@ -142,8 +194,43 @@ const Schedules = () => {
           )}
         </div>
 
-        {/* Next Scheduled Upload Countdown */}
-        <NextScheduledUpload queuedItems={queue || []} isLoading={queueLoading} />
+        {/* Bulk Action Toolbar */}
+        {selectedSchedules.size > 0 && (
+          <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border border-border rounded-lg py-3 px-4 flex items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-sm font-medium">
+                {selectedSchedules.size} selected
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleBulkToggle(true)}
+                disabled={isBulkUpdating}
+              >
+                <Play className="h-4 w-4 mr-1" />
+                Activate All
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleBulkToggle(false)}
+                disabled={isBulkUpdating}
+              >
+                <Pause className="h-4 w-4 mr-1" />
+                Pause All
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearSelection}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* View Publishing Queue Widget */}
         <Card className="bg-card/50 backdrop-blur-sm border-border/50">
@@ -219,6 +306,10 @@ const Schedules = () => {
             {activeSchedules.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={activeSchedules.length > 0 && activeSchedules.every(s => selectedSchedules.has(s.id))}
+                    onCheckedChange={toggleSelectAllActive}
+                  />
                   <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
                   <h2 className="text-lg font-semibold">Active Schedules</h2>
                   <span className="text-sm text-muted-foreground">({activeSchedules.length})</span>
@@ -229,6 +320,9 @@ const Schedules = () => {
                       key={schedule.id}
                       schedule={schedule}
                       onEdit={() => handleEditSchedule(schedule)}
+                      isSelected={selectedSchedules.has(schedule.id)}
+                      onToggleSelect={() => toggleSelection(schedule.id)}
+                      showCheckbox
                     />
                   ))}
                 </div>
@@ -239,6 +333,10 @@ const Schedules = () => {
             {pausedSchedules.length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={pausedSchedules.length > 0 && pausedSchedules.every(s => selectedSchedules.has(s.id))}
+                    onCheckedChange={toggleSelectAllPaused}
+                  />
                   <span className="h-2 w-2 rounded-full bg-muted-foreground" />
                   <h2 className="text-lg font-semibold">Paused Schedules</h2>
                   <span className="text-sm text-muted-foreground">({pausedSchedules.length})</span>
@@ -249,6 +347,9 @@ const Schedules = () => {
                       key={schedule.id}
                       schedule={schedule}
                       onEdit={() => handleEditSchedule(schedule)}
+                      isSelected={selectedSchedules.has(schedule.id)}
+                      onToggleSelect={() => toggleSelection(schedule.id)}
+                      showCheckbox
                     />
                   ))}
                 </div>
