@@ -1,25 +1,25 @@
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Pause, Play, Upload } from 'lucide-react';
+import { Pause, Play, Upload, Infinity as InfinityIcon } from 'lucide-react';
 import { QuotaUsage, useToggleChannelPause } from '@/hooks/useYouTubeQuota';
 import { cn } from '@/lib/utils';
 
-const DAILY_UPLOAD_LIMIT = 6;
-
 interface QuotaIndicatorProps {
   quota: QuotaUsage;
+  dailyLimit: number;
+  isUnlimited?: boolean;
 }
 
-export function QuotaIndicator({ quota }: QuotaIndicatorProps) {
+export function QuotaIndicator({ quota, dailyLimit, isUnlimited }: QuotaIndicatorProps) {
   const togglePause = useToggleChannelPause();
   
   const uploadsUsed = quota.uploads_count;
-  const uploadsRemaining = Math.max(0, DAILY_UPLOAD_LIMIT - uploadsUsed);
-  const uploadPercentage = (uploadsUsed / DAILY_UPLOAD_LIMIT) * 100;
+  const uploadsRemaining = isUnlimited ? Infinity : Math.max(0, dailyLimit - uploadsUsed);
+  const uploadPercentage = isUnlimited ? 0 : (uploadsUsed / dailyLimit) * 100;
   
-  const isWarning = uploadsRemaining <= 2 && uploadsRemaining > 0;
-  const isExhausted = uploadsRemaining <= 0;
+  const isWarning = !isUnlimited && uploadsRemaining <= 2 && uploadsRemaining > 0;
+  const isExhausted = !isUnlimited && uploadsRemaining <= 0;
   const isPaused = quota.is_paused;
 
   const getStatusColor = () => {
@@ -35,7 +35,17 @@ export function QuotaIndicator({ quota }: QuotaIndicatorProps) {
         <div className="flex items-center gap-2">
           <Upload className={cn("h-4 w-4", getStatusColor())} />
           <span className={cn("text-sm font-medium", getStatusColor())}>
-            {uploadsUsed} / {DAILY_UPLOAD_LIMIT} uploads today
+            {isUnlimited ? (
+              <>
+                {uploadsUsed} uploads today
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  <InfinityIcon className="h-3 w-3 mr-1" />
+                  Unlimited
+                </Badge>
+              </>
+            ) : (
+              `${uploadsUsed} / ${dailyLimit} uploads today`
+            )}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -70,13 +80,18 @@ export function QuotaIndicator({ quota }: QuotaIndicatorProps) {
         </div>
       </div>
       
-      <Progress 
-        value={uploadPercentage} 
-        className={cn("h-1.5", isPaused && "opacity-50")}
-      />
+      {!isUnlimited && (
+        <Progress 
+          value={uploadPercentage} 
+          className={cn("h-1.5", isPaused && "opacity-50")}
+        />
+      )}
       
       <p className="text-xs text-muted-foreground">
-        {uploadsRemaining} remaining • Resets at midnight UTC
+        {isUnlimited 
+          ? 'Unlimited uploads • Owner access' 
+          : `${uploadsRemaining} remaining • Resets at midnight UTC`
+        }
       </p>
     </div>
   );
