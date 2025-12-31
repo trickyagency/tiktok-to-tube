@@ -116,6 +116,12 @@ const Schedules = () => {
   const activeSchedules = enrichedSchedules.filter(s => s.is_active);
   const pausedSchedules = enrichedSchedules.filter(s => !s.is_active);
 
+  // Calculate account usage stats
+  const tiktokAccountsWithSchedules = new Set(schedules.map(s => s.tiktok_account_id)).size;
+  const youtubeChannelsWithSchedules = new Set(schedules.map(s => s.youtube_channel_id)).size;
+  const totalTikTokAccounts = tikTokAccounts.length;
+  const totalYouTubeChannels = youTubeChannels.length;
+
   // Count videos in queue
   const queuedCount = queue?.filter(q => q.status === 'queued' || q.status === 'processing').length || 0;
 
@@ -125,6 +131,20 @@ const Schedules = () => {
       description="Automate your video publishing with scheduled uploads"
     >
       <div className="space-y-6">
+        {/* Account Usage Summary */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20">
+            <span className="text-sm font-medium text-primary">
+              {tiktokAccountsWithSchedules}/{totalTikTokAccounts} TikTok scheduled
+            </span>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-red-500/10 border border-red-500/20">
+            <span className="text-sm font-medium text-red-600 dark:text-red-400">
+              {youtubeChannelsWithSchedules}/{totalYouTubeChannels} YouTube scheduled
+            </span>
+          </div>
+        </div>
+
         {/* Subscription Limit Warning */}
         {schedulesExceedingLimit.length > 0 && (
           <Alert variant="default" className="border-warning/50 bg-warning/10">
