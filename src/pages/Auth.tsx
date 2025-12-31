@@ -89,20 +89,25 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
     
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { full_name: fullName },
-        emailRedirectTo: `${getProductionUrl()}/dashboard`
+    try {
+      const { data, error } = await supabase.functions.invoke('signup-confirmation', {
+        body: { email, password, fullName }
+      });
+
+      if (error) {
+        toast.error(error.message || 'Failed to create account');
+      } else if (data?.error) {
+        toast.error(data.error);
+      } else {
+        toast.success('Check your email to confirm your account!');
+        setEmail('');
+        setPassword('');
+        setFullName('');
       }
-    });
-    
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success('Check your email to confirm your account!');
+    } catch (err: any) {
+      toast.error(err.message || 'An unexpected error occurred');
     }
+    
     setLoading(false);
   };
 
