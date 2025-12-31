@@ -49,6 +49,7 @@ export default function UpgradePlans() {
     scale: 1,
   });
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'annual'>('monthly');
+  const [selectedCardPlan, setSelectedCardPlan] = useState<string | null>('pro');
   const [roiExpanded, setRoiExpanded] = useState(false);
   const [avgViews, setAvgViews] = useState(10000);
   const [cpmRate, setCpmRate] = useState(2);
@@ -241,13 +242,14 @@ export default function UpgradePlans() {
 
             return (
               <Card 
-                key={plan.id} 
-                className={`relative flex flex-col ${
+                key={plan.id}
+                onClick={() => setSelectedCardPlan(plan.id)}
+                className={`relative flex flex-col cursor-pointer transition-all duration-200 ${
                   isCurrentPlan 
-                    ? 'border-emerald-500 shadow-lg' 
-                    : isRecommended 
-                      ? 'border-primary shadow-lg' 
-                      : 'border-border'
+                    ? 'ring-2 ring-emerald-500 shadow-lg' 
+                    : selectedCardPlan === plan.id
+                      ? 'ring-2 ring-primary shadow-lg'
+                      : 'border-border hover:border-primary/50'
                 }`}
               >
                 {isCurrentPlan && (
@@ -336,6 +338,17 @@ export default function UpgradePlans() {
                       <div className="text-xs text-muted-foreground">
                         total for {accountCount} {accountCount === 1 ? 'account' : 'accounts'}
                       </div>
+                      
+                      {billingCycle === 'annual' && (
+                        <div className="mt-2 pt-2 border-t border-primary/10">
+                          <div className="text-lg font-bold text-emerald-600">
+                            ${(totalMonthly * 12).toFixed(2)}/year
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            billed annually
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -384,7 +397,14 @@ export default function UpgradePlans() {
           })}
 
           {/* Agency Tier Card */}
-          <Card className="relative flex flex-col border-purple-500/50 bg-gradient-to-br from-purple-500/5 to-pink-500/5">
+          <Card 
+            onClick={() => setSelectedCardPlan('agency')}
+            className={`relative flex flex-col cursor-pointer transition-all duration-200 bg-gradient-to-br from-purple-500/5 to-pink-500/5 ${
+              selectedCardPlan === 'agency'
+                ? 'ring-2 ring-purple-500 shadow-lg'
+                : 'border-purple-500/50 hover:border-purple-500'
+            }`}
+          >
             <div className="absolute -top-3 left-1/2 -translate-x-1/2">
               <span className="bg-purple-600 text-white text-xs font-medium px-3 py-1 rounded-full flex items-center gap-1">
                 <Crown className="h-3 w-3" />
