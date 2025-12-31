@@ -1,258 +1,123 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { 
-  Calendar, 
-  CalendarClock, 
-  Loader2, 
-  Play, 
-  Pause,
-  Video,
-  ArrowRight,
-  FlaskConical
-} from 'lucide-react';
+import { Calendar, RefreshCw } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
-import { useABTests } from '@/hooks/useABTests';
-import { ScheduleCard } from '@/components/schedules/ScheduleCard';
+import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
+import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
-import { SchedulingHeatmap } from '@/components/schedules/SchedulingHeatmap';
-import { CreateABTestDialog } from '@/components/schedules/CreateABTestDialog';
-import { ABTestCard } from '@/components/schedules/ABTestCard';
+import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 
 const Schedules = () => {
-  const { schedules, isLoading, toggleSchedule } = usePublishSchedules();
-  const { abTests, isLoading: isLoadingTests } = useABTests();
+  const { schedules, isLoading, refetch } = usePublishSchedules();
+  const { data: tikTokAccounts = [] } = useTikTokAccounts();
+  const { channels: youTubeChannels } = useYouTubeChannels();
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
-  
-  // Controlled state for CreateScheduleDialog
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedHeatmapTime, setSelectedHeatmapTime] = useState<{ hour: number; dayOfWeek: number } | null>(null);
 
-  // Handle heatmap time selection
-  const handleHeatmapTimeSelect = (hour: number, dayOfWeek: number) => {
-    setSelectedHeatmapTime({ hour, dayOfWeek });
-    setIsCreateDialogOpen(true);
+  useEffect(() => {
+    refetch();
+  }, []);
+
+  const handleEditSchedule = (schedule: PublishSchedule) => {
+    setEditingSchedule(schedule);
   };
 
-  // Reset selected time when dialog closes
-  const handleDialogOpenChange = (open: boolean) => {
-    setIsCreateDialogOpen(open);
-    if (!open) {
-      setSelectedHeatmapTime(null);
-    }
-  };
-
-  const activeSchedules = schedules.filter(s => s.is_active);
-  const totalVideosPerDay = schedules
-    .filter(s => s.is_active)
-    .reduce((sum, s) => sum + s.publish_times.length, 0);
-
-  const handlePauseAll = async () => {
-    for (const schedule of activeSchedules) {
-      await toggleSchedule({ id: schedule.id, is_active: false });
-    }
-  };
-
-  const handleResumeAll = async () => {
-    const pausedSchedules = schedules.filter(s => !s.is_active);
-    for (const schedule of pausedSchedules) {
-      await toggleSchedule({ id: schedule.id, is_active: true });
-    }
-  };
+  // Enrich schedules with account and channel data
+  const enrichedSchedules = schedules.map((schedule) => {
+    const tikTokAccount = tikTokAccounts.find(acc => acc.id === schedule.tiktok_account_id);
+    const youTubeChannel = youTubeChannels.find(ch => ch.id === schedule.youtube_channel_id);
+    return {
+      ...schedule,
+      tiktok_account: tikTokAccount ? {
+        username: tikTokAccount.username,
+        avatar_url: tikTokAccount.avatar_url,
+        display_name: tikTokAccount.display_name,
+      } : undefined,
+      youtube_channel: youTubeChannel ? {
+        channel_title: youTubeChannel.channel_title,
+        channel_thumbnail: youTubeChannel.channel_thumbnail,
+      } : undefined,
+    };
+  });
 
   return (
-    <DashboardLayout
-      title="Publishing Schedules"
-      description="Manage your automated TikTok to YouTube publishing schedules"
-    >
-      <div className="space-y-6">
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <Play className="h-5 w-5 text-green-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{activeSchedules.length}</p>
-                  <p className="text-sm text-muted-foreground">Active Schedules</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <CalendarClock className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{schedules.length}</p>
-                  <p className="text-sm text-muted-foreground">Total Schedules</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                  <Video className="h-5 w-5 text-blue-500" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{totalVideosPerDay}</p>
-                  <p className="text-sm text-muted-foreground">Videos/Day</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Publishing Schedules</h1>
+          <p className="text-muted-foreground">
+            Automate your video publishing with scheduled uploads
+          </p>
         </div>
-
-        {/* Scheduling Heatmap */}
-        <SchedulingHeatmap onSelectTime={handleHeatmapTimeSelect} />
-
-        {/* Main Schedules Card */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                All Schedules
-              </CardTitle>
-              <CardDescription>
-                Configure when and how videos are automatically published
-              </CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              {schedules.length > 0 && (
-                <>
-                  {activeSchedules.length > 0 ? (
-                    <Button variant="outline" size="sm" onClick={handlePauseAll}>
-                      <Pause className="h-4 w-4 mr-2" />
-                      Pause All
-                    </Button>
-                  ) : (
-                    <Button variant="outline" size="sm" onClick={handleResumeAll}>
-                      <Play className="h-4 w-4 mr-2" />
-                      Resume All
-                    </Button>
-                  )}
-                </>
-                )}
-              <CreateScheduleDialog 
-                isOpen={isCreateDialogOpen}
-                onOpenChange={handleDialogOpenChange}
-                initialTime={selectedHeatmapTime}
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : schedules.length === 0 ? (
-              <div className="text-center py-12">
-                <CalendarClock className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                <h3 className="font-semibold text-lg mb-2">No schedules yet</h3>
-                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                  Create a schedule to automatically upload videos from your TikTok accounts 
-                  to YouTube at specific times each day.
-                </p>
-                <CreateScheduleDialog />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {schedules.map((schedule) => (
-                  <ScheduleCard 
-                    key={schedule.id} 
-                    schedule={schedule} 
-                    onEdit={() => setEditingSchedule(schedule)}
-                  />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* A/B Testing Section */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <FlaskConical className="h-5 w-5" />
-                A/B Testing
-              </CardTitle>
-              <CardDescription>
-                Compare different posting times to optimize engagement
-              </CardDescription>
-            </div>
-            <CreateABTestDialog />
-          </CardHeader>
-          <CardContent>
-            {isLoadingTests ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : abTests.length === 0 ? (
-              <div className="text-center py-8">
-                <FlaskConical className="h-10 w-10 mx-auto text-muted-foreground/50 mb-3" />
-                <h3 className="font-medium mb-1">No A/B tests yet</h3>
-                <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
-                  Create an A/B test to find the best posting times for your audience.
-                </p>
-                <CreateABTestDialog />
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {abTests.map((test) => (
-                  <ABTestCard key={test.id} test={test} />
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Link to Video Queue */}
-        <Card className="bg-muted/30">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                  <Calendar className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <h3 className="font-medium">View Publishing Queue</h3>
-                  <p className="text-sm text-muted-foreground">
-                    See all videos scheduled to be uploaded
-                  </p>
-                </div>
-              </div>
-              <Button variant="outline" asChild>
-                <Link to="/dashboard/queue">
-                  View Queue
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => refetch()}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <CreateScheduleDialog />
+        </div>
       </div>
+
+      {/* Schedules List */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Your Schedules
+          </CardTitle>
+          <CardDescription>
+            Manage your automated publishing schedules
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="space-y-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-32 w-full" />
+              ))}
+            </div>
+          ) : enrichedSchedules.length === 0 ? (
+            <div className="text-center py-12">
+              <Calendar className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-medium mb-2">No schedules yet</h3>
+              <p className="text-muted-foreground mb-4">
+                Create your first schedule to start automating your video uploads
+              </p>
+              <CreateScheduleDialog />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {enrichedSchedules.map((schedule) => (
+                <ScheduleCard
+                  key={schedule.id}
+                  schedule={schedule}
+                  onEdit={() => handleEditSchedule(schedule)}
+                />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Edit Schedule Dialog */}
       <EditScheduleDialog
         schedule={editingSchedule}
         isOpen={!!editingSchedule}
         onClose={() => setEditingSchedule(null)}
+        onSuccess={() => {
+          setEditingSchedule(null);
+          refetch();
+        }}
       />
-    </DashboardLayout>
+    </div>
   );
 };
 
