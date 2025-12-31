@@ -14,7 +14,7 @@ import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
 import { ScrapeQueueProgress } from '@/components/tiktok/ScrapeQueueProgress';
-import { ScrapeAllAccountsButton } from '@/components/tiktok/ScrapeAllAccountsButton';
+
 import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
 
 const TikTokAccounts = () => {
@@ -141,7 +141,7 @@ const TikTokAccounts = () => {
               <Alert className="border-green-500/50 bg-green-500/10">
                 <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
                 <AlertDescription className="text-green-700 dark:text-green-300">
-                  <strong>Scraper connected.</strong> Video scraping is ready to use.
+                  <strong>Repostflow Connected.</strong> Database Creation is ready to use.
                 </AlertDescription>
               </Alert>
             )}
@@ -156,7 +156,6 @@ const TikTokAccounts = () => {
         <div className="flex flex-wrap justify-between items-center gap-2">
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
           <div className="flex flex-wrap gap-2">
-            <ScrapeAllAccountsButton disabled={!isApifyUsable} />
             <BulkAccountImport />
             <AddTikTokAccountDialog />
           </div>

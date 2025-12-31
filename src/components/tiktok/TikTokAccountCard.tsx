@@ -122,7 +122,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               {!isScraping && account.scrape_status === 'pending' && !isAccountUnavailable && (
                 <Badge variant="outline" className="shrink-0 text-amber-600 border-amber-600/30">
                   <AlertCircle className="h-3 w-3 mr-1" />
-                  Videos not scraped
+                  Database not created
                 </Badge>
               )}
               {account.account_status === 'private' && (
@@ -266,7 +266,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                     ) : (
                       <Download className="h-4 w-4 mr-2" />
                     )}
-                    Scrape Now
+                    Create Account Database
                   </Button>
                 </TooltipTrigger>
                 {(!isApifyConfigured || !canScrape) && (
