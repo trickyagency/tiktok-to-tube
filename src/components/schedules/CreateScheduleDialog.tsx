@@ -18,10 +18,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, X, Clock } from 'lucide-react';
+import { Plus, X, Clock, Crown, AlertCircle } from 'lucide-react';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { usePublishSchedules } from '@/hooks/usePublishSchedules';
+import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
+import { Link } from 'react-router-dom';
 
 const TIMEZONES = [
   { value: 'America/New_York', label: 'Eastern Time (ET)' },
@@ -52,13 +54,29 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
 
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   const { channels: youtubeChannels } = useYouTubeChannels();
-  const { createSchedule, isCreating } = usePublishSchedules();
+  const { createSchedule, isCreating, schedules: existingSchedules } = usePublishSchedules();
+  const { data: subscription } = useCurrentUserSubscription();
+
+  // Get max videos per day from subscription plan (default to 2 for basic)
+  const maxVideosPerDay = subscription?.plan?.max_videos_per_day || 2;
 
   // Only show connected YouTube channels
   const connectedChannels = youtubeChannels.filter(c => c.auth_status === 'connected');
 
+  // Get channels that already have an active schedule
+  const channelsWithActiveSchedule = existingSchedules
+    .filter(s => s.is_active)
+    .map(s => s.youtube_channel_id);
+
+  // Available channels are those without active schedules
+  const availableChannels = connectedChannels.filter(
+    c => !channelsWithActiveSchedule.includes(c.id)
+  );
+
+  const canAddMoreTimes = publishTimes.length < maxVideosPerDay;
+
   const addTimeSlot = () => {
-    if (publishTimes.length < 10) {
+    if (canAddMoreTimes) {
       setPublishTimes([...publishTimes, '12:00']);
     }
   };
@@ -165,16 +183,30 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
                 <SelectValue placeholder="Select YouTube channel" />
               </SelectTrigger>
               <SelectContent>
-                {connectedChannels.map((channel) => (
+                {availableChannels.map((channel) => (
                   <SelectItem key={channel.id} value={channel.id}>
                     {channel.channel_title || 'Unnamed Channel'}
                   </SelectItem>
                 ))}
+                {/* Show channels with existing schedules as disabled */}
+                {connectedChannels
+                  .filter(c => channelsWithActiveSchedule.includes(c.id))
+                  .map((channel) => (
+                    <SelectItem key={channel.id} value={channel.id} disabled>
+                      {channel.channel_title || 'Unnamed Channel'} (Schedule exists)
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
             {connectedChannels.length === 0 && (
               <p className="text-xs text-muted-foreground">
                 No connected YouTube channels. Please authorize a channel first.
+              </p>
+            )}
+            {connectedChannels.length > 0 && availableChannels.length === 0 && (
+              <p className="text-xs text-amber-600 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                All channels have active schedules. You can only have one schedule per channel.
               </p>
             )}
           </div>
@@ -183,7 +215,7 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Publish Times (one video per time)</Label>
-              {publishTimes.length < 10 && (
+              {canAddMoreTimes && (
                 <Button type="button" variant="ghost" size="sm" onClick={addTimeSlot}>
                   <Plus className="h-3 w-3 mr-1" />
                   Add Time
@@ -191,8 +223,19 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
               )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {publishTimes.length} video{publishTimes.length > 1 ? 's' : ''} will be uploaded per day
+              {publishTimes.length}/{maxVideosPerDay} time slots used
             </p>
+            {!canAddMoreTimes && (
+              <div className="flex items-center gap-2 p-2 rounded-md bg-amber-500/10 border border-amber-500/20">
+                <Crown className="h-4 w-4 text-amber-500" />
+                <p className="text-xs text-amber-600">
+                  Your plan allows {maxVideosPerDay} videos/day.{' '}
+                  <Link to="/dashboard/upgrade" className="underline font-medium hover:text-amber-700">
+                    Upgrade for more
+                  </Link>
+                </p>
+              </div>
+            )}
             <div className="space-y-2 max-h-[200px] overflow-y-auto">
               {publishTimes.map((time, index) => (
                 <div key={index} className="flex items-center gap-2">

@@ -58,6 +58,39 @@ export function usePublishSchedules() {
     mutationFn: async (input: CreateScheduleInput) => {
       if (!user?.id) throw new Error('User not authenticated');
 
+      // Check if an active schedule already exists for this YouTube channel
+      const { data: existingSchedule } = await supabase
+        .from('publish_schedules')
+        .select('id')
+        .eq('youtube_channel_id', input.youtube_channel_id)
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (existingSchedule) {
+        throw new Error('A schedule already exists for this YouTube channel. You can only have one active schedule per channel.');
+      }
+
+      // Check subscription limit for videos per day
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('plan_id')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (subscription) {
+        const { data: plan } = await supabase
+          .from('subscription_plans')
+          .select('max_videos_per_day')
+          .eq('id', subscription.plan_id)
+          .single();
+
+        if (plan && input.publish_times.length > plan.max_videos_per_day) {
+          throw new Error(`Your subscription allows up to ${plan.max_videos_per_day} videos per day. Please upgrade to add more.`);
+        }
+      }
+
       const { data, error } = await supabase
         .from('publish_schedules')
         .insert({
