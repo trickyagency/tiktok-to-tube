@@ -71,29 +71,37 @@ export function usePublishQueue() {
         youtube_channel:youtube_channels(id, channel_id, channel_handle, channel_title, channel_thumbnail, tiktok_account_id)
       `;
 
-      // If owner, fetch all queue items; otherwise only user's items
-      if (isOwner) {
-        const { data, error } = await supabase
-          .from('publish_queue')
-          .select(`${baseSelect}, profiles!publish_queue_user_id_fkey(email)`)
-          .order('scheduled_for', { ascending: true });
+      // Build query based on role
+      const query = supabase
+        .from('publish_queue')
+        .select(baseSelect)
+        .order('scheduled_for', { ascending: true });
 
-        if (error) throw error;
-        return (data || []).map((item: any) => ({
-          ...item,
-          owner_email: item.profiles?.email,
-          profiles: undefined,
-        })) as QueueItemWithOwner[];
-      } else {
-        const { data, error } = await supabase
-          .from('publish_queue')
-          .select(baseSelect)
-          .eq('user_id', user.id)
-          .order('scheduled_for', { ascending: true });
-
-        if (error) throw error;
-        return data as QueueItemWithOwner[];
+      // Non-owners only see their own items
+      if (!isOwner) {
+        query.eq('user_id', user.id);
       }
+
+      const { data: queueItems, error } = await query;
+      if (error) throw error;
+      if (!queueItems || queueItems.length === 0) return [] as QueueItemWithOwner[];
+
+      // If owner, fetch profiles separately to get owner emails
+      if (isOwner) {
+        const userIds = [...new Set(queueItems.map(item => item.user_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .in('id', userIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
+        return queueItems.map(item => ({
+          ...item,
+          owner_email: profileMap.get(item.user_id),
+        })) as QueueItemWithOwner[];
+      }
+
+      return queueItems as QueueItemWithOwner[];
     },
     enabled: !!user?.id,
   });
