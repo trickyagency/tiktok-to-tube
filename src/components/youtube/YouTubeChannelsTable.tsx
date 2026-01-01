@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,22 @@ import {
   Clock,
   RotateCcw
 } from 'lucide-react';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+  PaginationEllipsis,
+} from '@/components/ui/pagination';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,7 +78,14 @@ export function YouTubeChannelsTable({
   const [sortField, setSortField] = useState<SortField>('channel_title');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [deleteChannelId, setDeleteChannelId] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const channelToDelete = channels.find(c => c.id === deleteChannelId);
+
+  // Reset to page 1 when channels change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [channels.length]);
 
   const sortedChannels = useMemo(() => {
     return [...channels].sort((a, b) => {
@@ -83,6 +106,35 @@ export function YouTubeChannelsTable({
       return sortDirection === 'asc' ? comparison : -comparison;
     });
   }, [channels, sortField, sortDirection]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(sortedChannels.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedChannels = sortedChannels.slice(startIndex, endIndex);
+
+  // Ensure current page is valid
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const getPageNumbers = () => {
+    const pages: (number | 'ellipsis')[] = [];
+    if (totalPages <= 7) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      if (currentPage <= 3) {
+        pages.push(1, 2, 3, 4, 'ellipsis', totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1, 'ellipsis', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+      } else {
+        pages.push(1, 'ellipsis', currentPage - 1, currentPage, currentPage + 1, 'ellipsis', totalPages);
+      }
+    }
+    return pages;
+  };
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -179,7 +231,7 @@ export function YouTubeChannelsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedChannels.map((channel) => (
+            {paginatedChannels.map((channel) => (
               <TableRow key={channel.id}>
                 <TableCell>
                   <Avatar className="h-8 w-8">
@@ -267,6 +319,69 @@ export function YouTubeChannelsTable({
           </TableBody>
         </Table>
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <span>
+              Showing {startIndex + 1}-{Math.min(endIndex, sortedChannels.length)} of {sortedChannels.length} channels
+            </span>
+            <Select
+              value={String(itemsPerPage)}
+              onValueChange={(value) => {
+                setItemsPerPage(Number(value));
+                setCurrentPage(1);
+              }}
+            >
+              <SelectTrigger className="w-[70px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="10">10</SelectItem>
+                <SelectItem value="25">25</SelectItem>
+                <SelectItem value="50">50</SelectItem>
+                <SelectItem value="100">100</SelectItem>
+              </SelectContent>
+            </Select>
+            <span>per page</span>
+          </div>
+
+          <Pagination>
+            <PaginationContent>
+              <PaginationItem>
+                <PaginationPrevious 
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+              
+              {getPageNumbers().map((page, i) => (
+                <PaginationItem key={i}>
+                  {page === 'ellipsis' ? (
+                    <PaginationEllipsis />
+                  ) : (
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  )}
+                </PaginationItem>
+              ))}
+
+              <PaginationItem>
+                <PaginationNext 
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                />
+              </PaginationItem>
+            </PaginationContent>
+          </Pagination>
+        </div>
+      )}
 
       <AlertDialog open={!!deleteChannelId} onOpenChange={() => setDeleteChannelId(null)}>
         <AlertDialogContent>
