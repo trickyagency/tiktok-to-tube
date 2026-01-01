@@ -72,11 +72,12 @@ export function useScrapedVideos(accountId: string | null) {
 }
 
 export function useAllScrapedVideos() {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
 
   return useQuery({
-    queryKey: ['scraped-videos', 'all'],
+    queryKey: ['scraped-videos', 'all', isOwner],
     queryFn: async () => {
+      // Owner can see all scraped videos; regular users see their own via RLS
       const { data, error } = await supabase
         .from('scraped_videos')
         .select('*')

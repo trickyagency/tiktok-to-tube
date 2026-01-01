@@ -25,19 +25,38 @@ export interface TikTokAccount {
   youtube_tags: string | null;
 }
 
+export interface TikTokAccountWithOwner extends TikTokAccount {
+  owner_email?: string;
+}
+
 export function useTikTokAccounts() {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   
   return useQuery({
-    queryKey: ['tiktok-accounts', user?.id],
+    queryKey: ['tiktok-accounts', user?.id, isOwner],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('tiktok_accounts')
-        .select('*')
-        .order('created_at', { ascending: false });
+      // If owner, fetch all accounts with owner info; otherwise only user's accounts
+      if (isOwner) {
+        const { data, error } = await supabase
+          .from('tiktok_accounts')
+          .select('*, profiles!tiktok_accounts_user_id_fkey(email)')
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data as TikTokAccount[];
+        if (error) throw error;
+        return (data || []).map((account: any) => ({
+          ...account,
+          owner_email: account.profiles?.email,
+          profiles: undefined,
+        })) as TikTokAccountWithOwner[];
+      } else {
+        const { data, error } = await supabase
+          .from('tiktok_accounts')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as TikTokAccountWithOwner[];
+      }
     },
     enabled: !!user,
   });

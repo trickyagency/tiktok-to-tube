@@ -34,23 +34,42 @@ export interface CreateChannelInput {
   tiktok_account_id?: string;
 }
 
+export interface YouTubeChannelWithOwner extends YouTubeChannel {
+  owner_email?: string;
+}
+
 export function useYouTubeChannels() {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   const queryClient = useQueryClient();
 
   const channelsQuery = useQuery({
-    queryKey: ['youtube-channels', user?.id],
+    queryKey: ['youtube-channels', user?.id, isOwner],
     queryFn: async () => {
       if (!user?.id) return [];
       
-      const { data, error } = await supabase
-        .from('youtube_channels')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+      // If owner, fetch all channels with owner info; otherwise only user's channels
+      if (isOwner) {
+        const { data, error } = await supabase
+          .from('youtube_channels')
+          .select('*, profiles!youtube_channels_user_id_fkey(email)')
+          .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      return data as YouTubeChannel[];
+        if (error) throw error;
+        return (data || []).map((channel: any) => ({
+          ...channel,
+          owner_email: channel.profiles?.email,
+          profiles: undefined,
+        })) as YouTubeChannelWithOwner[];
+      } else {
+        const { data, error } = await supabase
+          .from('youtube_channels')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        return data as YouTubeChannelWithOwner[];
+      }
     },
     enabled: !!user?.id,
   });
