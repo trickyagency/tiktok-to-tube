@@ -48,31 +48,52 @@ export interface QueueItemWithDetails extends PublishQueueItem {
   };
 }
 
+export interface QueueItemWithOwner extends QueueItemWithDetails {
+  owner_email?: string;
+}
+
 export function usePublishQueue() {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   const queryClient = useQueryClient();
   const processingToastsRef = useRef<Set<string>>(new Set());
 
   const queueQuery = useQuery({
-    queryKey: ['publish-queue', user?.id],
+    queryKey: ['publish-queue', user?.id, isOwner],
     queryFn: async () => {
       if (!user?.id) return [];
 
-      const { data, error } = await supabase
-        .from('publish_queue')
-        .select(`
-          *,
-          scraped_video:scraped_videos(
-            id, title, thumbnail_url, video_url, download_url, tiktok_account_id,
-            tiktok_account:tiktok_accounts(id, username, avatar_url)
-          ),
-          youtube_channel:youtube_channels(id, channel_id, channel_handle, channel_title, channel_thumbnail, tiktok_account_id)
-        `)
-        .eq('user_id', user.id)
-        .order('scheduled_for', { ascending: true });
+      const baseSelect = `
+        *,
+        scraped_video:scraped_videos(
+          id, title, thumbnail_url, video_url, download_url, tiktok_account_id,
+          tiktok_account:tiktok_accounts(id, username, avatar_url)
+        ),
+        youtube_channel:youtube_channels(id, channel_id, channel_handle, channel_title, channel_thumbnail, tiktok_account_id)
+      `;
 
-      if (error) throw error;
-      return data as QueueItemWithDetails[];
+      // If owner, fetch all queue items; otherwise only user's items
+      if (isOwner) {
+        const { data, error } = await supabase
+          .from('publish_queue')
+          .select(`${baseSelect}, profiles!publish_queue_user_id_fkey(email)`)
+          .order('scheduled_for', { ascending: true });
+
+        if (error) throw error;
+        return (data || []).map((item: any) => ({
+          ...item,
+          owner_email: item.profiles?.email,
+          profiles: undefined,
+        })) as QueueItemWithOwner[];
+      } else {
+        const { data, error } = await supabase
+          .from('publish_queue')
+          .select(baseSelect)
+          .eq('user_id', user.id)
+          .order('scheduled_for', { ascending: true });
+
+        if (error) throw error;
+        return data as QueueItemWithOwner[];
+      }
     },
     enabled: !!user?.id,
   });

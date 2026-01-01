@@ -5,34 +5,62 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { QueueItemWithDetails } from './usePublishQueue';
 
+export interface UploadHistoryItemWithOwner extends QueueItemWithDetails {
+  owner_email?: string;
+}
+
 export function useUploadHistory(selectedChannelId?: string) {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   const queryClient = useQueryClient();
 
   const historyQuery = useQuery({
-    queryKey: ['upload-history', user?.id, selectedChannelId],
+    queryKey: ['upload-history', user?.id, selectedChannelId, isOwner],
     queryFn: async () => {
       if (!user?.id) return [];
 
-      let query = supabase
-        .from('publish_queue')
-        .select(`
-          *,
-          scraped_video:scraped_videos(id, title, thumbnail_url, video_url, download_url, tiktok_account_id),
-          youtube_channel:youtube_channels(id, channel_id, channel_handle, channel_title, channel_thumbnail, tiktok_account_id)
-        `)
-        .eq('user_id', user.id)
-        .eq('status', 'published')
-        .order('processed_at', { ascending: false });
+      const baseSelect = `
+        *,
+        scraped_video:scraped_videos(id, title, thumbnail_url, video_url, download_url, tiktok_account_id),
+        youtube_channel:youtube_channels(id, channel_id, channel_handle, channel_title, channel_thumbnail, tiktok_account_id)
+      `;
 
-      if (selectedChannelId && selectedChannelId !== 'all') {
-        query = query.eq('youtube_channel_id', selectedChannelId);
+      // If owner, fetch all history; otherwise only user's history
+      if (isOwner) {
+        let query = supabase
+          .from('publish_queue')
+          .select(`${baseSelect}, profiles!publish_queue_user_id_fkey(email)`)
+          .eq('status', 'published')
+          .order('processed_at', { ascending: false });
+
+        if (selectedChannelId && selectedChannelId !== 'all') {
+          query = query.eq('youtube_channel_id', selectedChannelId);
+        }
+
+        const { data, error } = await query.limit(100);
+
+        if (error) throw error;
+        return (data || []).map((item: any) => ({
+          ...item,
+          owner_email: item.profiles?.email,
+          profiles: undefined,
+        })) as UploadHistoryItemWithOwner[];
+      } else {
+        let query = supabase
+          .from('publish_queue')
+          .select(baseSelect)
+          .eq('user_id', user.id)
+          .eq('status', 'published')
+          .order('processed_at', { ascending: false });
+
+        if (selectedChannelId && selectedChannelId !== 'all') {
+          query = query.eq('youtube_channel_id', selectedChannelId);
+        }
+
+        const { data, error } = await query.limit(100);
+
+        if (error) throw error;
+        return data as UploadHistoryItemWithOwner[];
       }
-
-      const { data, error } = await query.limit(100);
-
-      if (error) throw error;
-      return data as QueueItemWithDetails[];
     },
     enabled: !!user?.id,
   });
