@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   ChevronUp, 
   ChevronDown, 
@@ -11,7 +12,13 @@ import {
   RefreshCw, 
   Trash2, 
   Eye,
-  User
+  User,
+  ExternalLink,
+  Download,
+  Lock,
+  UserX,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import {
   Pagination,
@@ -78,11 +85,15 @@ export function TikTokAccountsTable({
   const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  
   const accountToDelete = accounts.find(a => a.id === deleteAccountId);
 
   // Reset to page 1 when accounts change
   useEffect(() => {
     setCurrentPage(1);
+    setSelectedIds(new Set());
   }, [accounts.length]);
 
   const sortedAccounts = useMemo(() => {
@@ -90,11 +101,9 @@ export function TikTokAccountsTable({
       let aVal: string | number | null = a[sortField];
       let bVal: string | number | null = b[sortField];
 
-      // Handle null values
       if (aVal === null) aVal = sortField === 'username' ? '' : 0;
       if (bVal === null) bVal = sortField === 'username' ? '' : 0;
 
-      // For dates, compare timestamps
       if (sortField === 'last_scraped_at') {
         aVal = aVal ? new Date(aVal as string).getTime() : 0;
         bVal = bVal ? new Date(bVal as string).getTime() : 0;
@@ -150,52 +159,151 @@ export function TikTokAccountsTable({
       : <ChevronDown className="h-4 w-4 ml-1" />;
   };
 
-  const getStatusBadge = (scrapeStatus: string | null) => {
-    switch (scrapeStatus) {
+  const getStatusBadge = (account: TikTokAccountWithOwner) => {
+    if (account.account_status === 'deleted' || account.account_status === 'not_found') {
+      return (
+        <Badge variant="destructive" className="text-xs">
+          <UserX className="h-3 w-3 mr-1" />
+          Deleted
+        </Badge>
+      );
+    }
+    if (account.account_status === 'private') {
+      return (
+        <Badge variant="outline" className="text-xs text-amber-500 border-amber-500/30 bg-amber-500/10">
+          <Lock className="h-3 w-3 mr-1" />
+          Private
+        </Badge>
+      );
+    }
+    switch (account.scrape_status) {
       case 'completed':
-        return <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">Completed</Badge>;
+        return (
+          <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-500/30 bg-emerald-500/10">
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Synced
+          </Badge>
+        );
       case 'scraping':
-        return <Badge variant="secondary">Scraping...</Badge>;
+        return (
+          <Badge className="text-xs bg-primary/20 text-primary animate-pulse">
+            Scraping...
+          </Badge>
+        );
       case 'failed':
-        return <Badge variant="destructive">Failed</Badge>;
+        return (
+          <Badge variant="destructive" className="text-xs">
+            <AlertCircle className="h-3 w-3 mr-1" />
+            Failed
+          </Badge>
+        );
       case 'pending':
-        return <Badge variant="outline">Pending</Badge>;
+        return (
+          <Badge variant="outline" className="text-xs text-amber-600 border-amber-500/30 bg-amber-500/10">
+            Pending
+          </Badge>
+        );
       default:
-        return <Badge variant="outline">Idle</Badge>;
+        return <Badge variant="outline" className="text-xs">Idle</Badge>;
     }
   };
 
+  // Selection handlers
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedAccounts.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedAccounts.map(a => a.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
+  };
+
+  const handleBulkDelete = () => {
+    selectedIds.forEach(id => onDelete(id));
+    setSelectedIds(new Set());
+    setBulkDeleteOpen(false);
+  };
+
+  const handleBulkScrape = () => {
+    selectedIds.forEach(id => onScrape(id));
+  };
+
+  const isAllSelected = paginatedAccounts.length > 0 && selectedIds.size === paginatedAccounts.length;
+  const hasSelection = selectedIds.size > 0;
+
   return (
     <>
-      <div className="rounded-md border">
+      {/* Bulk actions toolbar */}
+      {hasSelection && (
+        <div className="flex items-center gap-3 p-3 mb-4 bg-primary/5 border border-primary/20 rounded-lg animate-fade-in">
+          <span className="text-sm font-medium">
+            {selectedIds.size} account{selectedIds.size > 1 ? 's' : ''} selected
+          </span>
+          <div className="flex-1" />
+          <Button variant="outline" size="sm" onClick={handleBulkScrape} className="h-8">
+            <Download className="h-4 w-4 mr-2" />
+            Scrape Selected
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => setBulkDeleteOpen(true)}
+            className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Selected
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())} className="h-8">
+            Clear
+          </Button>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="hover:bg-transparent border-border/50">
+              <TableHead className="w-[40px]">
+                <Checkbox 
+                  checked={isAllSelected}
+                  onCheckedChange={toggleSelectAll}
+                  aria-label="Select all"
+                />
+              </TableHead>
               <TableHead className="w-[50px]"></TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => handleSort('username')}
               >
-                <div className="flex items-center">
+                <div className="flex items-center font-medium">
                   Username
                   <SortIcon field="username" />
                 </div>
               </TableHead>
               <TableHead>Display Name</TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-muted/50 text-right"
+                className="cursor-pointer hover:bg-muted/50 transition-colors text-right"
                 onClick={() => handleSort('follower_count')}
               >
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-end font-medium">
                   Followers
                   <SortIcon field="follower_count" />
                 </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-muted/50 text-right"
+                className="cursor-pointer hover:bg-muted/50 transition-colors text-right"
                 onClick={() => handleSort('video_count')}
               >
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-end font-medium">
                   Videos
                   <SortIcon field="video_count" />
                 </div>
@@ -203,10 +311,10 @@ export function TikTokAccountsTable({
               <TableHead>Status</TableHead>
               {isOwner && <TableHead>Owner</TableHead>}
               <TableHead 
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() => handleSort('last_scraped_at')}
               >
-                <div className="flex items-center">
+                <div className="flex items-center font-medium">
                   Last Scraped
                   <SortIcon field="last_scraped_at" />
                 </div>
@@ -216,32 +324,50 @@ export function TikTokAccountsTable({
           </TableHeader>
           <TableBody>
             {paginatedAccounts.map((account) => (
-              <TableRow key={account.id}>
+              <TableRow 
+                key={account.id} 
+                className={`group transition-colors border-border/30 ${selectedIds.has(account.id) ? 'bg-primary/5' : ''}`}
+              >
                 <TableCell>
-                  <Avatar className="h-8 w-8">
+                  <Checkbox 
+                    checked={selectedIds.has(account.id)}
+                    onCheckedChange={() => toggleSelect(account.id)}
+                    aria-label={`Select ${account.username}`}
+                  />
+                </TableCell>
+                <TableCell>
+                  <Avatar className="h-9 w-9 ring-1 ring-border/50">
                     {account.avatar_url ? (
                       <AvatarImage src={account.avatar_url} alt={account.username} />
                     ) : (
-                      <AvatarFallback>
-                        <User className="h-4 w-4" />
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-medium">
+                        {account.username[0]?.toUpperCase()}
                       </AvatarFallback>
                     )}
                   </Avatar>
                 </TableCell>
-                <TableCell className="font-medium">@{account.username}</TableCell>
+                <TableCell className="font-medium">
+                  <button 
+                    onClick={() => window.open(`https://www.tiktok.com/@${account.username}`, '_blank')}
+                    className="hover:text-primary transition-colors flex items-center gap-1 group/link"
+                  >
+                    @{account.username}
+                    <ExternalLink className="h-3 w-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
+                  </button>
+                </TableCell>
                 <TableCell className="text-muted-foreground">
                   {account.display_name || '-'}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right font-medium tabular-nums">
                   {account.follower_count?.toLocaleString() || 0}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right font-medium tabular-nums">
                   {account.video_count || 0}
                 </TableCell>
-                <TableCell>{getStatusBadge(account.scrape_status)}</TableCell>
+                <TableCell>{getStatusBadge(account)}</TableCell>
                 {isOwner && (
                   <TableCell>
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs text-muted-foreground truncate max-w-[150px] block">
                       {account.owner_email || '-'}
                     </span>
                   </TableCell>
@@ -258,11 +384,15 @@ export function TikTokAccountsTable({
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-48">
                       <DropdownMenuItem onClick={() => onViewVideos(account)}>
                         <Eye className="h-4 w-4 mr-2" />
                         View Videos
@@ -296,8 +426,11 @@ export function TikTokAccountsTable({
             ))}
             {sortedAccounts.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isOwner ? 9 : 8} className="h-24 text-center text-muted-foreground">
-                  No accounts found
+                <TableCell colSpan={isOwner ? 10 : 9} className="h-32 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <User className="h-8 w-8 text-muted-foreground/50" />
+                    <span>No accounts found</span>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
@@ -310,7 +443,7 @@ export function TikTokAccountsTable({
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
-              Showing {startIndex + 1}-{Math.min(endIndex, sortedAccounts.length)} of {sortedAccounts.length} accounts
+              Showing <span className="font-medium text-foreground">{startIndex + 1}-{Math.min(endIndex, sortedAccounts.length)}</span> of <span className="font-medium text-foreground">{sortedAccounts.length}</span>
             </span>
             <Select
               value={String(itemsPerPage)}
@@ -368,6 +501,7 @@ export function TikTokAccountsTable({
         </div>
       )}
 
+      {/* Single delete dialog */}
       <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -388,6 +522,27 @@ export function TikTokAccountsTable({
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk delete dialog */}
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {selectedIds.size} accounts?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the selected accounts and all their scraped videos. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleBulkDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete {selectedIds.size} accounts
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
