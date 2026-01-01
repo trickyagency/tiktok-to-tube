@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { getProductionUrl } from '@/lib/auth-utils';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Sparkles, Zap, Shield, Clock, CheckCircle2 } from 'lucide-react';
+import { Sparkles, Zap, Shield, Clock, CheckCircle2, Loader2 } from 'lucide-react';
 import ForgotPasswordDialog from '@/components/auth/ForgotPasswordDialog';
 import MFAVerification from '@/components/auth/MFAVerification';
 
@@ -20,6 +20,7 @@ const features = [
 
 const Auth = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +31,13 @@ const Auth = () => {
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
 
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!authLoading && user && !mfaRequired) {
+      navigate('/dashboard');
+    }
+  }, [user, authLoading, navigate, mfaRequired]);
+
   useEffect(() => {
     document.title = "Sign In | RepostFlow";
   }, []);
@@ -38,40 +46,57 @@ const Auth = () => {
     e.preventDefault();
     setLoading(true);
     
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    
-    if (error) {
-      // Check if MFA is required
-      if (error.message.includes('MFA') || error.message.includes('second factor')) {
-        // Get MFA factors
-        const { data: factorsData } = await supabase.auth.mfa.listFactors();
-        const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
-        
-        if (verifiedFactor) {
-          setMfaFactorId(verifiedFactor.id);
-          setMfaRequired(true);
-          setLoading(false);
-          return;
-        }
-      }
-      toast.error(error.message);
-    } else if (data.session) {
-      // Check if user has MFA enabled
-      const { data: factorsData } = await supabase.auth.mfa.listFactors();
-      const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
-      if (verifiedFactor) {
-        // User has MFA, need to verify
-        setMfaFactorId(verifiedFactor.id);
-        setMfaRequired(true);
+      if (error) {
+        // Check if MFA is required
+        if (error.message.includes('MFA') || error.message.includes('second factor')) {
+          // Get MFA factors
+          const { data: factorsData } = await supabase.auth.mfa.listFactors();
+          const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
+          
+          if (verifiedFactor) {
+            setMfaFactorId(verifiedFactor.id);
+            setMfaRequired(true);
+            setLoading(false);
+            return;
+          }
+        }
+        toast.error(error.message);
         setLoading(false);
         return;
       }
       
-      toast.success('Welcome back!');
-      navigate('/dashboard');
+      if (data.session) {
+        // Defer MFA check to avoid race condition with auth state listener
+        setTimeout(async () => {
+          try {
+            const { data: factorsData } = await supabase.auth.mfa.listFactors();
+            const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
+            
+            if (verifiedFactor) {
+              // User has MFA, need to verify
+              setMfaFactorId(verifiedFactor.id);
+              setMfaRequired(true);
+            } else {
+              toast.success('Welcome back!');
+              navigate('/dashboard');
+            }
+          } catch {
+            // If MFA check fails, just proceed to dashboard
+            toast.success('Welcome back!');
+            navigate('/dashboard');
+          }
+          setLoading(false);
+        }, 100);
+      } else {
+        setLoading(false);
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'An unexpected error occurred');
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleMFASuccess = () => {
@@ -118,6 +143,15 @@ const Auth = () => {
     
     setLoading(false);
   };
+
+  // Show loading while checking auth state
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   // If MFA is required, show the MFA verification screen
   if (mfaRequired && mfaFactorId) {
