@@ -6,18 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Users, Loader2, AlertTriangle, Settings, XCircle, CheckCircle2, Search, X } from 'lucide-react';
-import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
+import { Video, Users, Loader2, AlertTriangle, Settings, XCircle, CheckCircle2, Search, X, LayoutGrid, Table2 } from 'lucide-react';
+import { useTikTokAccounts, TikTokAccount, TikTokAccountWithOwner, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useTikTokAccountsRealtime } from '@/hooks/useTikTokAccountsRealtime';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
 import { useApifyStatus, useApifyValidation } from '@/hooks/useApifyStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
+import { TikTokAccountsTable } from '@/components/tiktok/TikTokAccountsTable';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
 import { ScrapeQueueProgress } from '@/components/tiktok/ScrapeQueueProgress';
-
 import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
 
 const TikTokAccounts = () => {
@@ -30,6 +30,14 @@ const TikTokAccounts = () => {
   const [videosModalOpen, setVideosModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  
+  // Action hooks for table view
+  const scrapeVideos = useScrapeVideos();
+  const refreshAccount = useRefreshTikTokAccount();
+  const deleteAccount = useDeleteTikTokAccount();
+  const [scrapingAccountId, setScrapingAccountId] = useState<string | null>(null);
+  const [syncingAccountId, setSyncingAccountId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "TikTok Accounts | RepostFlow";
@@ -69,9 +77,35 @@ const TikTokAccounts = () => {
     });
   }, [accounts, searchQuery, ownerFilter]);
 
-  const handleViewVideos = (account: TikTokAccount) => {
-    setSelectedAccount(account);
+  const handleViewVideos = (account: TikTokAccount | TikTokAccountWithOwner) => {
+    setSelectedAccount(account as TikTokAccount);
     setVideosModalOpen(true);
+  };
+
+  const handleScrape = async (accountId: string) => {
+    const account = accounts?.find(a => a.id === accountId);
+    if (!account) return;
+    setScrapingAccountId(accountId);
+    try {
+      await scrapeVideos.mutateAsync({ accountId, username: account.username });
+    } finally {
+      setScrapingAccountId(null);
+    }
+  };
+
+  const handleSyncProfile = async (accountId: string) => {
+    const account = accounts?.find(a => a.id === accountId);
+    if (!account) return;
+    setSyncingAccountId(accountId);
+    try {
+      await refreshAccount.mutateAsync({ accountId, username: account.username });
+    } finally {
+      setSyncingAccountId(null);
+    }
+  };
+
+  const handleDelete = (accountId: string) => {
+    deleteAccount.mutate(accountId);
   };
 
   const clearFilters = () => {
@@ -193,9 +227,32 @@ const TikTokAccounts = () => {
         {/* Scrape Queue Progress */}
         <ScrapeQueueProgress />
 
-        {/* Header with Add Button */}
+        {/* Header with Add Button and View Toggle */}
         <div className="flex flex-wrap justify-between items-center gap-2">
-          <h2 className="text-lg font-semibold">Monitored Accounts</h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold">Monitored Accounts</h2>
+            {/* View Toggle */}
+            {filteredAccounts.length > 0 && (
+              <div className="flex items-center gap-1 border rounded-md p-1">
+                <Button
+                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setViewMode('cards')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setViewMode('table')}
+                >
+                  <Table2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             <BulkAccountImport />
             <AddTikTokAccountDialog />
@@ -249,16 +306,29 @@ const TikTokAccounts = () => {
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
         ) : filteredAccounts.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2">
-            {filteredAccounts.map((account) => (
-              <TikTokAccountCard
-                key={account.id}
-                account={account}
-                onViewVideos={handleViewVideos}
-                isApifyConfigured={isApifyUsable ?? false}
-              />
-            ))}
-          </div>
+          viewMode === 'table' ? (
+            <TikTokAccountsTable
+              accounts={filteredAccounts}
+              isOwner={isOwner}
+              onViewVideos={handleViewVideos}
+              onScrape={handleScrape}
+              onSyncProfile={handleSyncProfile}
+              onDelete={handleDelete}
+              isScraping={scrapingAccountId}
+              isSyncing={syncingAccountId}
+            />
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {filteredAccounts.map((account) => (
+                <TikTokAccountCard
+                  key={account.id}
+                  account={account}
+                  onViewVideos={handleViewVideos}
+                  isApifyConfigured={isApifyUsable ?? false}
+                />
+              ))}
+            </div>
+          )
         ) : (
           <Card>
             <CardContent className="text-center py-12">

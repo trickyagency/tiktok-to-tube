@@ -4,19 +4,23 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Youtube, Loader2, Search, X } from 'lucide-react';
+import { Youtube, Loader2, Search, X, LayoutGrid, Table2 } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
+import { YouTubeChannelsTable } from '@/components/youtube/YouTubeChannelsTable';
 import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuide';
-import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { useYouTubeChannels, YouTubeChannelWithOwner } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 const YouTubeChannels = () => {
   const { isOwner } = useAuth();
-  const { channels, isLoading, refetch } = useYouTubeChannels();
+  const { channels, isLoading, refetch, startOAuth, refreshToken, deleteChannel, isDeleting } = useYouTubeChannels();
   const [searchQuery, setSearchQuery] = useState('');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [authorizingChannelId, setAuthorizingChannelId] = useState<string | null>(null);
+  const [refreshingChannelId, setRefreshingChannelId] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = "YouTube Channels | RepostFlow";
@@ -76,6 +80,22 @@ const YouTubeChannels = () => {
     setOwnerFilter('all');
   };
 
+  const handleReauthorize = async (channelId: string) => {
+    setAuthorizingChannelId(channelId);
+    await startOAuth(channelId);
+    setAuthorizingChannelId(null);
+  };
+
+  const handleRefresh = async (channelId: string) => {
+    setRefreshingChannelId(channelId);
+    await refreshToken(channelId);
+    setRefreshingChannelId(null);
+  };
+
+  const handleDelete = (channelId: string) => {
+    deleteChannel(channelId);
+  };
+
   const hasActiveFilters = searchQuery !== '' || ownerFilter !== 'all';
 
   const connectedChannels = filteredChannels.filter(c => c.auth_status === 'connected');
@@ -92,6 +112,27 @@ const YouTubeChannels = () => {
 
         <div className="flex flex-wrap justify-between items-center gap-3">
           <div className="flex flex-wrap gap-3 items-center flex-1">
+            {/* View Toggle */}
+            {filteredChannels.length > 0 && (
+              <div className="flex items-center gap-1 border rounded-md p-1">
+                <Button
+                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setViewMode('cards')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() => setViewMode('table')}
+                >
+                  <Table2 className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
             {/* Search and Filter (for owners) */}
             {isOwner && channels.length > 0 && (
               <>
@@ -164,6 +205,17 @@ const YouTubeChannels = () => {
               </div>
             </CardContent>
           </Card>
+        ) : viewMode === 'table' ? (
+          <YouTubeChannelsTable
+            channels={filteredChannels}
+            isOwner={isOwner}
+            onReauthorize={handleReauthorize}
+            onRefresh={handleRefresh}
+            onDelete={handleDelete}
+            isAuthorizing={authorizingChannelId}
+            isRefreshing={refreshingChannelId}
+            isDeleting={isDeleting}
+          />
         ) : (
           <>
             {/* Pending Authorization */}
