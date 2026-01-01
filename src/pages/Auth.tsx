@@ -50,9 +50,8 @@ const Auth = () => {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       
       if (error) {
-        // Check if MFA is required
+        // Check if MFA is required - only then do we need to check factors
         if (error.message.includes('MFA') || error.message.includes('second factor')) {
-          // Get MFA factors
           const { data: factorsData } = await supabase.auth.mfa.listFactors();
           const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
           
@@ -68,31 +67,13 @@ const Auth = () => {
         return;
       }
       
+      // Successful login - don't make additional auth calls here
+      // The AuthContext will handle the session via onAuthStateChange
       if (data.session) {
-        // Defer MFA check to avoid race condition with auth state listener
-        setTimeout(async () => {
-          try {
-            const { data: factorsData } = await supabase.auth.mfa.listFactors();
-            const verifiedFactor = factorsData?.totp?.find(f => f.status === 'verified');
-            
-            if (verifiedFactor) {
-              // User has MFA, need to verify
-              setMfaFactorId(verifiedFactor.id);
-              setMfaRequired(true);
-            } else {
-              toast.success('Welcome back!');
-              navigate('/dashboard');
-            }
-          } catch {
-            // If MFA check fails, just proceed to dashboard
-            toast.success('Welcome back!');
-            navigate('/dashboard');
-          }
-          setLoading(false);
-        }, 100);
-      } else {
-        setLoading(false);
+        toast.success('Welcome back!');
+        // Navigation will happen via the useEffect that watches user state
       }
+      setLoading(false);
     } catch (err: any) {
       toast.error(err.message || 'An unexpected error occurred');
       setLoading(false);
