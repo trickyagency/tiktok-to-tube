@@ -18,8 +18,22 @@ interface ImportResult {
   message?: string;
 }
 
-export const BulkAccountImport = () => {
-  const [open, setOpen] = useState(false);
+interface BulkAccountImportProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
+}
+
+export const BulkAccountImport = ({ 
+  open: controlledOpen, 
+  onOpenChange: controlledOnOpenChange,
+  showTrigger = true 
+}: BulkAccountImportProps) => {
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  const isControlled = controlledOpen !== undefined;
+  const open = isControlled ? controlledOpen : internalOpen;
+  const setOpen = isControlled ? (controlledOnOpenChange || (() => {})) : setInternalOpen;
   const [inputText, setInputText] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [results, setResults] = useState<ImportResult[]>([]);
@@ -162,12 +176,14 @@ export const BulkAccountImport = () => {
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <Users className="h-4 w-4 mr-2" />
-          Bulk Add
-        </Button>
-      </DialogTrigger>
+      {showTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="outline" size="sm">
+            <Users className="h-4 w-4 mr-2" />
+            Bulk Add
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Bulk Add TikTok Accounts</DialogTitle>
