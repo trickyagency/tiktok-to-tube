@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -229,7 +230,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
     (channel.auth_status === 'connected' && !channel.refresh_token);
 
   return (
-    <Card className="overflow-hidden">
+    <Card className={cn(
+      "overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5",
+      channel.auth_status === 'connected' && "border-l-2 border-l-green-500",
+      channel.auth_status === 'pending' && "border-l-2 border-l-blue-500",
+      channel.auth_status === 'no_channel' && "border-l-2 border-l-amber-500",
+      channel.auth_status === 'failed' && "border-l-2 border-l-red-500"
+    )}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <Avatar className="h-16 w-16 rounded-lg">

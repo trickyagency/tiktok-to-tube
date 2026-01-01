@@ -14,11 +14,23 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { OAUTH_REDIRECT_URI, JAVASCRIPT_ORIGIN } from '@/lib/api-config';
 
 interface AddYouTubeChannelDialogProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  showTrigger?: boolean;
   onSuccess?: () => void;
 }
 
-export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogProps) {
-  const [open, setOpen] = useState(false);
+export function AddYouTubeChannelDialog({ 
+  open: controlledOpen, 
+  onOpenChange: controlledOnOpenChange,
+  showTrigger = true,
+  onSuccess 
+}: AddYouTubeChannelDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Support both controlled and uncontrolled modes
+  const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setIsOpen = controlledOnOpenChange || setInternalOpen;
   const [channelName, setChannelName] = useState('');
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
@@ -49,7 +61,7 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
 
     try {
       await createChannel(input);
-      setOpen(false);
+      setIsOpen(false);
       resetForm();
       onSuccess?.();
     } catch (error) {
@@ -102,13 +114,15 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add YouTube Channel
-        </Button>
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      {showTrigger && (
+        <DialogTrigger asChild>
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Add YouTube Channel
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add YouTube Channel</DialogTitle>
@@ -229,7 +243,7 @@ export function AddYouTubeChannelDialog({ onSuccess }: AddYouTubeChannelDialogPr
           </div>
 
           <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+            <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={isCreating || !channelName || !clientId || !clientSecret}>
