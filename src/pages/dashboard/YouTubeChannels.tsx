@@ -1,15 +1,22 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Youtube, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Youtube, Loader2, Search, X } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuide';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 const YouTubeChannels = () => {
+  const { isOwner } = useAuth();
   const { channels, isLoading, refetch } = useYouTubeChannels();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState<string>('all');
 
   useEffect(() => {
     document.title = "YouTube Channels | RepostFlow";
@@ -37,8 +44,42 @@ const YouTubeChannels = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [refetch]);
 
-  const connectedChannels = channels.filter(c => c.auth_status === 'connected');
-  const pendingChannels = channels.filter(c => c.auth_status !== 'connected');
+  // Get unique owner emails for filter dropdown (only for owners)
+  const ownerEmails = useMemo(() => {
+    if (!channels || !isOwner) return [];
+    const emails = channels.map(c => (c as any).owner_email).filter(Boolean) as string[];
+    return [...new Set(emails)];
+  }, [channels, isOwner]);
+
+  // Filter channels based on search and owner filter
+  const filteredChannels = useMemo(() => {
+    if (!channels) return [];
+    
+    return channels.filter(channel => {
+      const ownerEmail = (channel as any).owner_email?.toLowerCase() || '';
+      
+      // Search filter (channel_title, owner_email)
+      const matchesSearch = searchQuery === '' || 
+        channel.channel_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ownerEmail.includes(searchQuery.toLowerCase());
+      
+      // Owner filter (only for owners viewing all channels)
+      const matchesOwner = ownerFilter === 'all' || 
+        (channel as any).owner_email === ownerFilter;
+      
+      return matchesSearch && matchesOwner;
+    });
+  }, [channels, searchQuery, ownerFilter]);
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setOwnerFilter('all');
+  };
+
+  const hasActiveFilters = searchQuery !== '' || ownerFilter !== 'all';
+
+  const connectedChannels = filteredChannels.filter(c => c.auth_status === 'connected');
+  const pendingChannels = filteredChannels.filter(c => c.auth_status !== 'connected');
 
   return (
     <DashboardLayout
@@ -49,7 +90,49 @@ const YouTubeChannels = () => {
         {/* Setup Guide */}
         <GoogleCloudSetupGuide />
 
-        <div className="flex justify-end">
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <div className="flex flex-wrap gap-3 items-center flex-1">
+            {/* Search and Filter (for owners) */}
+            {isOwner && channels.length > 0 && (
+              <>
+                <div className="relative min-w-[200px] max-w-md flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search by channel name or owner email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                  />
+                </div>
+                {ownerEmails.length > 0 && (
+                  <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+                    <SelectTrigger className="w-[200px]">
+                      <SelectValue placeholder="Filter by owner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Owners</SelectItem>
+                      {ownerEmails.map((email) => (
+                        <SelectItem key={email} value={email}>
+                          {email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <X className="h-4 w-4 mr-1" />
+                    Clear
+                  </Button>
+                )}
+                {hasActiveFilters && (
+                  <span className="text-sm text-muted-foreground">
+                    Showing {filteredChannels.length} of {channels.length}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
           <AddYouTubeChannelDialog onSuccess={refetch} />
         </div>
 

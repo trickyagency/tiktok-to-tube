@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Video, Users, Loader2, AlertTriangle, Settings, XCircle, CheckCircle2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Video, Users, Loader2, AlertTriangle, Settings, XCircle, CheckCircle2, Search, X } from 'lucide-react';
 import { useTikTokAccounts, TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useTikTokAccountsRealtime } from '@/hooks/useTikTokAccountsRealtime';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
 import { useApifyStatus, useApifyValidation } from '@/hooks/useApifyStatus';
+import { useAuth } from '@/contexts/AuthContext';
 import { AddTikTokAccountDialog } from '@/components/tiktok/AddTikTokAccountDialog';
 import { TikTokAccountCard } from '@/components/tiktok/TikTokAccountCard';
 import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
@@ -18,12 +21,15 @@ import { ScrapeQueueProgress } from '@/components/tiktok/ScrapeQueueProgress';
 import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
 
 const TikTokAccounts = () => {
+  const { isOwner } = useAuth();
   const { data: accounts, isLoading } = useTikTokAccounts();
   const { data: totalVideos } = useScrapedVideosCount();
   const { data: isApifyConfigured, isLoading: isApifyLoading } = useApifyStatus();
   const { data: apifyValidation, isLoading: isValidationLoading } = useApifyValidation();
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [ownerFilter, setOwnerFilter] = useState<string>('all');
 
   useEffect(() => {
     document.title = "TikTok Accounts | RepostFlow";
@@ -35,10 +41,45 @@ const TikTokAccounts = () => {
   // Enable realtime updates
   useTikTokAccountsRealtime();
 
+  // Get unique owner emails for filter dropdown (only for owners)
+  const ownerEmails = useMemo(() => {
+    if (!accounts || !isOwner) return [];
+    const emails = accounts.map(a => (a as any).owner_email).filter(Boolean) as string[];
+    return [...new Set(emails)];
+  }, [accounts, isOwner]);
+
+  // Filter accounts based on search and owner filter
+  const filteredAccounts = useMemo(() => {
+    if (!accounts) return [];
+    
+    return accounts.filter(account => {
+      const ownerEmail = (account as any).owner_email?.toLowerCase() || '';
+      
+      // Search filter (username, display_name, owner_email)
+      const matchesSearch = searchQuery === '' || 
+        account.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        account.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        ownerEmail.includes(searchQuery.toLowerCase());
+      
+      // Owner filter (only for owners viewing all accounts)
+      const matchesOwner = ownerFilter === 'all' || 
+        (account as any).owner_email === ownerFilter;
+      
+      return matchesSearch && matchesOwner;
+    });
+  }, [accounts, searchQuery, ownerFilter]);
+
   const handleViewVideos = (account: TikTokAccount) => {
     setSelectedAccount(account);
     setVideosModalOpen(true);
   };
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setOwnerFilter('all');
+  };
+
+  const hasActiveFilters = searchQuery !== '' || ownerFilter !== 'all';
 
   const totalFollowers = accounts?.reduce((sum, a) => sum + a.follower_count, 0) || 0;
   const scrapingAccounts = accounts?.filter(a => a.scrape_status === 'scraping') || [];
@@ -161,14 +202,55 @@ const TikTokAccounts = () => {
           </div>
         </div>
 
+        {/* Search and Filter (for owners) */}
+        {isOwner && accounts && accounts.length > 0 && (
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-[200px] max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by username, name, or owner email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            {ownerEmails.length > 0 && (
+              <Select value={ownerFilter} onValueChange={setOwnerFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Filter by owner" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Owners</SelectItem>
+                  {ownerEmails.map((email) => (
+                    <SelectItem key={email} value={email}>
+                      {email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+            {hasActiveFilters && (
+              <Button variant="ghost" size="sm" onClick={clearFilters}>
+                <X className="h-4 w-4 mr-1" />
+                Clear
+              </Button>
+            )}
+            {hasActiveFilters && (
+              <span className="text-sm text-muted-foreground">
+                Showing {filteredAccounts.length} of {accounts.length}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Account List */}
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        ) : accounts && accounts.length > 0 ? (
+        ) : filteredAccounts.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2">
-            {accounts.map((account) => (
+            {filteredAccounts.map((account) => (
               <TikTokAccountCard
                 key={account.id}
                 account={account}
