@@ -4,9 +4,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Video, Users, Loader2, AlertTriangle, Settings, XCircle, CheckCircle2, Search, X, LayoutGrid, Table2 } from 'lucide-react';
+import { Video, Users, AlertTriangle, Settings, XCircle, CheckCircle2, Plus } from 'lucide-react';
 import { useTikTokAccounts, TikTokAccount, TikTokAccountWithOwner, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { useTikTokAccountsRealtime } from '@/hooks/useTikTokAccountsRealtime';
 import { useScrapedVideosCount } from '@/hooks/useScrapedVideos';
@@ -19,6 +17,9 @@ import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
 import { ScrapeQueueProgress } from '@/components/tiktok/ScrapeQueueProgress';
 import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
+import { TikTokFiltersToolbar } from '@/components/tiktok/TikTokFiltersToolbar';
+import { TikTokStatsSkeleton, TikTokCardsSkeleton, TikTokTableSkeleton, TikTokFiltersSkeleton } from '@/components/tiktok/TikTokAccountsSkeleton';
+import { TikTokEmptyState } from '@/components/tiktok/TikTokEmptyState';
 
 const TikTokAccounts = () => {
   const { isOwner } = useAuth();
@@ -28,9 +29,17 @@ const TikTokAccounts = () => {
   const { data: apifyValidation, isLoading: isValidationLoading } = useApifyValidation();
   const [selectedAccount, setSelectedAccount] = useState<TikTokAccount | null>(null);
   const [videosModalOpen, setVideosModalOpen] = useState(false);
+  
+  // Filter and view state
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState('username');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  
+  // Dialog state for empty state callbacks
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [bulkImportOpen, setBulkImportOpen] = useState(false);
   
   // Action hooks for table view
   const scrapeVideos = useScrapeVideos();
@@ -56,7 +65,7 @@ const TikTokAccounts = () => {
     return [...new Set(emails)];
   }, [accounts, isOwner]);
 
-  // Filter accounts based on search and owner filter
+  // Filter accounts based on search, status, and owner filter
   const filteredAccounts = useMemo(() => {
     if (!accounts) return [];
     
@@ -69,13 +78,36 @@ const TikTokAccounts = () => {
         account.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ownerEmail.includes(searchQuery.toLowerCase());
       
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || 
+        account.scrape_status === statusFilter ||
+        (statusFilter === 'active' && account.account_status === 'active') ||
+        (statusFilter === 'private' && account.account_status === 'private') ||
+        (statusFilter === 'deleted' && account.account_status === 'deleted');
+      
       // Owner filter (only for owners viewing all accounts)
       const matchesOwner = ownerFilter === 'all' || 
         (account as any).owner_email === ownerFilter;
       
-      return matchesSearch && matchesOwner;
+      return matchesSearch && matchesStatus && matchesOwner;
     });
-  }, [accounts, searchQuery, ownerFilter]);
+  }, [accounts, searchQuery, statusFilter, ownerFilter]);
+
+  // Sort accounts
+  const sortedAccounts = useMemo(() => {
+    return [...filteredAccounts].sort((a, b) => {
+      switch (sortBy) {
+        case 'followers':
+          return (b.follower_count || 0) - (a.follower_count || 0);
+        case 'recent':
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+        case 'lastScraped':
+          return new Date(b.last_scraped_at || 0).getTime() - new Date(a.last_scraped_at || 0).getTime();
+        default:
+          return a.username.localeCompare(b.username);
+      }
+    });
+  }, [filteredAccounts, sortBy]);
 
   const handleViewVideos = (account: TikTokAccount | TikTokAccountWithOwner) => {
     setSelectedAccount(account as TikTokAccount);
@@ -110,13 +142,13 @@ const TikTokAccounts = () => {
 
   const clearFilters = () => {
     setSearchQuery('');
+    setStatusFilter('all');
     setOwnerFilter('all');
   };
 
-  const hasActiveFilters = searchQuery !== '' || ownerFilter !== 'all';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || ownerFilter !== 'all';
 
-  const totalFollowers = accounts?.reduce((sum, a) => sum + a.follower_count, 0) || 0;
-  const scrapingAccounts = accounts?.filter(a => a.scrape_status === 'scraping') || [];
+  const totalFollowers = accounts?.reduce((sum, a) => sum + (a.follower_count || 0), 0) || 0;
 
   return (
     <DashboardLayout
@@ -128,41 +160,54 @@ const TikTokAccounts = () => {
         <SubscriptionStatusBanner />
 
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{accounts?.length || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Videos Scraped</CardTitle>
-              <Video className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{totalVideos || 0}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Combined Followers</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {totalFollowers >= 1000000
-                  ? `${(totalFollowers / 1000000).toFixed(1)}M`
-                  : totalFollowers >= 1000
-                  ? `${(totalFollowers / 1000).toFixed(1)}K`
-                  : totalFollowers}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {isLoading ? (
+          <TikTokStatsSkeleton />
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Accounts</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{accounts?.length || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">Monitored accounts</p>
+              </CardContent>
+            </Card>
+            <Card className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Videos Scraped</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Video className="h-4 w-4 text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{totalVideos || 0}</div>
+                <p className="text-xs text-muted-foreground mt-1">Available in queue</p>
+              </CardContent>
+            </Card>
+            <Card className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Combined Followers</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Users className="h-4 w-4 text-primary" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">
+                  {totalFollowers >= 1000000
+                    ? `${(totalFollowers / 1000000).toFixed(1)}M`
+                    : totalFollowers >= 1000
+                    ? `${(totalFollowers / 1000).toFixed(1)}K`
+                    : totalFollowers}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">Total reach</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Apify Status Banner */}
         {!isApifyLoading && !isValidationLoading && (
@@ -223,92 +268,53 @@ const TikTokAccounts = () => {
           </>
         )}
 
-
         {/* Scrape Queue Progress */}
         <ScrapeQueueProgress />
 
-        {/* Header with Add Button and View Toggle */}
-        <div className="flex flex-wrap justify-between items-center gap-2">
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-semibold">Monitored Accounts</h2>
-            {/* View Toggle */}
-            {filteredAccounts.length > 0 && (
-              <div className="flex items-center gap-1 border rounded-md p-1">
-                <Button
-                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={() => setViewMode('cards')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={() => setViewMode('table')}
-                >
-                  <Table2 className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-          </div>
+        {/* Header with Add Button */}
+        <div className="flex flex-wrap justify-between items-center gap-3">
+          <h2 className="text-lg font-semibold">Monitored Accounts</h2>
           <div className="flex flex-wrap gap-2">
-            <BulkAccountImport />
-            <AddTikTokAccountDialog />
+            <BulkAccountImport 
+              open={bulkImportOpen} 
+              onOpenChange={setBulkImportOpen} 
+            />
+            <AddTikTokAccountDialog 
+              open={addDialogOpen} 
+              onOpenChange={setAddDialogOpen} 
+            />
           </div>
         </div>
 
-        {/* Search and Filter (for owners) */}
-        {isOwner && accounts && accounts.length > 0 && (
-          <div className="flex flex-wrap gap-3 items-center">
-            <div className="relative flex-1 min-w-[200px] max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by username, name, or owner email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-            {ownerEmails.length > 0 && (
-              <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Filter by owner" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Owners</SelectItem>
-                  {ownerEmails.map((email) => (
-                    <SelectItem key={email} value={email}>
-                      {email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="h-4 w-4 mr-1" />
-                Clear
-              </Button>
-            )}
-            {hasActiveFilters && (
-              <span className="text-sm text-muted-foreground">
-                Showing {filteredAccounts.length} of {accounts.length}
-              </span>
-            )}
-          </div>
-        )}
+        {/* Filters Toolbar */}
+        {isLoading ? (
+          <TikTokFiltersSkeleton />
+        ) : accounts && accounts.length > 0 ? (
+          <TikTokFiltersToolbar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+            viewMode={viewMode}
+            onViewModeChange={setViewMode}
+            ownerFilter={ownerFilter}
+            onOwnerFilterChange={setOwnerFilter}
+            ownerEmails={ownerEmails}
+            isOwner={isOwner}
+            totalCount={accounts?.length || 0}
+            filteredCount={sortedAccounts.length}
+          />
+        ) : null}
 
         {/* Account List */}
         {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : filteredAccounts.length > 0 ? (
+          viewMode === 'table' ? <TikTokTableSkeleton /> : <TikTokCardsSkeleton />
+        ) : sortedAccounts.length > 0 ? (
           viewMode === 'table' ? (
             <TikTokAccountsTable
-              accounts={filteredAccounts}
+              accounts={sortedAccounts}
               isOwner={isOwner}
               onViewVideos={handleViewVideos}
               onScrape={handleScrape}
@@ -318,8 +324,8 @@ const TikTokAccounts = () => {
               isSyncing={syncingAccountId}
             />
           ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {filteredAccounts.map((account) => (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {sortedAccounts.map((account) => (
                 <TikTokAccountCard
                   key={account.id}
                   account={account}
@@ -330,16 +336,12 @@ const TikTokAccounts = () => {
             </div>
           )
         ) : (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Video className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-              <h3 className="font-medium mb-2">No accounts added</h3>
-              <p className="text-sm text-muted-foreground mb-4">
-                Add a TikTok account to start scraping videos
-              </p>
-              <AddTikTokAccountDialog />
-            </CardContent>
-          </Card>
+          <TikTokEmptyState
+            onAddAccount={() => setAddDialogOpen(true)}
+            onBulkImport={() => setBulkImportOpen(true)}
+            hasFilters={hasActiveFilters}
+            onClearFilters={clearFilters}
+          />
         )}
       </div>
 
