@@ -1,26 +1,33 @@
 import { useEffect, useState, useMemo } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Youtube, Loader2, Search, X, LayoutGrid, Table2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { YouTubeChannelsTable } from '@/components/youtube/YouTubeChannelsTable';
 import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuide';
-import { useYouTubeChannels, YouTubeChannelWithOwner } from '@/hooks/useYouTubeChannels';
+import { YouTubeFiltersToolbar } from '@/components/youtube/YouTubeFiltersToolbar';
+import { YouTubeEmptyState } from '@/components/youtube/YouTubeEmptyState';
+import { 
+  YouTubeStatsSkeleton, 
+  YouTubeCardsSkeleton, 
+  YouTubeFiltersSkeleton 
+} from '@/components/youtube/YouTubeChannelsSkeleton';
+import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 const YouTubeChannels = () => {
   const { isOwner } = useAuth();
-  const { channels, isLoading, refetch, startOAuth, refreshToken, deleteChannel, isDeleting } = useYouTubeChannels();
+  const { channels = [], isLoading, refetch, startOAuth, refreshToken, deleteChannel, isDeleting } = useYouTubeChannels();
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('recent');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
   const [authorizingChannelId, setAuthorizingChannelId] = useState<string | null>(null);
   const [refreshingChannelId, setRefreshingChannelId] = useState<string | null>(null);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   useEffect(() => {
     document.title = "YouTube Channels | RepostFlow";
@@ -55,30 +62,58 @@ const YouTubeChannels = () => {
     return [...new Set(emails)];
   }, [channels, isOwner]);
 
-  // Filter channels based on search and owner filter
+  // Calculate stats
+  const stats = useMemo(() => {
+    if (!channels) return { total: 0, connected: 0, pending: 0, failed: 0 };
+    return {
+      total: channels.length,
+      connected: channels.filter(c => c.auth_status === 'connected').length,
+      pending: channels.filter(c => ['pending', 'no_channel'].includes(c.auth_status || '')).length,
+      failed: channels.filter(c => c.auth_status === 'failed').length,
+    };
+  }, [channels]);
+
+  // Filter and sort channels
   const filteredChannels = useMemo(() => {
     if (!channels) return [];
     
-    return channels.filter(channel => {
+    let result = channels.filter(channel => {
       const ownerEmail = (channel as any).owner_email?.toLowerCase() || '';
       
-      // Search filter (channel_title, owner_email)
+      // Search filter
       const matchesSearch = searchQuery === '' || 
         channel.channel_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ownerEmail.includes(searchQuery.toLowerCase());
       
-      // Owner filter (only for owners viewing all channels)
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || 
+        channel.auth_status === statusFilter ||
+        (statusFilter === 'pending' && ['pending', 'authorizing'].includes(channel.auth_status || ''));
+      
+      // Owner filter
       const matchesOwner = ownerFilter === 'all' || 
         (channel as any).owner_email === ownerFilter;
       
-      return matchesSearch && matchesOwner;
+      return matchesSearch && matchesStatus && matchesOwner;
     });
-  }, [channels, searchQuery, ownerFilter]);
 
-  const clearFilters = () => {
-    setSearchQuery('');
-    setOwnerFilter('all');
-  };
+    // Sort
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.channel_title || '').localeCompare(b.channel_title || '');
+        case 'subscribers':
+          return (b.subscriber_count || 0) - (a.subscriber_count || 0);
+        case 'updated':
+          return new Date(b.updated_at || 0).getTime() - new Date(a.updated_at || 0).getTime();
+        case 'recent':
+        default:
+          return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+    });
+
+    return result;
+  }, [channels, searchQuery, statusFilter, ownerFilter, sortBy]);
 
   const handleReauthorize = async (channelId: string) => {
     setAuthorizingChannelId(channelId);
@@ -96,8 +131,6 @@ const YouTubeChannels = () => {
     deleteChannel(channelId);
   };
 
-  const hasActiveFilters = searchQuery !== '' || ownerFilter !== 'all';
-
   const connectedChannels = filteredChannels.filter(c => c.auth_status === 'connected');
   const pendingChannels = filteredChannels.filter(c => c.auth_status !== 'connected');
 
@@ -110,101 +143,108 @@ const YouTubeChannels = () => {
         {/* Setup Guide */}
         <GoogleCloudSetupGuide />
 
-        <div className="flex flex-wrap justify-between items-center gap-3">
-          <div className="flex flex-wrap gap-3 items-center flex-1">
-            {/* View Toggle */}
-            {filteredChannels.length > 0 && (
-              <div className="flex items-center gap-1 border rounded-md p-1">
-                <Button
-                  variant={viewMode === 'cards' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={() => setViewMode('cards')}
-                >
-                  <LayoutGrid className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'table' ? 'secondary' : 'ghost'}
-                  size="sm"
-                  className="h-7 w-7 p-0"
-                  onClick={() => setViewMode('table')}
-                >
-                  <Table2 className="h-4 w-4" />
-                </Button>
-              </div>
-            )}
-            {/* Search and Filter (for owners) */}
-            {isOwner && channels.length > 0 && (
-              <>
-                <div className="relative min-w-[200px] max-w-md flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by channel name or owner email..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                {ownerEmails.length > 0 && (
-                  <Select value={ownerFilter} onValueChange={setOwnerFilter}>
-                    <SelectTrigger className="w-[200px]">
-                      <SelectValue placeholder="Filter by owner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Owners</SelectItem>
-                      {ownerEmails.map((email) => (
-                        <SelectItem key={email} value={email}>
-                          {email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {hasActiveFilters && (
-                  <Button variant="ghost" size="sm" onClick={clearFilters}>
-                    <X className="h-4 w-4 mr-1" />
-                    Clear
-                  </Button>
-                )}
-                {hasActiveFilters && (
-                  <span className="text-sm text-muted-foreground">
-                    Showing {filteredChannels.length} of {channels.length}
-                  </span>
-                )}
-              </>
-            )}
-          </div>
-          <AddYouTubeChannelDialog onSuccess={refetch} />
-        </div>
-
+        {/* Stats Cards */}
         {isLoading ? (
-          <Card>
-            <CardContent className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </CardContent>
-          </Card>
+          <YouTubeStatsSkeleton />
+        ) : channels.length > 0 && (
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Total Channels</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <Youtube className="h-4 w-4 text-red-500" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <p className="text-xs text-muted-foreground">YouTube channels</p>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Connected</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{stats.connected}</div>
+                <p className="text-xs text-muted-foreground">Ready to upload</p>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                  <Clock className="h-4 w-4 text-amber-500" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
+                <p className="text-xs text-muted-foreground">Need authorization</p>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Failed</CardTitle>
+                <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                  <XCircle className="h-4 w-4 text-red-500" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
+                <p className="text-xs text-muted-foreground">Need attention</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Filters Toolbar */}
+        {isLoading ? (
+          <YouTubeFiltersSkeleton />
+        ) : channels.length > 0 && (
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <YouTubeFiltersToolbar
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                sortBy={sortBy}
+                onSortByChange={setSortBy}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                ownerFilter={ownerFilter}
+                onOwnerFilterChange={setOwnerFilter}
+                ownerEmails={ownerEmails}
+                isOwner={isOwner}
+                totalCount={channels.length}
+                filteredCount={filteredChannels.length}
+              />
+            </div>
+            <AddYouTubeChannelDialog onSuccess={refetch} />
+          </div>
+        )}
+
+        {/* Content */}
+        {isLoading ? (
+          <YouTubeCardsSkeleton />
         ) : channels.length === 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Youtube className="h-5 w-5 text-red-500" />
-                Your Channels
-              </CardTitle>
-              <CardDescription>
-                Each YouTube channel uses its own Google Cloud project credentials
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-12">
-                <Youtube className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                <h3 className="font-medium mb-2">No channels connected</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Add your YouTube channel with Google OAuth credentials to start uploading
-                </p>
-                <AddYouTubeChannelDialog onSuccess={refetch} />
-              </div>
-            </CardContent>
-          </Card>
+          <>
+            <YouTubeEmptyState onAddChannel={() => setAddDialogOpen(true)} />
+            <AddYouTubeChannelDialog 
+              open={addDialogOpen} 
+              onOpenChange={setAddDialogOpen}
+              showTrigger={false}
+              onSuccess={() => {
+                refetch();
+                setAddDialogOpen(false);
+              }} 
+            />
+          </>
         ) : viewMode === 'table' ? (
           <YouTubeChannelsTable
             channels={filteredChannels}
@@ -217,7 +257,7 @@ const YouTubeChannels = () => {
             isDeleting={isDeleting}
           />
         ) : (
-          <>
+          <div className="space-y-6">
             {/* Pending Authorization */}
             {pendingChannels.length > 0 && (
               <div className="space-y-3">
@@ -225,7 +265,7 @@ const YouTubeChannels = () => {
                   <span className="h-2 w-2 rounded-full bg-amber-500" />
                   Pending Authorization ({pendingChannels.length})
                 </h2>
-                <div className="grid gap-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {pendingChannels.map((channel) => (
                     <YouTubeChannelCard 
                       key={channel.id} 
@@ -244,7 +284,7 @@ const YouTubeChannels = () => {
                   <span className="h-2 w-2 rounded-full bg-green-500" />
                   Connected Channels ({connectedChannels.length})
                 </h2>
-                <div className="grid gap-4">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {connectedChannels.map((channel) => (
                     <YouTubeChannelCard 
                       key={channel.id} 
@@ -255,7 +295,20 @@ const YouTubeChannels = () => {
                 </div>
               </div>
             )}
-          </>
+
+            {/* No results */}
+            {filteredChannels.length === 0 && channels.length > 0 && (
+              <Card className="border-dashed">
+                <CardContent className="flex flex-col items-center justify-center py-12">
+                  <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
+                  <h3 className="font-medium mb-2">No channels match your filters</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Try adjusting your search or filter criteria
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         )}
       </div>
     </DashboardLayout>
