@@ -20,7 +20,6 @@ import { SubscriptionStatusBanner } from '@/components/subscriptions/Subscriptio
 import { TikTokFiltersToolbar } from '@/components/tiktok/TikTokFiltersToolbar';
 import { TikTokStatsSkeleton, TikTokCardsSkeleton, TikTokTableSkeleton, TikTokFiltersSkeleton } from '@/components/tiktok/TikTokAccountsSkeleton';
 import { TikTokEmptyState } from '@/components/tiktok/TikTokEmptyState';
-import { AccountHealthSummary } from '@/components/tiktok/AccountHealthSummary';
 
 const TikTokAccounts = () => {
   const { isOwner } = useAuth();
@@ -208,19 +207,6 @@ const TikTokAccounts = () => {
               </CardContent>
             </Card>
           </div>
-        )}
-
-        {/* Account Health Summary */}
-        {!isLoading && accounts && accounts.length > 0 && (
-          <AccountHealthSummary
-            accounts={accounts}
-            onScrape={handleScrape}
-            onSyncProfile={handleSyncProfile}
-            onDelete={handleDelete}
-            isApifyConfigured={isApifyUsable ?? false}
-            isScraping={scrapingAccountId}
-            isSyncing={syncingAccountId}
-          />
         )}
 
         {/* Apify Status Banner */}
