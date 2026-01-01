@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -19,54 +19,82 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const initialCheckDone = useRef(false);
 
   const fetchUserRoles = async (userId: string) => {
-    const { data: roles } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', userId);
+    try {
+      const { data: roles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
 
-    if (roles) {
-      const roleList = roles.map(r => r.role);
-      setIsOwner(roleList.includes('owner'));
-      setIsAdmin(roleList.includes('admin') || roleList.includes('owner'));
-    } else {
+      if (roles) {
+        const roleList = roles.map(r => r.role);
+        setIsOwner(roleList.includes('owner'));
+        setIsAdmin(roleList.includes('admin') || roleList.includes('owner'));
+      } else {
+        setIsOwner(false);
+        setIsAdmin(false);
+      }
+    } catch (error) {
+      console.error('Error fetching user roles:', error);
       setIsOwner(false);
       setIsAdmin(false);
     }
   };
 
   useEffect(() => {
-    // Set up auth state listener FIRST to avoid missing events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      // Only fetch roles on SIGNED_IN or USER_UPDATED, not on TOKEN_REFRESHED
-      if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+    let isMounted = true;
+
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      if (!isMounted) return;
+
+      // Update session and user state
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
+
+      // Fetch roles on relevant auth events
+      if (currentSession?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED')) {
         setTimeout(() => {
-          fetchUserRoles(session.user.id);
+          if (isMounted) {
+            fetchUserRoles(currentSession.user.id);
+          }
         }, 0);
-      } else if (!session?.user) {
+      } else if (!currentSession?.user) {
         setIsOwner(false);
         setIsAdmin(false);
       }
-      setLoading(false);
+
+      // Only set loading false after initial check is complete
+      if (initialCheckDone.current) {
+        setLoading(false);
+      }
     });
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
+    supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
+      if (!isMounted) return;
+
+      setSession(existingSession);
+      setUser(existingSession?.user ?? null);
+
+      if (existingSession?.user) {
         setTimeout(() => {
-          fetchUserRoles(session.user.id);
+          if (isMounted) {
+            fetchUserRoles(existingSession.user.id);
+          }
         }, 0);
       }
+
+      initialCheckDone.current = true;
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
