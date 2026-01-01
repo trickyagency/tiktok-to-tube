@@ -64,7 +64,7 @@ export function useYouTubeChannels() {
         .insert({
           user_id: user.id,
           channel_title: input.channel_title,
-          channel_id: '', // Will be filled after OAuth
+          channel_id: null, // NULL values don't violate unique constraints - will be filled after OAuth
           google_client_id: input.google_client_id,
           google_client_secret: input.google_client_secret,
           google_redirect_uri: input.google_redirect_uri || OAUTH_REDIRECT_URI,
