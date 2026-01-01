@@ -35,28 +35,31 @@ export function useTikTokAccounts() {
   return useQuery({
     queryKey: ['tiktok-accounts', user?.id, isOwner],
     queryFn: async () => {
-      // If owner, fetch all accounts with owner info; otherwise only user's accounts
+      // Fetch accounts
+      const { data: accounts, error: accountsError } = await supabase
+        .from('tiktok_accounts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (accountsError) throw accountsError;
+      if (!accounts || accounts.length === 0) return [] as TikTokAccountWithOwner[];
+
+      // If owner, fetch all profiles to get owner emails
       if (isOwner) {
-        const { data, error } = await supabase
-          .from('tiktok_accounts')
-          .select('*, profiles!tiktok_accounts_user_id_fkey(email)')
-          .order('created_at', { ascending: false });
+        const userIds = [...new Set(accounts.map(a => a.user_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .in('id', userIds);
 
-        if (error) throw error;
-        return (data || []).map((account: any) => ({
+        const profileMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
+        return accounts.map(account => ({
           ...account,
-          owner_email: account.profiles?.email,
-          profiles: undefined,
+          owner_email: profileMap.get(account.user_id),
         })) as TikTokAccountWithOwner[];
-      } else {
-        const { data, error } = await supabase
-          .from('tiktok_accounts')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        return data as TikTokAccountWithOwner[];
       }
+
+      return accounts as TikTokAccountWithOwner[];
     },
     enabled: !!user,
   });

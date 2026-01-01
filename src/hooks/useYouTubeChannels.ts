@@ -46,30 +46,38 @@ export function useYouTubeChannels() {
     queryKey: ['youtube-channels', user?.id, isOwner],
     queryFn: async () => {
       if (!user?.id) return [];
-      
-      // If owner, fetch all channels with owner info; otherwise only user's channels
-      if (isOwner) {
-        const { data, error } = await supabase
-          .from('youtube_channels')
-          .select('*, profiles!youtube_channels_user_id_fkey(email)')
-          .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        return (data || []).map((channel: any) => ({
-          ...channel,
-          owner_email: channel.profiles?.email,
-          profiles: undefined,
-        })) as YouTubeChannelWithOwner[];
-      } else {
-        const { data, error } = await supabase
-          .from('youtube_channels')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false });
+      // Fetch channels based on role
+      const query = supabase
+        .from('youtube_channels')
+        .select('*')
+        .order('created_at', { ascending: false });
 
-        if (error) throw error;
-        return data as YouTubeChannelWithOwner[];
+      // Non-owners only see their own channels
+      if (!isOwner) {
+        query.eq('user_id', user.id);
       }
+
+      const { data: channels, error } = await query;
+      if (error) throw error;
+      if (!channels || channels.length === 0) return [] as YouTubeChannelWithOwner[];
+
+      // If owner, fetch profiles separately to get owner emails
+      if (isOwner) {
+        const userIds = [...new Set(channels.map(c => c.user_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .in('id', userIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
+        return channels.map(channel => ({
+          ...channel,
+          owner_email: profileMap.get(channel.user_id),
+        })) as YouTubeChannelWithOwner[];
+      }
+
+      return channels as YouTubeChannelWithOwner[];
     },
     enabled: !!user?.id,
   });
