@@ -105,7 +105,28 @@ Deno.serve(async (req) => {
     const cleanUsername = username.replace(/^@/, '').trim();
     console.log(`Fetching profile for: ${cleanUsername}`);
 
+    // Check if this TikTok account is already added by ANY user (global duplicate check)
+    if (!accountId) {
+      const { data: globalExisting } = await supabase
+        .from('tiktok_accounts')
+        .select('id, username, user_id')
+        .eq('username', cleanUsername)
+        .limit(1)
+        .maybeSingle();
+
+      if (globalExisting) {
+        console.log('Global duplicate found:', cleanUsername);
+        return new Response(
+          JSON.stringify({ 
+            error: `This TikTok account (@${cleanUsername}) has already been added to the platform.` 
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Fetch user info from TikWM
+    console.log('Fetching user info from TikWM for:', cleanUsername);
     const userInfo = await fetchUserInfo(cleanUsername);
     
     if (!userInfo) {
