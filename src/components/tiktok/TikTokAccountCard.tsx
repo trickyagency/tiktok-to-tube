@@ -7,19 +7,21 @@ import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Settings } from 'lucide-react';
-import { TikTokAccount, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
+import { TikTokAccountWithOwner, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow } from 'date-fns';
 import { AccountYouTubeSettingsDialog } from './AccountYouTubeSettingsDialog';
 
 interface TikTokAccountCardProps {
-  account: TikTokAccount;
-  onViewVideos: (account: TikTokAccount) => void;
+  account: TikTokAccountWithOwner;
+  onViewVideos: (account: TikTokAccountWithOwner) => void;
   isApifyConfigured: boolean;
 }
 
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
+  const { isOwner } = useAuth();
   const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
   const scrapeVideos = useScrapeVideos();
   const refreshAccount = useRefreshTikTokAccount();
@@ -103,6 +105,11 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
               <h3 className="font-semibold truncate">
                 {account.display_name || account.username}
               </h3>
+              {isOwner && account.owner_email && (
+                <Badge variant="outline" className="shrink-0 text-xs bg-blue-500/10 text-blue-600 border-blue-500/20">
+                  Owner: {account.owner_email}
+                </Badge>
+              )}
               {isScraping && (
                 <Badge variant="secondary" className="shrink-0 animate-pulse">
                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />

@@ -17,7 +17,8 @@ import {
   Unlink,
   RotateCcw
 } from 'lucide-react';
-import { YouTubeChannel, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { YouTubeChannelWithOwner, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useScrapedVideos } from '@/hooks/useScrapedVideos';
 import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
@@ -44,11 +45,12 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 interface YouTubeChannelCardProps {
-  channel: YouTubeChannel;
+  channel: YouTubeChannelWithOwner;
   onAuthComplete?: () => void;
 }
 
 export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCardProps) {
+  const { isOwner } = useAuth();
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
@@ -241,11 +243,16 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
           </Avatar>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h3 className="font-semibold truncate">
                 {channel.channel_title || 'Unnamed Channel'}
               </h3>
               {getStatusBadge()}
+              {isOwner && channel.owner_email && (
+                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/20">
+                  Owner: {channel.owner_email}
+                </Badge>
+              )}
             </div>
 
             {channel.auth_status === 'connected' && (
