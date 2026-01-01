@@ -37,6 +37,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    // Set up auth state listener FIRST to avoid missing events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      // Only fetch roles on SIGNED_IN or USER_UPDATED, not on TOKEN_REFRESHED
+      if (session?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
+        setTimeout(() => {
+          fetchUserRoles(session.user.id);
+        }, 0);
+      } else if (!session?.user) {
+        setIsOwner(false);
+        setIsAdmin(false);
+      }
+      setLoading(false);
+    });
+
+    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
@@ -44,20 +62,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setTimeout(() => {
           fetchUserRoles(session.user.id);
         }, 0);
-      }
-      setLoading(false);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        setTimeout(() => {
-          fetchUserRoles(session.user.id);
-        }, 0);
-      } else {
-        setIsOwner(false);
-        setIsAdmin(false);
       }
       setLoading(false);
     });
