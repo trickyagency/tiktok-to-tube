@@ -6,12 +6,12 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Settings, Heart, CheckCircle2 } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Settings, Heart, CheckCircle2, Clock } from 'lucide-react';
 import { TikTokAccountWithOwner, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { useAuth } from '@/contexts/AuthContext';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, differenceInDays } from 'date-fns';
 import { AccountYouTubeSettingsDialog } from './AccountYouTubeSettingsDialog';
 
 interface TikTokAccountCardProps {
@@ -19,6 +19,8 @@ interface TikTokAccountCardProps {
   onViewVideos: (account: TikTokAccountWithOwner) => void;
   isApifyConfigured: boolean;
 }
+
+const RESCRAPE_COOLDOWN_DAYS = 7;
 
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
   const { isOwner } = useAuth();
@@ -37,6 +39,15 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
   const canScrape = subscriptionStatus === 'active' || limits?.isUnlimited;
   const isScraping = account.scrape_status === 'scraping' || scrapeVideos.isPending;
   const isRefreshing = refreshAccount.isPending;
+  
+  // 7-day rescrape cooldown logic
+  const lastScrapedAt = account.last_scraped_at ? new Date(account.last_scraped_at) : null;
+  const daysSinceLastScrape = lastScrapedAt ? differenceInDays(new Date(), lastScrapedAt) : null;
+  const canRescrape = daysSinceLastScrape !== null && daysSinceLastScrape >= RESCRAPE_COOLDOWN_DAYS;
+  const daysUntilRescrape = daysSinceLastScrape !== null ? Math.max(0, RESCRAPE_COOLDOWN_DAYS - daysSinceLastScrape) : null;
+  const isScraped = account.scrape_status === 'completed' && lastScrapedAt !== null;
+  const isFailed = account.scrape_status === 'failed';
+  const isPending = account.scrape_status === 'pending' || !lastScrapedAt;
   
   // Progress tracking
   const progressCurrent = account.scrape_progress_current || 0;
@@ -95,6 +106,56 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
   };
 
   const healthStatus = getHealthStatus();
+
+  // Determine button state
+  const getButtonConfig = () => {
+    if (isScraping) {
+      return {
+        label: 'Importing Videos...',
+        icon: <Loader2 className="h-4 w-4 animate-spin mr-2" />,
+        variant: 'secondary' as const,
+        disabled: true,
+        tooltip: 'Videos are being imported'
+      };
+    }
+    if (isFailed) {
+      return {
+        label: 'Retry Scrape',
+        icon: <AlertCircle className="h-4 w-4 mr-2" />,
+        variant: 'outline' as const,
+        disabled: !isApifyConfigured || !canScrape,
+        tooltip: 'Previous scrape failed. Click to retry.'
+      };
+    }
+    if (isScraped && !canRescrape) {
+      return {
+        label: 'Scraped',
+        icon: <CheckCircle2 className="h-4 w-4 mr-2" />,
+        variant: 'outline' as const,
+        disabled: true,
+        tooltip: `ReScrape available in ${daysUntilRescrape} day${daysUntilRescrape !== 1 ? 's' : ''}`
+      };
+    }
+    if (isScraped && canRescrape) {
+      return {
+        label: 'ReScrape Videos',
+        icon: <RefreshCw className="h-4 w-4 mr-2" />,
+        variant: 'default' as const,
+        disabled: !isApifyConfigured || !canScrape,
+        tooltip: 'Fetch new videos from TikTok'
+      };
+    }
+    // Default: pending or never scraped
+    return {
+      label: 'Scrape Videos',
+      icon: <Download className="h-4 w-4 mr-2" />,
+      variant: 'default' as const,
+      disabled: !isApifyConfigured || !canScrape,
+      tooltip: 'Import videos from TikTok'
+    };
+  };
+
+  const buttonConfig = getButtonConfig();
 
   return (
     <Card className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 border-border/50 ${isScraping ? 'ring-2 ring-primary/30 shadow-lg shadow-primary/10' : ''} ${isAccountUnavailable ? 'opacity-80' : ''}`}>
@@ -198,19 +259,25 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                   Importing
                 </Badge>
               )}
-              {!isScraping && account.scrape_status === 'completed' && (
+              {!isScraping && isScraped && !canRescrape && (
                 <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-emerald-600 border-emerald-500/30 bg-emerald-500/10">
                   <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Synced
+                  Scraped {daysSinceLastScrape}d ago
                 </Badge>
               )}
-              {!isScraping && account.scrape_status === 'failed' && (
+              {!isScraping && isScraped && canRescrape && (
+                <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-primary border-primary/30 bg-primary/10">
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  ReScrape Available
+                </Badge>
+              )}
+              {!isScraping && isFailed && (
                 <Badge variant="destructive" className="text-xs px-2 py-0 h-5">
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Failed
                 </Badge>
               )}
-              {!isScraping && account.scrape_status === 'pending' && !isAccountUnavailable && (
+              {!isScraping && isPending && !isAccountUnavailable && (
                 <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-amber-600 border-amber-500/30 bg-amber-500/10">
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Not scraped
@@ -299,13 +366,17 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
           </div>
         )}
 
-        {/* Last sync info */}
-        {!isScraping && (account.last_profile_synced_at || account.last_scraped_at) && (
-          <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
-            {account.last_scraped_at && (
-              <span className="flex items-center gap-1">
-                <Video className="h-3 w-3" />
-                Scraped {formatDistanceToNow(new Date(account.last_scraped_at))} ago
+        {/* Last sync info with rescrape countdown */}
+        {!isScraping && lastScrapedAt && (
+          <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <Video className="h-3 w-3" />
+              Scraped {formatDistanceToNow(lastScrapedAt)} ago
+            </span>
+            {isScraped && !canRescrape && daysUntilRescrape !== null && (
+              <span className="flex items-center gap-1 text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                ReScrape in {daysUntilRescrape}d
               </span>
             )}
           </div>
@@ -317,30 +388,25 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
-                  variant={isScraping ? "secondary" : "default"}
+                  variant={buttonConfig.variant}
                   size="sm"
                   onClick={handleScrapeVideos}
-                  disabled={isScraping || !isApifyConfigured || !canScrape}
-                  className="w-full h-9"
+                  disabled={buttonConfig.disabled}
+                  className={`w-full h-9 ${isScraped && !canRescrape ? 'opacity-60' : ''}`}
                 >
-                  {isScraping ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      Importing Videos...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Scrape Videos
-                    </>
-                  )}
+                  {buttonConfig.icon}
+                  {buttonConfig.label}
                 </Button>
               </TooltipTrigger>
-              {(!isApifyConfigured || !canScrape) && (
-                <TooltipContent className="max-w-xs">
-                  <p>{!canScrape ? subscriptionMessage : 'Scraper API key not configured'}</p>
-                </TooltipContent>
-              )}
+              <TooltipContent className="max-w-xs">
+                <p>
+                  {!canScrape 
+                    ? subscriptionMessage 
+                    : !isApifyConfigured 
+                    ? 'Scraper API key not configured' 
+                    : buttonConfig.tooltip}
+                </p>
+              </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
