@@ -206,8 +206,8 @@ export default function UpgradePlans() {
 
   // ROI Calculator state
   const [roiAccountCount, setRoiAccountCount] = useState(10);
-  const [roiAvgViews, setRoiAvgViews] = useState(50000);
-  const [roiCpmRate, setRoiCpmRate] = useState(2);
+  const [roiAvgViews, setRoiAvgViews] = useState(10000);
+  const [roiCpmRate, setRoiCpmRate] = useState(1.5);
   const [roiSelectedPlan, setRoiSelectedPlan] = useState<string>('pro');
 
   // Handle scroll for sticky footer
@@ -581,7 +581,6 @@ export default function UpgradePlans() {
                       isRecommended && "bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600"
                     )}
                     variant={isRecommended ? "default" : "outline"}
-                    disabled={!isOwner}
                   >
                     {isCurrentPlan ? 'Modify Plan' : 'Get Started'}
                     <ArrowRight className="h-4 w-4" />
@@ -774,7 +773,7 @@ export default function UpgradePlans() {
                   <Slider
                     value={[roiAvgViews]}
                     min={1000}
-                    max={500000}
+                    max={200000}
                     step={1000}
                     onValueChange={([value]) => setRoiAvgViews(value)}
                   />
@@ -847,6 +846,10 @@ export default function UpgradePlans() {
                   <span className="text-2xl font-bold text-emerald-500">${roiData?.profit.toLocaleString() || 0}</span>
                 </div>
               </div>
+              
+              <p className="text-xs text-muted-foreground text-center mt-4 pt-4 border-t border-border/50">
+                * Estimates assume 4 videos/account/month. Actual results vary based on content, niche, and audience. YouTube Shorts CPM typically ranges $0.5-$3.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -976,7 +979,7 @@ export default function UpgradePlans() {
             <Button 
               onClick={() => handleSelectPlan(selectedPlanForCta, accountCounts[selectedPlanForCta])}
               className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 gap-2"
-              disabled={!isOwner}
+              
             >
               Get Started
               <ArrowRight className="h-4 w-4" />
