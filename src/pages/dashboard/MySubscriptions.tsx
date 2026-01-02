@@ -502,7 +502,7 @@ export default function MySubscriptions() {
             </div>
             {accounts.length > 0 && (
               <Button asChild variant="outline" size="sm">
-                <Link to="/dashboard/tiktok-accounts">
+                <Link to="/dashboard/tiktok">
                   View All
                   <ArrowUpRight className="h-4 w-4 ml-1" />
                 </Link>
@@ -524,7 +524,7 @@ export default function MySubscriptions() {
               {accounts.length > 6 && (
                 <Card className="flex items-center justify-center bg-card/50 backdrop-blur-xl border-border/50 border-dashed min-h-[100px]">
                   <Button asChild variant="ghost">
-                    <Link to="/dashboard/tiktok-accounts" className="text-muted-foreground">
+                    <Link to="/dashboard/tiktok" className="text-muted-foreground">
                       +{accounts.length - 6} more accounts
                     </Link>
                   </Button>
