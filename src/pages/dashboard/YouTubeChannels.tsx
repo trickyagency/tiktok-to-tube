@@ -66,8 +66,8 @@ const YouTubeChannels = () => {
     return {
       total: channels.length,
       connected: channels.filter(c => c.auth_status === 'connected').length,
-      pending: channels.filter(c => ['pending', 'no_channel'].includes(c.auth_status || '')).length,
-      failed: channels.filter(c => c.auth_status === 'failed').length,
+      pending: channels.filter(c => ['pending', 'authorizing', 'no_channel'].includes(c.auth_status || '')).length,
+      failed: channels.filter(c => ['failed', 'token_revoked'].includes(c.auth_status || '')).length,
     };
   }, [channels]);
 
@@ -83,7 +83,8 @@ const YouTubeChannels = () => {
       
       const matchesStatus = statusFilter === 'all' || 
         channel.auth_status === statusFilter ||
-        (statusFilter === 'pending' && ['pending', 'authorizing'].includes(channel.auth_status || ''));
+        (statusFilter === 'pending' && ['pending', 'authorizing', 'no_channel'].includes(channel.auth_status || '')) ||
+        (statusFilter === 'failed' && ['failed', 'token_revoked'].includes(channel.auth_status || ''));
       
       const matchesOwner = ownerFilter === 'all' || 
         (channel as any).owner_email === ownerFilter;
@@ -125,7 +126,12 @@ const YouTubeChannels = () => {
   };
 
   const connectedChannels = filteredChannels.filter(c => c.auth_status === 'connected');
-  const pendingChannels = filteredChannels.filter(c => c.auth_status !== 'connected');
+  const pendingChannels = filteredChannels.filter(c => 
+    ['pending', 'authorizing', 'no_channel'].includes(c.auth_status || '')
+  );
+  const failedChannels = filteredChannels.filter(c => 
+    ['failed', 'token_revoked'].includes(c.auth_status || '')
+  );
 
   // Stats card data
   const statsCards = [
@@ -305,6 +311,35 @@ const YouTubeChannels = () => {
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {pendingChannels.map((channel, index) => (
+                    <div 
+                      key={channel.id} 
+                      className="animate-in fade-in slide-in-from-bottom-4"
+                      style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
+                    >
+                      <YouTubeChannelCard 
+                        channel={channel} 
+                        onAuthComplete={refetch}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Failed Channels */}
+            {failedChannels.length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <XCircle className="h-4 w-4 text-red-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Failed Channels</h2>
+                    <p className="text-sm text-muted-foreground">{failedChannels.length} channel{failedChannels.length !== 1 ? 's' : ''} need{failedChannels.length === 1 ? 's' : ''} reconnection</p>
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {failedChannels.map((channel, index) => (
                     <div 
                       key={channel.id} 
                       className="animate-in fade-in slide-in-from-bottom-4"
