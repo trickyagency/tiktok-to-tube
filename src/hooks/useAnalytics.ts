@@ -20,6 +20,15 @@ interface InviteStats {
   expired: number;
 }
 
+interface PlatformStats {
+  tiktokAccounts: number;
+  youtubeChannels: number;
+  scrapedVideos: number;
+  publishedVideos: number;
+  publishedThisWeek: number;
+  publishedThisMonth: number;
+}
+
 interface AnalyticsData {
   totalUsers: number;
   verifiedUsers: number;
@@ -29,6 +38,8 @@ interface AnalyticsData {
   inviteStats: InviteStats;
   verificationRate: number;
   recentSignIns: { email: string; last_sign_in_at: string }[];
+  platformStats: PlatformStats;
+  weeklyUserGrowth: number;
 }
 
 export function useAnalytics() {
@@ -54,6 +65,27 @@ export function useAnalytics() {
 
       if (invitationsError) throw invitationsError;
 
+      // Fetch platform-wide stats
+      const [
+        { count: tiktokCount },
+        { count: youtubeCount },
+        { count: scrapedCount },
+        { count: publishedCount },
+        { count: publishedWeekCount },
+        { count: publishedMonthCount },
+      ] = await Promise.all([
+        supabase.from('tiktok_accounts').select('*', { count: 'exact', head: true }),
+        supabase.from('youtube_channels').select('*', { count: 'exact', head: true }),
+        supabase.from('scraped_videos').select('*', { count: 'exact', head: true }),
+        supabase.from('publish_queue').select('*', { count: 'exact', head: true }).eq('status', 'published'),
+        supabase.from('publish_queue').select('*', { count: 'exact', head: true })
+          .eq('status', 'published')
+          .gte('published_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
+        supabase.from('publish_queue').select('*', { count: 'exact', head: true })
+          .eq('status', 'published')
+          .gte('published_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
+      ]);
+
       // Map auth metadata
       const authMap = new Map<string, AuthMetadata>();
       if (!authError && authMetadata) {
@@ -69,8 +101,13 @@ export function useAnalytics() {
       let activeUsers = 0;
       const thirtyDaysAgo = new Date();
       thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
       const recentSignIns: { email: string; last_sign_in_at: string }[] = [];
+
+      // Count users created in last 7 days for weekly growth
+      let weeklyNewUsers = 0;
 
       profiles?.forEach(profile => {
         const auth = authMap.get(profile.user_id);
@@ -83,6 +120,9 @@ export function useAnalytics() {
             email: profile.email,
             last_sign_in_at: auth.last_sign_in_at,
           });
+        }
+        if (new Date(profile.created_at) > sevenDaysAgo) {
+          weeklyNewUsers++;
         }
       });
 
@@ -156,6 +196,12 @@ export function useAnalytics() {
         ? Math.round((verifiedUsers / totalUsers) * 100) 
         : 0;
 
+      // Calculate weekly growth percentage
+      const previousWeekUsers = totalUsers - weeklyNewUsers;
+      const weeklyUserGrowth = previousWeekUsers > 0 
+        ? Math.round((weeklyNewUsers / previousWeekUsers) * 100)
+        : weeklyNewUsers > 0 ? 100 : 0;
+
       return {
         totalUsers,
         verifiedUsers,
@@ -165,6 +211,15 @@ export function useAnalytics() {
         inviteStats,
         verificationRate,
         recentSignIns: recentSignIns.slice(0, 5),
+        platformStats: {
+          tiktokAccounts: tiktokCount || 0,
+          youtubeChannels: youtubeCount || 0,
+          scrapedVideos: scrapedCount || 0,
+          publishedVideos: publishedCount || 0,
+          publishedThisWeek: publishedWeekCount || 0,
+          publishedThisMonth: publishedMonthCount || 0,
+        },
+        weeklyUserGrowth,
       };
     },
   });
