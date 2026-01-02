@@ -2,7 +2,38 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { useState, useEffect } from 'react';
 
+// Hook to check if a TikTok username already exists
+export function useCheckTikTokUsername(username: string) {
+  const [debouncedUsername, setDebouncedUsername] = useState('');
+
+  useEffect(() => {
+    const cleanUsername = username.replace(/^@/, '').toLowerCase().trim();
+    const timer = setTimeout(() => {
+      setDebouncedUsername(cleanUsername);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [username]);
+
+  return useQuery({
+    queryKey: ['check-tiktok-username', debouncedUsername],
+    queryFn: async () => {
+      if (!debouncedUsername || debouncedUsername.length < 2) return null;
+      
+      const { data, error } = await supabase
+        .from('tiktok_accounts')
+        .select('id, username, avatar_url, follower_count')
+        .eq('username', debouncedUsername)
+        .maybeSingle();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: debouncedUsername.length >= 2,
+    staleTime: 30000,
+  });
+}
 export interface TikTokAccount {
   id: string;
   user_id: string;

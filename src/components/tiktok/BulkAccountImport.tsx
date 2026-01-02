@@ -242,32 +242,42 @@ export const BulkAccountImport = ({
 
           {results.length > 0 && !isImporting && (
             <div className="space-y-3">
-              <div className="flex gap-3 text-sm">
+              <div className="flex flex-wrap gap-3 text-sm">
                 {successResults.length > 0 && (
-                  <span className="flex items-center gap-1 text-green-600">
-                    <CheckCircle2 className="h-4 w-4" />
+                  <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30">
+                    <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
                     {successResults.length} added
-                  </span>
+                  </Badge>
                 )}
                 {duplicateResults.length > 0 && (
-                  <span className="flex items-center gap-1 text-yellow-600">
-                    <AlertTriangle className="h-4 w-4" />
-                    {duplicateResults.length} duplicates
-                  </span>
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30">
+                    <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                    {duplicateResults.length} already added
+                  </Badge>
                 )}
                 {failedResults.length > 0 && (
-                  <span className="flex items-center gap-1 text-destructive">
-                    <XCircle className="h-4 w-4" />
+                  <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/30">
+                    <XCircle className="h-3.5 w-3.5 mr-1" />
                     {failedResults.length} failed
-                  </span>
+                  </Badge>
                 )}
                 {limitReachedResults.length > 0 && (
-                  <span className="flex items-center gap-1 text-muted-foreground">
-                    <Ban className="h-4 w-4" />
-                    {limitReachedResults.length} skipped
-                  </span>
+                  <Badge variant="outline" className="bg-muted text-muted-foreground">
+                    <Ban className="h-3.5 w-3.5 mr-1" />
+                    {limitReachedResults.length} skipped (limit)
+                  </Badge>
                 )}
               </div>
+
+              {duplicateResults.length > 0 && (
+                <Alert className="border-amber-500/30 bg-amber-500/10">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <AlertDescription className="text-sm text-amber-600 dark:text-amber-400">
+                    <span className="font-medium">Already on platform:</span>{' '}
+                    {duplicateResults.map(r => `@${r.username}`).join(', ')}
+                  </AlertDescription>
+                </Alert>
+              )}
 
               {failedResults.length > 0 && (
                 <div className="text-xs space-y-1 max-h-24 overflow-y-auto">
