@@ -17,7 +17,9 @@ import {
   Video,
   Unlink,
   RotateCcw,
-  Sparkles
+  Sparkles,
+  AlertTriangle,
+  Copy
 } from 'lucide-react';
 import { YouTubeChannelWithOwner, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,6 +29,8 @@ import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
 import { useCurrentUserSubscription } from '@/hooks/useCurrentUserSubscription';
 import { QuotaIndicator } from '@/components/quota/QuotaIndicator';
 import { toast } from 'sonner';
+import { OAUTH_REDIRECT_URI } from '@/lib/api-config';
+import { supabase } from '@/integrations/supabase/client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -207,24 +211,76 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   const handleAuthorize = async () => {
     setIsAuthorizing(true);
     setAuthFailed(false);
+    
+    // Track if we've already detected completion
+    let completed = false;
+    
     const handleMessage = (event: MessageEvent) => {
+      if (completed) return;
       if (event.data?.type === 'youtube-oauth-success') {
+        completed = true;
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
         setAuthFailed(false);
         onAuthComplete?.();
       } else if (event.data?.type === 'youtube-oauth-error') {
+        completed = true;
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
         setAuthFailed(true);
       }
     };
     window.addEventListener('message', handleMessage);
+    
     await startOAuth(channel.id);
+    
+    // Start polling to detect auth completion even if postMessage fails
+    const pollInterval = setInterval(async () => {
+      if (completed) {
+        clearInterval(pollInterval);
+        return;
+      }
+      
+      try {
+        const { data } = await supabase
+          .from('youtube_channels')
+          .select('auth_status')
+          .eq('id', channel.id)
+          .single();
+        
+        if (data?.auth_status && 
+            data.auth_status !== 'authorizing' && 
+            data.auth_status !== 'pending') {
+          completed = true;
+          clearInterval(pollInterval);
+          window.removeEventListener('message', handleMessage);
+          setIsAuthorizing(false);
+          
+          if (data.auth_status === 'connected') {
+            toast.success('YouTube channel connected successfully!');
+            setAuthFailed(false);
+          } else if (data.auth_status === 'no_channel') {
+            toast.info('Connected, but no YouTube channel found on this Google account');
+            setAuthFailed(false);
+          } else if (data.auth_status === 'failed') {
+            setAuthFailed(true);
+          }
+          
+          onAuthComplete?.();
+        }
+      } catch (err) {
+        console.error('Auth polling error:', err);
+      }
+    }, 3000);
+    
+    // Stop polling after 60 seconds timeout
     setTimeout(() => {
-      window.removeEventListener('message', handleMessage);
-      setIsAuthorizing(false);
-    }, 120000);
+      if (!completed) {
+        clearInterval(pollInterval);
+        window.removeEventListener('message', handleMessage);
+        setIsAuthorizing(false);
+      }
+    }, 60000);
   };
 
   const handleRefresh = async () => {
@@ -282,6 +338,15 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
     channel.auth_status === 'failed' || 
     channel.auth_status === 'token_revoked' ||
     (channel.auth_status === 'connected' && !channel.refresh_token);
+
+  // Check if redirect URI is outdated
+  const hasOutdatedRedirectUri = channel.google_redirect_uri && 
+    channel.google_redirect_uri !== OAUTH_REDIRECT_URI;
+
+  const handleCopyRedirectUri = () => {
+    navigator.clipboard.writeText(OAUTH_REDIRECT_URI);
+    toast.success('Redirect URI copied to clipboard');
+  };
 
   return (
     <Card className={cn(
@@ -348,6 +413,30 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                 <Sparkles className="h-3 w-3 mr-1" />
                 Owner: {channel.owner_email}
               </Badge>
+            )}
+
+            {/* Outdated Redirect URI Warning */}
+            {hasOutdatedRedirectUri && (
+              <div className="mt-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-600 font-medium">Redirect URI may be outdated</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Update your Google Cloud Console to use the recommended redirect URI for reliable authorization.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyRedirectUri}
+                  className="mt-2 h-7 text-xs"
+                >
+                  <Copy className="h-3 w-3 mr-1.5" />
+                  Copy Recommended URI
+                </Button>
+              </div>
             )}
 
             {/* Stats grid for connected channels */}
