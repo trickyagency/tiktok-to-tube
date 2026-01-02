@@ -116,6 +116,7 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   const [isPolling, setIsPolling] = useState(false);
   const [secondsUntilCheck, setSecondsUntilCheck] = useState(30);
   const [isManualChecking, setIsManualChecking] = useState(false);
+  const [authFailed, setAuthFailed] = useState(false);
   const pollingRef = useRef<{ intervalId: NodeJS.Timeout | null; timeoutId: NodeJS.Timeout | null }>({
     intervalId: null,
     timeoutId: null,
@@ -205,14 +206,17 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
 
   const handleAuthorize = async () => {
     setIsAuthorizing(true);
+    setAuthFailed(false);
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'youtube-oauth-success') {
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
+        setAuthFailed(false);
         onAuthComplete?.();
       } else if (event.data?.type === 'youtube-oauth-error') {
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
+        setAuthFailed(true);
       }
     };
     window.addEventListener('message', handleMessage);
@@ -294,6 +298,15 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
         "absolute top-0 left-0 right-0 h-1 bg-gradient-to-r",
         statusColors.gradient
       )} />
+
+      {/* Loading overlay during OAuth */}
+      {isAuthorizing && (
+        <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex flex-col items-center justify-center z-10 rounded-xl">
+          <RefreshCw className="h-8 w-8 animate-spin text-primary mb-3" />
+          <p className="text-sm font-medium">Waiting for authorization...</p>
+          <p className="text-xs text-muted-foreground mt-1">Complete the process in the popup window</p>
+        </div>
+      )}
 
       <CardContent className="p-5">
         <div className="flex items-start gap-4">
@@ -470,6 +483,33 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
               <p className="text-xs text-amber-500 mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                 Refresh token revoked - please reconnect your channel
               </p>
+            )}
+
+            {/* Authorization failed banner with retry */}
+            {(channel.auth_status === 'failed' || authFailed) && channel.auth_status !== 'connected' && (
+              <div className="mt-3 p-3 rounded-xl bg-red-500/5 border border-red-500/20">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-red-600 font-medium">Authorization failed</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      This could happen if you denied access or there was a connection issue.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleAuthorize}
+                  disabled={isAuthorizing}
+                  className="mt-3 w-full bg-red-500 hover:bg-red-600 text-white"
+                >
+                  {isAuthorizing ? (
+                    <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Retrying...</>
+                  ) : (
+                    <><RotateCcw className="h-4 w-4 mr-2" />Retry Authorization</>
+                  )}
+                </Button>
+              </div>
             )}
 
             {/* Quota Indicator for connected channels */}
