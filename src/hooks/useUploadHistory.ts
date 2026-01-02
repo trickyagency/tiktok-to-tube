@@ -9,12 +9,28 @@ export interface UploadHistoryItemWithOwner extends QueueItemWithDetails {
   owner_email?: string;
 }
 
-export function useUploadHistory(selectedChannelId?: string, page = 1, pageSize = 12) {
+interface UseUploadHistoryOptions {
+  selectedChannelId?: string;
+  page?: number;
+  pageSize?: number;
+  dateFrom?: Date;
+  dateTo?: Date;
+}
+
+export function useUploadHistory(options: UseUploadHistoryOptions = {}) {
+  const {
+    selectedChannelId,
+    page = 1,
+    pageSize = 12,
+    dateFrom,
+    dateTo,
+  } = options;
+  
   const { user, isOwner } = useAuth();
   const queryClient = useQueryClient();
 
   const historyQuery = useQuery({
-    queryKey: ['upload-history', user?.id, selectedChannelId, isOwner, page, pageSize],
+    queryKey: ['upload-history', user?.id, selectedChannelId, isOwner, page, pageSize, dateFrom?.toISOString(), dateTo?.toISOString()],
     queryFn: async () => {
       if (!user?.id) return { items: [], count: 0 };
 
@@ -38,6 +54,16 @@ export function useUploadHistory(selectedChannelId?: string, page = 1, pageSize 
 
         if (selectedChannelId && selectedChannelId !== 'all') {
           query = query.eq('youtube_channel_id', selectedChannelId);
+        }
+
+        // Add date range filters
+        if (dateFrom) {
+          query = query.gte('processed_at', dateFrom.toISOString());
+        }
+        if (dateTo) {
+          const endDate = new Date(dateTo);
+          endDate.setHours(23, 59, 59, 999);
+          query = query.lte('processed_at', endDate.toISOString());
         }
 
         const { data, error, count } = await query.range(from, to);
@@ -69,6 +95,16 @@ export function useUploadHistory(selectedChannelId?: string, page = 1, pageSize 
 
         if (selectedChannelId && selectedChannelId !== 'all') {
           query = query.eq('youtube_channel_id', selectedChannelId);
+        }
+
+        // Add date range filters
+        if (dateFrom) {
+          query = query.gte('processed_at', dateFrom.toISOString());
+        }
+        if (dateTo) {
+          const endDate = new Date(dateTo);
+          endDate.setHours(23, 59, 59, 999);
+          query = query.lte('processed_at', endDate.toISOString());
         }
 
         const { data, error, count } = await query.range(from, to);
