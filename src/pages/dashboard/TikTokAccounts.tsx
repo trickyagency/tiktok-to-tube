@@ -18,6 +18,7 @@ import { BulkAccountImport } from '@/components/tiktok/BulkAccountImport';
 import { ScrapeQueueProgress } from '@/components/tiktok/ScrapeQueueProgress';
 import { ScrapeAllAccountsButton } from '@/components/tiktok/ScrapeAllAccountsButton';
 import { BulkRescrapeButton } from '@/components/tiktok/BulkRescrapeButton';
+import { BulkScrapeNewButton } from '@/components/tiktok/BulkScrapeNewButton';
 import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
 import { TikTokFiltersToolbar } from '@/components/tiktok/TikTokFiltersToolbar';
 import { TikTokStatsSkeleton, TikTokCardsSkeleton, TikTokTableSkeleton, TikTokFiltersSkeleton } from '@/components/tiktok/TikTokAccountsSkeleton';
@@ -278,6 +279,7 @@ const TikTokAccounts = () => {
           <h2 className="text-lg font-semibold">Monitored Accounts</h2>
           <div className="flex flex-wrap gap-2">
             <ScrapeAllAccountsButton />
+            <BulkScrapeNewButton />
             <BulkRescrapeButton />
             <BulkAccountImport 
               open={bulkImportOpen} 
