@@ -131,7 +131,12 @@ function StatCard({
 // TikTok account card
 function AccountCard({ account, index }: { account: any; index: number }) {
   return (
-    <Link to="/dashboard/tiktok-accounts" className="block">
+    <a 
+      href={`https://www.tiktok.com/@${account.username}`} 
+      target="_blank" 
+      rel="noopener noreferrer" 
+      className="block"
+    >
       <Card 
         className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
         style={{ animationDelay: `${index * 50}ms` }}
@@ -177,7 +182,7 @@ function AccountCard({ account, index }: { account: any; index: number }) {
           </div>
         </CardContent>
       </Card>
-    </Link>
+    </a>
   );
 }
 
