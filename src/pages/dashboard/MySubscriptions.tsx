@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { SubscriptionStatusBanner } from '@/components/subscriptions/SubscriptionStatusBanner';
 import { SubscriptionHistoryCard } from '@/components/subscriptions/SubscriptionHistoryCard';
+import { SubscriptionCountdownWidget } from '@/components/subscriptions/SubscriptionCountdownWidget';
 import { RadialProgress } from '@/components/subscriptions/RadialProgress';
 import { MySubscriptionsSkeleton, AccountsGridSkeleton } from '@/components/subscriptions/MySubscriptionsSkeleton';
 import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
@@ -304,6 +305,14 @@ export default function MySubscriptions() {
             delay={300}
           />
         </div>
+
+        {/* Countdown Widget */}
+        {!isOwner && subscription?.expires_at && (
+          <SubscriptionCountdownWidget 
+            subscription={subscription} 
+            isUnlimited={isUnlimited} 
+          />
+        )}
 
         {/* Main Content Grid */}
         <div className="grid gap-6 lg:grid-cols-2">
