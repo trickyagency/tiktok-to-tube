@@ -80,8 +80,10 @@ export const API_BASE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 // OAuth redirect URI uses the custom domain because Google redirects the browser
 // The custom domain's reverse proxy handles forwarding to Supabase
 
-// OAuth Configuration - always points to production
-export const OAUTH_REDIRECT_URI = `https://${ENV_CONFIG.production.domain}/functions/v1/youtube-oauth?action=callback`;
+// OAuth Configuration
+// IMPORTANT: Use Supabase URL directly for OAuth callback to avoid SPA routing issues
+// The website domain relies on client-side proxy routing which can fail with PWA caching
+export const OAUTH_REDIRECT_URI = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
 export const JAVASCRIPT_ORIGIN = `https://${ENV_CONFIG.production.domain}`;
 
 // Helper function for auth redirects (always redirects to production for auth)
