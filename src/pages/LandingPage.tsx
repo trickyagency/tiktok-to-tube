@@ -140,8 +140,9 @@ const LandingPage = () => {
     <div className="min-h-screen bg-background">
       <Header />
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden">
+      <main>
+        {/* Hero Section */}
+        <section className="relative pt-32 pb-20 md:pt-40 md:pb-32 overflow-hidden">
         {/* Background Effects */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-purple-500/5 to-pink-500/5" />
         <div className="absolute top-20 left-10 w-72 h-72 bg-primary/10 rounded-full blur-3xl animate-pulse" />
@@ -431,6 +432,7 @@ const LandingPage = () => {
           </div>
         </section>
       </AnimatedSection>
+      </main>
 
       <Footer />
     </div>
