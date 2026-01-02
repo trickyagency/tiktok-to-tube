@@ -128,3 +128,62 @@ Please send payment details for renewal.`;
   
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
 }
+
+interface QuickRenewalParams {
+  planName: string;
+  planBasePrice: number;
+  accountCount: number;
+  billingInterval: 'monthly' | 'yearly';
+  expiryDate?: string;
+  userEmail?: string;
+  volumeDiscount?: number;
+  pricePerAccount?: number;
+  totalPrice?: number;
+}
+
+export function generateQuickRenewalWhatsAppLink(params: QuickRenewalParams): string {
+  const { 
+    planName, 
+    planBasePrice, 
+    accountCount, 
+    billingInterval, 
+    expiryDate, 
+    userEmail,
+    volumeDiscount = 0,
+    pricePerAccount,
+    totalPrice
+  } = params;
+  
+  const billingLabel = billingInterval === 'yearly' ? 'Yearly' : 'Monthly';
+  const periodLabel = billingInterval === 'yearly' ? 'year' : 'month';
+  const displayPricePerAccount = pricePerAccount ?? planBasePrice;
+  const displayTotal = totalPrice ?? (displayPricePerAccount * accountCount);
+  
+  let message = `Hi! I want to renew my RepostFlow subscription.
+
+📋 Current Subscription Details:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+• Plan: ${planName}
+• Accounts: ${accountCount}
+• Billing: ${billingLabel}`;
+
+  if (volumeDiscount > 0) {
+    message += `\n• Volume Discount: ${volumeDiscount}% off`;
+  }
+  
+  message += `
+• Price per Account: $${displayPricePerAccount.toFixed(2)}/${periodLabel}
+• Total: $${displayTotal.toFixed(2)}/${periodLabel}`;
+
+  if (expiryDate) {
+    message += `\n\n📅 Expires: ${expiryDate}`;
+  }
+  
+  if (userEmail) {
+    message += `\n📧 Email: ${userEmail}`;
+  }
+  
+  message += `\n\nPlease send payment details for renewal.`;
+  
+  return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(message)}`;
+}
