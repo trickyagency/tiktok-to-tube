@@ -28,7 +28,7 @@ export function useUploadHistory(selectedChannelId?: string) {
       if (isOwner) {
         let query = supabase
           .from('publish_queue')
-          .select(`${baseSelect}, profiles!publish_queue_user_id_fkey(email)`)
+          .select(baseSelect)
           .eq('status', 'published')
           .order('processed_at', { ascending: false });
 
@@ -39,10 +39,19 @@ export function useUploadHistory(selectedChannelId?: string) {
         const { data, error } = await query.limit(100);
 
         if (error) throw error;
-        return (data || []).map((item: any) => ({
+        if (!data || data.length === 0) return [];
+
+        // Fetch profiles separately to get owner emails
+        const userIds = [...new Set(data.map(item => item.user_id))];
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, email')
+          .in('id', userIds);
+
+        const profileMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
+        return data.map(item => ({
           ...item,
-          owner_email: item.profiles?.email,
-          profiles: undefined,
+          owner_email: profileMap.get(item.user_id),
         })) as UploadHistoryItemWithOwner[];
       } else {
         let query = supabase
