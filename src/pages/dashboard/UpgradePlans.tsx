@@ -257,8 +257,13 @@ export default function UpgradePlans() {
     const basePrice = plan.price_monthly || 0;
     const annualMultiplier = isAnnual ? 0.75 : 1;
     const monthlyCost = calculateTotalPrice(basePrice, roiAccountCount) * annualMultiplier;
-    const estimatedMonthlyViews = roiAccountCount * roiAvgViews * 4;
-    const estimatedEarnings = (estimatedMonthlyViews / 1000) * roiCpmRate;
+    
+    // Calculate based on daily video uploads per plan
+    const dailyVideos = plan.max_videos_per_day || 2;
+    const monthlyVideos = dailyVideos * 30 * roiAccountCount;
+    const totalMonthlyViews = monthlyVideos * roiAvgViews;
+    const estimatedEarnings = (totalMonthlyViews / 1000) * roiCpmRate;
+    
     const profit = estimatedEarnings - monthlyCost;
     const roi = monthlyCost > 0 ? Math.round((profit / monthlyCost) * 100) : 0;
     
@@ -266,7 +271,9 @@ export default function UpgradePlans() {
       monthlyCost,
       estimatedEarnings: Math.round(estimatedEarnings),
       profit: Math.round(profit),
-      roi
+      roi,
+      dailyVideos,
+      monthlyVideos
     };
   }, [activePlans, roiSelectedPlan, roiAccountCount, roiAvgViews, roiCpmRate, billingCycle]);
 
@@ -833,11 +840,15 @@ export default function UpgradePlans() {
               </div>
               
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-background/50 rounded-xl">
+                <div className="flex items-center justify-between p-3 bg-background/50 rounded-xl">
+                  <span className="text-sm text-muted-foreground">Videos/Month</span>
+                  <span className="text-sm font-medium">{roiData?.monthlyVideos.toLocaleString() || 0} ({roiData?.dailyVideos || 0}/day)</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-background/50 rounded-xl">
                   <span className="text-sm text-muted-foreground">Monthly Cost</span>
                   <span className="text-lg font-bold">${roiData?.monthlyCost.toFixed(0) || 0}</span>
                 </div>
-                <div className="flex items-center justify-between p-4 bg-background/50 rounded-xl">
+                <div className="flex items-center justify-between p-3 bg-background/50 rounded-xl">
                   <span className="text-sm text-muted-foreground">Est. Earnings</span>
                   <span className="text-lg font-bold text-blue-500">${roiData?.estimatedEarnings.toLocaleString() || 0}</span>
                 </div>
@@ -848,7 +859,7 @@ export default function UpgradePlans() {
               </div>
               
               <p className="text-xs text-muted-foreground text-center mt-4 pt-4 border-t border-border/50">
-                * Estimates assume 4 videos/account/month. Actual results vary based on content, niche, and audience. YouTube Shorts CPM typically ranges $0.5-$3.
+                * Based on {roiData?.dailyVideos || 2} videos/day × 30 days. CPM varies by niche ($0.5-$3 typical).
               </p>
             </div>
           </CardContent>
