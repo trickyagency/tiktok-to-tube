@@ -59,7 +59,7 @@ import { formatDistanceToNow, differenceInDays } from 'date-fns';
 type SortField = 'username' | 'follower_count' | 'video_count' | 'last_scraped_at';
 type SortDirection = 'asc' | 'desc';
 
-const RESCRAPE_COOLDOWN_DAYS = 7;
+const RESCRAPE_COOLDOWN_DAYS = 15;
 
 // Helper to determine scrape button state
 function getScrapeButtonState(account: TikTokAccountWithOwner, isScraping: boolean) {

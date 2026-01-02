@@ -20,7 +20,7 @@ interface TikTokAccountCardProps {
   isApifyConfigured: boolean;
 }
 
-const RESCRAPE_COOLDOWN_DAYS = 7;
+const RESCRAPE_COOLDOWN_DAYS = 15;
 
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
   const { isOwner } = useAuth();
@@ -260,10 +260,17 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
                 </Badge>
               )}
               {!isScraping && isScraped && !canRescrape && (
-                <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-emerald-600 border-emerald-500/30 bg-emerald-500/10">
-                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                  Scraped {daysSinceLastScrape}d ago
-                </Badge>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-emerald-600 border-emerald-500/30 bg-emerald-500/10 cursor-help">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Videos Scraped Successfully
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Scraped {daysSinceLastScrape} days ago • ReScrape available in {daysUntilRescrape} days</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
               {!isScraping && isScraped && canRescrape && (
                 <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-primary border-primary/30 bg-primary/10">
