@@ -470,7 +470,7 @@ export default function MySubscriptions() {
               {/* Add account button */}
               {limits?.canAddTikTokAccount && (
                 <Button asChild className="w-full" variant="outline">
-                  <Link to="/dashboard/tiktok-accounts">
+                  <Link to="/dashboard/tiktok">
                     <Plus className="h-4 w-4 mr-2" />
                     Add TikTok Account
                   </Link>
