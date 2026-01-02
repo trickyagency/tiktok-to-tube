@@ -3,6 +3,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { 
   ChevronUp, 
   ChevronDown, 
@@ -13,7 +14,8 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  RotateCcw
+  RotateCcw,
+  ArrowUpDown
 } from 'lucide-react';
 import {
   Pagination,
@@ -82,7 +84,6 @@ export function YouTubeChannelsTable({
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const channelToDelete = channels.find(c => c.id === deleteChannelId);
 
-  // Reset to page 1 when channels change
   useEffect(() => {
     setCurrentPage(1);
   }, [channels.length]);
@@ -92,11 +93,9 @@ export function YouTubeChannelsTable({
       let aVal: string | number | null = a[sortField];
       let bVal: string | number | null = b[sortField];
 
-      // Handle null values
       if (aVal === null) aVal = sortField === 'channel_title' ? '' : 0;
       if (bVal === null) bVal = sortField === 'channel_title' ? '' : 0;
 
-      // For dates, compare timestamps
       if (sortField === 'created_at') {
         aVal = aVal ? new Date(aVal as string).getTime() : 0;
         bVal = bVal ? new Date(bVal as string).getTime() : 0;
@@ -107,13 +106,11 @@ export function YouTubeChannelsTable({
     });
   }, [channels, sortField, sortDirection]);
 
-  // Pagination calculations
   const totalPages = Math.ceil(sortedChannels.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedChannels = sortedChannels.slice(startIndex, endIndex);
 
-  // Ensure current page is valid
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(totalPages);
@@ -146,39 +143,42 @@ export function YouTubeChannelsTable({
   };
 
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null;
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-3.5 w-3.5 ml-1.5 text-muted-foreground/50" />;
+    }
     return sortDirection === 'asc' 
-      ? <ChevronUp className="h-4 w-4 ml-1" /> 
-      : <ChevronDown className="h-4 w-4 ml-1" />;
+      ? <ChevronUp className="h-4 w-4 ml-1 text-primary" /> 
+      : <ChevronDown className="h-4 w-4 ml-1 text-primary" />;
   };
 
   const getStatusBadge = (status: string | null) => {
+    const baseClass = "gap-1.5 font-medium";
     switch (status) {
       case 'connected':
         return (
-          <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
-            <CheckCircle className="h-3 w-3 mr-1" />
+          <Badge className={cn(baseClass, "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30")}>
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
             Connected
           </Badge>
         );
       case 'no_channel':
         return (
-          <Badge variant="default" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
-            <AlertCircle className="h-3 w-3 mr-1" />
+          <Badge className={cn(baseClass, "bg-amber-500/10 text-amber-600 border border-amber-500/30")}>
+            <AlertCircle className="h-3 w-3" />
             No Channel
           </Badge>
         );
       case 'failed':
         return (
-          <Badge variant="destructive">
-            <AlertCircle className="h-3 w-3 mr-1" />
+          <Badge className={cn(baseClass, "bg-red-500/10 text-red-600 border border-red-500/30")}>
+            <AlertCircle className="h-3 w-3" />
             Failed
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline">
-            <Clock className="h-3 w-3 mr-1" />
+          <Badge variant="outline" className={cn(baseClass)}>
+            <Clock className="h-3 w-3" />
             Pending
           </Badge>
         );
@@ -192,76 +192,90 @@ export function YouTubeChannelsTable({
 
   return (
     <>
-      <div className="rounded-md border">
+      {/* Premium table container */}
+      <div className="relative rounded-2xl border border-border/50 overflow-hidden bg-card/80 backdrop-blur-xl shadow-lg shadow-black/5">
+        {/* Top gradient accent */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+        
         <Table>
           <TableHeader>
-            <TableRow>
+            <TableRow className="hover:bg-transparent border-b border-border/50 bg-muted/30">
               <TableHead className="w-[50px]"></TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:text-foreground transition-colors"
                 onClick={() => handleSort('channel_title')}
               >
-                <div className="flex items-center">
+                <div className="flex items-center font-semibold">
                   Channel Name
                   <SortIcon field="channel_title" />
                 </div>
               </TableHead>
               <TableHead 
-                className="cursor-pointer hover:bg-muted/50 text-right"
+                className="cursor-pointer hover:text-foreground transition-colors text-right"
                 onClick={() => handleSort('subscriber_count')}
               >
-                <div className="flex items-center justify-end">
+                <div className="flex items-center justify-end font-semibold">
                   Subscribers
                   <SortIcon field="subscriber_count" />
                 </div>
               </TableHead>
-              <TableHead className="text-right">Videos</TableHead>
-              <TableHead>Status</TableHead>
-              {isOwner && <TableHead>Owner</TableHead>}
+              <TableHead className="text-right font-semibold">Videos</TableHead>
+              <TableHead className="font-semibold">Status</TableHead>
+              {isOwner && <TableHead className="font-semibold">Owner</TableHead>}
               <TableHead 
-                className="cursor-pointer hover:bg-muted/50"
+                className="cursor-pointer hover:text-foreground transition-colors"
                 onClick={() => handleSort('created_at')}
               >
-                <div className="flex items-center">
+                <div className="flex items-center font-semibold">
                   Connected At
                   <SortIcon field="created_at" />
                 </div>
               </TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              <TableHead className="w-[60px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedChannels.map((channel) => (
-              <TableRow key={channel.id}>
-                <TableCell>
-                  <Avatar className="h-8 w-8">
+            {paginatedChannels.map((channel, index) => (
+              <TableRow 
+                key={channel.id}
+                className={cn(
+                  "group transition-all duration-200",
+                  "border-l-2 border-l-transparent",
+                  "hover:bg-muted/50 hover:border-l-primary",
+                  index % 2 === 0 ? "bg-transparent" : "bg-muted/10"
+                )}
+              >
+                <TableCell className="py-3">
+                  <Avatar className="h-9 w-9 rounded-lg transition-transform group-hover:scale-105">
                     {channel.channel_thumbnail ? (
-                      <AvatarImage src={channel.channel_thumbnail} alt={channel.channel_title || 'Channel'} />
+                      <AvatarImage src={channel.channel_thumbnail} alt={channel.channel_title || 'Channel'} className="object-cover" />
                     ) : (
-                      <AvatarFallback className="bg-red-500/10">
+                      <AvatarFallback className="rounded-lg bg-red-500/10">
                         <Youtube className="h-4 w-4 text-red-500" />
                       </AvatarFallback>
                     )}
                   </Avatar>
                 </TableCell>
-                <TableCell className="font-medium">
-                  {channel.channel_title || 'Unnamed Channel'}
+                <TableCell className="font-medium py-3">
+                  <span className="group-hover:text-primary transition-colors">
+                    {channel.channel_title || 'Unnamed Channel'}
+                  </span>
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right py-3 tabular-nums">
                   {channel.subscriber_count?.toLocaleString() || 0}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right py-3 tabular-nums">
                   {channel.video_count || 0}
                 </TableCell>
-                <TableCell>{getStatusBadge(channel.auth_status)}</TableCell>
+                <TableCell className="py-3">{getStatusBadge(channel.auth_status)}</TableCell>
                 {isOwner && (
-                  <TableCell>
-                    <span className="text-xs text-muted-foreground">
+                  <TableCell className="py-3">
+                    <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded-md">
                       {channel.owner_email || '-'}
                     </span>
                   </TableCell>
                 )}
-                <TableCell>
+                <TableCell className="py-3">
                   {channel.created_at ? (
                     <span className="text-xs text-muted-foreground">
                       {formatDistanceToNow(new Date(channel.created_at), { addSuffix: true })}
@@ -270,49 +284,54 @@ export function YouTubeChannelsTable({
                     <span className="text-xs text-muted-foreground">-</span>
                   )}
                 </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      {needsReconnect(channel) && (
+                <TableCell className="py-3">
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-xl">
+                        {needsReconnect(channel) && (
+                          <DropdownMenuItem 
+                            onClick={() => onReauthorize(channel.id)}
+                            disabled={isAuthorizing === channel.id}
+                          >
+                            <RotateCcw className={cn("h-4 w-4 mr-2", isAuthorizing === channel.id && 'animate-spin')} />
+                            {isAuthorizing === channel.id ? 'Reconnecting...' : 'Reconnect'}
+                          </DropdownMenuItem>
+                        )}
+                        {channel.auth_status === 'connected' && (
+                          <DropdownMenuItem 
+                            onClick={() => onRefresh(channel.id)}
+                            disabled={isRefreshing === channel.id}
+                          >
+                            <RefreshCw className={cn("h-4 w-4 mr-2", isRefreshing === channel.id && 'animate-spin')} />
+                            {isRefreshing === channel.id ? 'Refreshing...' : 'Refresh Token'}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem 
-                          onClick={() => onReauthorize(channel.id)}
-                          disabled={isAuthorizing === channel.id}
+                          onClick={() => setDeleteChannelId(channel.id)}
+                          className="text-destructive focus:text-destructive focus:bg-destructive/10"
                         >
-                          <RotateCcw className={`h-4 w-4 mr-2 ${isAuthorizing === channel.id ? 'animate-spin' : ''}`} />
-                          {isAuthorizing === channel.id ? 'Reconnecting...' : 'Reconnect'}
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
                         </DropdownMenuItem>
-                      )}
-                      {channel.auth_status === 'connected' && (
-                        <DropdownMenuItem 
-                          onClick={() => onRefresh(channel.id)}
-                          disabled={isRefreshing === channel.id}
-                        >
-                          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing === channel.id ? 'animate-spin' : ''}`} />
-                          {isRefreshing === channel.id ? 'Refreshing...' : 'Refresh Token'}
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem 
-                        onClick={() => setDeleteChannelId(channel.id)}
-                        className="text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
             {sortedChannels.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isOwner ? 8 : 7} className="h-24 text-center text-muted-foreground">
-                  No channels found
+                <TableCell colSpan={isOwner ? 8 : 7} className="h-32 text-center text-muted-foreground">
+                  <div className="flex flex-col items-center gap-2">
+                    <Youtube className="h-8 w-8 text-muted-foreground/50" />
+                    <span>No channels found</span>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
@@ -320,12 +339,13 @@ export function YouTubeChannelsTable({
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* Premium Pagination */}
       {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 rounded-xl bg-card/50 backdrop-blur-sm border border-border/30">
+          <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span>
-              Showing {startIndex + 1}-{Math.min(endIndex, sortedChannels.length)} of {sortedChannels.length} channels
+              Showing <span className="font-semibold text-foreground">{startIndex + 1}-{Math.min(endIndex, sortedChannels.length)}</span> of{' '}
+              <span className="font-semibold text-foreground">{sortedChannels.length}</span> channels
             </span>
             <Select
               value={String(itemsPerPage)}
@@ -334,10 +354,10 @@ export function YouTubeChannelsTable({
                 setCurrentPage(1);
               }}
             >
-              <SelectTrigger className="w-[70px] h-8">
+              <SelectTrigger className="w-[70px] h-8 rounded-lg">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="rounded-xl">
                 <SelectItem value="10">10</SelectItem>
                 <SelectItem value="25">25</SelectItem>
                 <SelectItem value="50">50</SelectItem>
@@ -352,7 +372,10 @@ export function YouTubeChannelsTable({
               <PaginationItem>
                 <PaginationPrevious 
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={cn(
+                    "rounded-lg transition-all",
+                    currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-muted'
+                  )}
                 />
               </PaginationItem>
               
@@ -364,7 +387,10 @@ export function YouTubeChannelsTable({
                     <PaginationLink
                       onClick={() => setCurrentPage(page)}
                       isActive={currentPage === page}
-                      className="cursor-pointer"
+                      className={cn(
+                        "cursor-pointer rounded-lg transition-all",
+                        currentPage === page && "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                      )}
                     >
                       {page}
                     </PaginationLink>
@@ -375,7 +401,10 @@ export function YouTubeChannelsTable({
               <PaginationItem>
                 <PaginationNext 
                   onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  className={currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  className={cn(
+                    "rounded-lg transition-all",
+                    currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer hover:bg-muted'
+                  )}
                 />
               </PaginationItem>
             </PaginationContent>
@@ -384,7 +413,7 @@ export function YouTubeChannelsTable({
       )}
 
       <AlertDialog open={!!deleteChannelId} onOpenChange={() => setDeleteChannelId(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle>Remove YouTube Channel?</AlertDialogTitle>
             <AlertDialogDescription>
@@ -392,7 +421,7 @@ export function YouTubeChannelsTable({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (deleteChannelId) {
@@ -400,7 +429,7 @@ export function YouTubeChannelsTable({
                   setDeleteChannelId(null);
                 }
               }}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
               disabled={isDeleting}
             >
               {isDeleting ? 'Removing...' : 'Remove'}

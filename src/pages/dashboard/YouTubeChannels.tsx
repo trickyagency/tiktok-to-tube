@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle } from 'lucide-react';
+import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle, TrendingUp } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { YouTubeChannelsTable } from '@/components/youtube/YouTubeChannelsTable';
@@ -16,6 +16,7 @@ import {
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const YouTubeChannels = () => {
   const { isOwner } = useAuth();
@@ -33,7 +34,6 @@ const YouTubeChannels = () => {
     document.title = "YouTube Channels | RepostFlow";
   }, []);
 
-  // Listen for OAuth completion messages from popup
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'youtube-oauth-success') {
@@ -55,14 +55,12 @@ const YouTubeChannels = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [refetch]);
 
-  // Get unique owner emails for filter dropdown (only for owners)
   const ownerEmails = useMemo(() => {
     if (!channels || !isOwner) return [];
     const emails = channels.map(c => (c as any).owner_email).filter(Boolean) as string[];
     return [...new Set(emails)];
   }, [channels, isOwner]);
 
-  // Calculate stats
   const stats = useMemo(() => {
     if (!channels) return { total: 0, connected: 0, pending: 0, failed: 0 };
     return {
@@ -73,31 +71,26 @@ const YouTubeChannels = () => {
     };
   }, [channels]);
 
-  // Filter and sort channels
   const filteredChannels = useMemo(() => {
     if (!channels) return [];
     
     let result = channels.filter(channel => {
       const ownerEmail = (channel as any).owner_email?.toLowerCase() || '';
       
-      // Search filter
       const matchesSearch = searchQuery === '' || 
         channel.channel_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ownerEmail.includes(searchQuery.toLowerCase());
       
-      // Status filter
       const matchesStatus = statusFilter === 'all' || 
         channel.auth_status === statusFilter ||
         (statusFilter === 'pending' && ['pending', 'authorizing'].includes(channel.auth_status || ''));
       
-      // Owner filter
       const matchesOwner = ownerFilter === 'all' || 
         (channel as any).owner_email === ownerFilter;
       
       return matchesSearch && matchesStatus && matchesOwner;
     });
 
-    // Sort
     result.sort((a, b) => {
       switch (sortBy) {
         case 'name':
@@ -134,6 +127,53 @@ const YouTubeChannels = () => {
   const connectedChannels = filteredChannels.filter(c => c.auth_status === 'connected');
   const pendingChannels = filteredChannels.filter(c => c.auth_status !== 'connected');
 
+  // Stats card data
+  const statsCards = [
+    {
+      title: 'Total Channels',
+      value: stats.total,
+      subtitle: 'YouTube channels',
+      icon: Youtube,
+      iconBg: 'bg-red-500/10',
+      iconColor: 'text-red-500',
+      gradient: 'from-red-500/5 to-transparent',
+      borderColor: 'hover:border-red-500/30'
+    },
+    {
+      title: 'Connected',
+      value: stats.connected,
+      subtitle: 'Ready to upload',
+      icon: CheckCircle2,
+      iconBg: 'bg-emerald-500/10',
+      iconColor: 'text-emerald-500',
+      valueColor: 'text-emerald-600',
+      gradient: 'from-emerald-500/5 to-transparent',
+      borderColor: 'hover:border-emerald-500/30'
+    },
+    {
+      title: 'Pending',
+      value: stats.pending,
+      subtitle: 'Need authorization',
+      icon: Clock,
+      iconBg: 'bg-amber-500/10',
+      iconColor: 'text-amber-500',
+      valueColor: 'text-amber-600',
+      gradient: 'from-amber-500/5 to-transparent',
+      borderColor: 'hover:border-amber-500/30'
+    },
+    {
+      title: 'Failed',
+      value: stats.failed,
+      subtitle: 'Need attention',
+      icon: XCircle,
+      iconBg: 'bg-red-500/10',
+      iconColor: 'text-red-500',
+      valueColor: 'text-red-600',
+      gradient: 'from-red-500/5 to-transparent',
+      borderColor: 'hover:border-red-500/30'
+    }
+  ];
+
   return (
     <DashboardLayout
       title="YouTube Channels"
@@ -143,62 +183,55 @@ const YouTubeChannels = () => {
         {/* Setup Guide */}
         <GoogleCloudSetupGuide />
 
-        {/* Stats Cards */}
+        {/* Premium Stats Cards */}
         {isLoading ? (
           <YouTubeStatsSkeleton />
         ) : channels.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-4">
-            <Card className="relative overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Total Channels</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <Youtube className="h-4 w-4 text-red-500" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{stats.total}</div>
-                <p className="text-xs text-muted-foreground">YouTube channels</p>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Connected</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{stats.connected}</div>
-                <p className="text-xs text-muted-foreground">Ready to upload</p>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                  <Clock className="h-4 w-4 text-amber-500" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-amber-600">{stats.pending}</div>
-                <p className="text-xs text-muted-foreground">Need authorization</p>
-              </CardContent>
-            </Card>
-
-            <Card className="relative overflow-hidden">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Failed</CardTitle>
-                <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
-                  <XCircle className="h-4 w-4 text-red-500" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-                <p className="text-xs text-muted-foreground">Need attention</p>
-              </CardContent>
-            </Card>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {statsCards.map((stat, index) => (
+              <Card 
+                key={stat.title}
+                className={cn(
+                  "relative overflow-hidden group",
+                  "bg-card/80 backdrop-blur-xl",
+                  "border border-border/50",
+                  "shadow-lg shadow-black/5",
+                  "hover:shadow-xl hover:-translate-y-0.5",
+                  "transition-all duration-300 ease-out",
+                  stat.borderColor
+                )}
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                {/* Background gradient */}
+                <div className={cn("absolute inset-0 bg-gradient-to-br opacity-50", stat.gradient)} />
+                
+                {/* Top gradient line */}
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                
+                <CardHeader className="relative flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.title}
+                  </CardTitle>
+                  <div className={cn(
+                    "h-10 w-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110",
+                    stat.iconBg
+                  )}>
+                    <stat.icon className={cn("h-5 w-5", stat.iconColor)} />
+                  </div>
+                </CardHeader>
+                <CardContent className="relative">
+                  <div className={cn(
+                    "text-3xl font-bold tracking-tight",
+                    stat.valueColor || "text-foreground"
+                  )}>
+                    {stat.value}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                    {stat.subtitle}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         )}
 
@@ -257,21 +290,31 @@ const YouTubeChannels = () => {
             isDeleting={isDeleting}
           />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             {/* Pending Authorization */}
             {pendingChannels.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-amber-500" />
-                  Pending Authorization ({pendingChannels.length})
-                </h2>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
+                    <Clock className="h-4 w-4 text-amber-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Pending Authorization</h2>
+                    <p className="text-sm text-muted-foreground">{pendingChannels.length} channel{pendingChannels.length !== 1 ? 's' : ''} need{pendingChannels.length === 1 ? 's' : ''} attention</p>
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {pendingChannels.map((channel) => (
-                    <YouTubeChannelCard 
+                  {pendingChannels.map((channel, index) => (
+                    <div 
                       key={channel.id} 
-                      channel={channel} 
-                      onAuthComplete={refetch}
-                    />
+                      className="animate-in fade-in slide-in-from-bottom-4"
+                      style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
+                    >
+                      <YouTubeChannelCard 
+                        channel={channel} 
+                        onAuthComplete={refetch}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
@@ -279,31 +322,43 @@ const YouTubeChannels = () => {
 
             {/* Connected Channels */}
             {connectedChannels.length > 0 && (
-              <div className="space-y-3">
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                  Connected Channels ({connectedChannels.length})
-                </h2>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold">Connected Channels</h2>
+                    <p className="text-sm text-muted-foreground">{connectedChannels.length} channel{connectedChannels.length !== 1 ? 's' : ''} ready to upload</p>
+                  </div>
+                </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {connectedChannels.map((channel) => (
-                    <YouTubeChannelCard 
-                      key={channel.id} 
-                      channel={channel}
-                      onAuthComplete={refetch}
-                    />
+                  {connectedChannels.map((channel, index) => (
+                    <div 
+                      key={channel.id}
+                      className="animate-in fade-in slide-in-from-bottom-4"
+                      style={{ animationDelay: `${index * 50}ms`, animationFillMode: 'both' }}
+                    >
+                      <YouTubeChannelCard 
+                        channel={channel}
+                        onAuthComplete={refetch}
+                      />
+                    </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* No results */}
+            {/* No results state */}
             {filteredChannels.length === 0 && channels.length > 0 && (
-              <Card className="border-dashed">
-                <CardContent className="flex flex-col items-center justify-center py-12">
-                  <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
-                  <h3 className="font-medium mb-2">No channels match your filters</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Try adjusting your search or filter criteria
+              <Card className="border-dashed bg-card/50 backdrop-blur-sm">
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <div className="h-16 w-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+                    <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="font-semibold text-lg mb-2">No channels match your filters</h3>
+                  <p className="text-sm text-muted-foreground text-center max-w-sm">
+                    Try adjusting your search query or filter criteria to find what you're looking for
                   </p>
                 </CardContent>
               </Card>
