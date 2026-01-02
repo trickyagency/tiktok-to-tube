@@ -4,13 +4,16 @@ import { useSubscriptionPlans } from '@/hooks/useSubscriptions';
 import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
-  calculatePricePerAccount, 
-  calculateTotalCharge, 
-  calculateTotalSavings, 
-  getVolumeDiscountTier,
+  calculateDiscountedPrice, 
+  calculateTotalPrice, 
+  calculateSavings, 
+  getDiscountTierName,
+  getDiscountPercentage,
+  getNextTierInfo,
+  getVolumeDiscount,
   VOLUME_DISCOUNTS 
 } from '@/lib/pricing';
-import { generateWhatsAppLink } from '@/lib/whatsapp';
+import { generateGeneralWhatsAppLink, openWhatsApp } from '@/lib/whatsapp';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -228,10 +231,13 @@ export default function UpgradePlans() {
     
     const isAnnual = billingCycle === 'annual';
     const basePrice = plan.price_monthly || 0;
-    const pricePerAccount = calculatePricePerAccount(basePrice, count, isAnnual);
-    const totalCharge = calculateTotalCharge(basePrice, count, isAnnual);
-    const totalSavings = calculateTotalSavings(basePrice, count, isAnnual);
-    const discountTier = getVolumeDiscountTier(count);
+    const volumeDiscount = getVolumeDiscount(count);
+    const discountedPrice = calculateDiscountedPrice(basePrice, count);
+    const annualMultiplier = isAnnual ? 0.75 : 1; // 25% off for annual
+    const pricePerAccount = discountedPrice * annualMultiplier;
+    const totalCharge = calculateTotalPrice(basePrice, count) * annualMultiplier;
+    const totalSavings = calculateSavings(basePrice, count) + (isAnnual ? calculateTotalPrice(basePrice, count) * 0.25 : 0);
+    const discountTier = VOLUME_DISCOUNTS.find(t => count >= t.minAccounts && count <= t.maxAccounts);
     
     return {
       pricePerAccount,
@@ -249,7 +255,8 @@ export default function UpgradePlans() {
     
     const isAnnual = billingCycle === 'annual';
     const basePrice = plan.price_monthly || 0;
-    const monthlyCost = calculateTotalCharge(basePrice, roiAccountCount, isAnnual);
+    const annualMultiplier = isAnnual ? 0.75 : 1;
+    const monthlyCost = calculateTotalPrice(basePrice, roiAccountCount) * annualMultiplier;
     const estimatedMonthlyViews = roiAccountCount * roiAvgViews * 4;
     const estimatedEarnings = (estimatedMonthlyViews / 1000) * roiCpmRate;
     const profit = estimatedEarnings - monthlyCost;
@@ -274,7 +281,7 @@ export default function UpgradePlans() {
     return {
       planName: currentSubscription.plan?.name || 'Unknown',
       planId: currentSubscription.plan?.id || currentSubscription.plan_id || '',
-      accountLimit: currentSubscription.account_limit || currentSubscription.account_count || 0,
+      accountLimit: currentSubscription.account_count || 0,
       status: currentSubscription.status,
       daysRemaining,
       expiresAt
@@ -283,8 +290,7 @@ export default function UpgradePlans() {
 
   // WhatsApp handlers
   const handleContactWhatsApp = () => {
-    const link = generateWhatsAppLink('general');
-    window.open(link, '_blank');
+    window.open(generateGeneralWhatsAppLink(), '_blank');
   };
 
   const handleSelectPlan = (planId: string, count: number) => {
@@ -293,8 +299,7 @@ export default function UpgradePlans() {
     
     const savings = getSavingsInfo(planId, count);
     const message = `Hi! I'm interested in the ${plan.name} plan with ${count} accounts (${billingCycle} billing). ${savings ? `Total: $${savings.totalCharge.toFixed(2)}/month` : ''}`;
-    const link = generateWhatsAppLink('subscription', message);
-    window.open(link, '_blank');
+    openWhatsApp(message);
   };
 
   if (plansLoading || subLoading) {
@@ -545,7 +550,7 @@ export default function UpgradePlans() {
                     <Slider
                       value={[count]}
                       min={1}
-                      max={plan.max_accounts || 50}
+                      max={50}
                       step={1}
                       onValueChange={([value]) => {
                         setAccountCounts(prev => ({ ...prev, [planId]: value }));
