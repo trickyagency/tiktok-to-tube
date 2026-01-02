@@ -98,8 +98,7 @@ serve(async (req) => {
       }
 
       // Use channel's custom redirect URI - this MUST match what's configured in Google Cloud Console
-      // Default to Supabase URL directly to avoid SPA routing issues with website domain
-      const DEFAULT_REDIRECT_URI = `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
+      const DEFAULT_REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
       const callbackUrl = channel.google_redirect_uri || DEFAULT_REDIRECT_URI;
       
       console.log('Using callback URL:', callbackUrl);
@@ -211,7 +210,7 @@ serve(async (req) => {
       }
 
       // MUST use the same redirect URI that was used during authorization
-      const DEFAULT_REDIRECT_URI = `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
+      const DEFAULT_REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
       const callbackUrl = channel.google_redirect_uri || DEFAULT_REDIRECT_URI;
       
       console.log('Token exchange using callback URL:', callbackUrl);
@@ -301,22 +300,33 @@ serve(async (req) => {
       // Calculate token expiration time
       const tokenExpiresAt = new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString();
 
+      // Build update object - only include refresh_token if Google returned one
+      // (Google doesn't always return refresh_token on re-authorization)
+      const updateData: Record<string, unknown> = {
+        channel_id: youtubeChannelId,
+        channel_title: channelTitle,
+        channel_thumbnail: channelThumbnail,
+        channel_handle: channelHandle,
+        subscriber_count: subscriberCount,
+        video_count: videoCount,
+        access_token: tokenData.access_token,
+        token_expires_at: tokenExpiresAt,
+        auth_status: authStatus,
+        is_connected: authStatus === 'connected',
+      };
+
+      // Only update refresh_token if we got a new one
+      if (tokenData.refresh_token) {
+        updateData.refresh_token = tokenData.refresh_token;
+        console.log('New refresh_token received and will be stored');
+      } else {
+        console.log('No new refresh_token received - keeping existing one');
+      }
+
       // Update channel with tokens and info
       const { error: updateError } = await supabase
         .from('youtube_channels')
-        .update({
-          channel_id: youtubeChannelId,
-          channel_title: channelTitle,
-          channel_thumbnail: channelThumbnail,
-          channel_handle: channelHandle,
-          subscriber_count: subscriberCount,
-          video_count: videoCount,
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          token_expires_at: tokenExpiresAt,
-          auth_status: authStatus,
-          is_connected: authStatus === 'connected',
-        })
+        .update(updateData)
         .eq('id', stateObj.channel_id);
 
       if (updateError) {
