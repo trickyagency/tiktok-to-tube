@@ -16,7 +16,8 @@ import {
   Users,
   Video,
   Unlink,
-  RotateCcw
+  RotateCcw,
+  Sparkles
 } from 'lucide-react';
 import { YouTubeChannelWithOwner, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,6 +51,64 @@ interface YouTubeChannelCardProps {
   onAuthComplete?: () => void;
 }
 
+// Status color mapping
+const getStatusColors = (status: string | null) => {
+  switch (status) {
+    case 'connected':
+      return {
+        gradient: 'from-emerald-500 via-emerald-400 to-emerald-500',
+        ring: 'ring-emerald-500/30',
+        bg: 'bg-emerald-500/10',
+        text: 'text-emerald-600',
+        border: 'border-emerald-500/30',
+        dot: 'bg-emerald-500',
+        glow: 'shadow-emerald-500/20'
+      };
+    case 'pending':
+    case 'authorizing':
+      return {
+        gradient: 'from-blue-500 via-blue-400 to-blue-500',
+        ring: 'ring-blue-500/30',
+        bg: 'bg-blue-500/10',
+        text: 'text-blue-600',
+        border: 'border-blue-500/30',
+        dot: 'bg-blue-500',
+        glow: 'shadow-blue-500/20'
+      };
+    case 'no_channel':
+      return {
+        gradient: 'from-amber-500 via-amber-400 to-amber-500',
+        ring: 'ring-amber-500/30',
+        bg: 'bg-amber-500/10',
+        text: 'text-amber-600',
+        border: 'border-amber-500/30',
+        dot: 'bg-amber-500',
+        glow: 'shadow-amber-500/20'
+      };
+    case 'failed':
+    case 'token_revoked':
+      return {
+        gradient: 'from-red-500 via-red-400 to-red-500',
+        ring: 'ring-red-500/30',
+        bg: 'bg-red-500/10',
+        text: 'text-red-600',
+        border: 'border-red-500/30',
+        dot: 'bg-red-500',
+        glow: 'shadow-red-500/20'
+      };
+    default:
+      return {
+        gradient: 'from-muted via-muted to-muted',
+        ring: 'ring-muted/30',
+        bg: 'bg-muted/10',
+        text: 'text-muted-foreground',
+        border: 'border-muted/30',
+        dot: 'bg-muted',
+        glow: 'shadow-muted/20'
+      };
+  }
+};
+
 export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCardProps) {
   const { isOwner } = useAuth();
   const [isAuthorizing, setIsAuthorizing] = useState(false);
@@ -66,16 +125,12 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   const { data: tikTokAccounts = [] } = useTikTokAccounts();
   
   const linkedTikTokAccount = tikTokAccounts.find(a => a.id === channel.tiktok_account_id);
-  
-  // Fetch video count for the linked TikTok account
   const { data: linkedAccountVideos = [] } = useScrapedVideos(channel.tiktok_account_id);
-  
-  // Fetch quota for this specific channel
   const { data: quotaData } = useYouTubeQuota(channel.id);
   const channelQuota = quotaData?.[0];
-  
-  // Fetch user subscription for daily limit
   const { data: subscriptionData } = useCurrentUserSubscription();
+
+  const statusColors = getStatusColors(channel.auth_status);
 
   // Countdown timer effect
   useEffect(() => {
@@ -83,7 +138,7 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
     
     const countdownId = setInterval(() => {
       setSecondsUntilCheck(prev => {
-        if (prev <= 1) return 30; // Reset when hitting 0
+        if (prev <= 1) return 30;
         return prev - 1;
       });
     }, 1000);
@@ -94,7 +149,6 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   // Automatic polling for no_channel status
   useEffect(() => {
     if (channel.auth_status !== 'no_channel') {
-      // Clear any existing polling
       if (pollingRef.current.intervalId) clearInterval(pollingRef.current.intervalId);
       if (pollingRef.current.timeoutId) clearTimeout(pollingRef.current.timeoutId);
       setIsPolling(false);
@@ -110,15 +164,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
         setIsPolling(false);
         onAuthComplete?.();
       }
-      setSecondsUntilCheck(30); // Reset countdown after each check
+      setSecondsUntilCheck(30);
     };
 
-    // Start polling every 30 seconds
     setIsPolling(true);
     setSecondsUntilCheck(30);
     pollingRef.current.intervalId = setInterval(poll, 30000);
     
-    // Stop polling after 5 minutes
     pollingRef.current.timeoutId = setTimeout(() => {
       if (pollingRef.current.intervalId) {
         clearInterval(pollingRef.current.intervalId);
@@ -145,13 +197,11 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
       } else {
         toast.info('No YouTube channel found yet. Keep waiting or create one first.');
       }
-      setSecondsUntilCheck(30); // Reset countdown after manual check
+      setSecondsUntilCheck(30);
     } finally {
       setIsManualChecking(false);
     }
   };
-
-
 
   const handleAuthorize = async () => {
     setIsAuthorizing(true);
@@ -184,46 +234,46 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   };
 
   const getStatusBadge = () => {
+    const baseClass = "gap-1.5 font-medium transition-all duration-200";
     switch (channel.auth_status) {
       case 'connected':
         return (
-          <Badge variant="default" className="bg-green-500/10 text-green-600 border-green-500/20">
-            <CheckCircle className="h-3 w-3 mr-1" />
+          <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
+            <span className={cn("h-1.5 w-1.5 rounded-full animate-pulse", statusColors.dot)} />
             Connected
           </Badge>
         );
       case 'no_channel':
         return (
-          <Badge variant="default" className="bg-amber-500/10 text-amber-600 border-amber-500/20">
-            <AlertCircle className="h-3 w-3 mr-1" />
+          <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
+            <AlertCircle className="h-3 w-3" />
             No YouTube Channel
           </Badge>
         );
       case 'authorizing':
         return (
-          <Badge variant="secondary">
-            <Clock className="h-3 w-3 mr-1" />
+          <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
+            <RefreshCw className="h-3 w-3 animate-spin" />
             Authorizing...
           </Badge>
         );
       case 'failed':
         return (
-          <Badge variant="destructive">
-            <AlertCircle className="h-3 w-3 mr-1" />
+          <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
+            <AlertCircle className="h-3 w-3" />
             Failed
           </Badge>
         );
       default:
         return (
-          <Badge variant="outline">
-            <Clock className="h-3 w-3 mr-1" />
+          <Badge variant="outline" className={cn(baseClass)}>
+            <Clock className="h-3 w-3" />
             Pending
           </Badge>
         );
     }
   };
 
-  // Determine if channel needs reconnection (only when refresh token is revoked, not when access token expires)
   const needsReconnect = 
     channel.auth_status === 'failed' || 
     channel.auth_status === 'token_revoked' ||
@@ -231,89 +281,119 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
 
   return (
     <Card className={cn(
-      "overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5",
-      channel.auth_status === 'connected' && "border-l-2 border-l-green-500",
-      channel.auth_status === 'pending' && "border-l-2 border-l-blue-500",
-      channel.auth_status === 'no_channel' && "border-l-2 border-l-amber-500",
-      channel.auth_status === 'failed' && "border-l-2 border-l-red-500"
+      "group relative overflow-hidden",
+      "bg-card/80 backdrop-blur-xl",
+      "border border-border/50",
+      "shadow-lg shadow-black/5",
+      "hover:shadow-xl hover:-translate-y-1",
+      "transition-all duration-300 ease-out",
+      statusColors.glow
     )}>
-      <CardContent className="p-4">
+      {/* Top gradient stripe */}
+      <div className={cn(
+        "absolute top-0 left-0 right-0 h-1 bg-gradient-to-r",
+        statusColors.gradient
+      )} />
+
+      <CardContent className="p-5">
         <div className="flex items-start gap-4">
-          <Avatar className="h-16 w-16 rounded-lg">
-            {channel.channel_thumbnail ? (
-              <AvatarImage src={channel.channel_thumbnail} alt={channel.channel_title || 'Channel'} />
-            ) : (
-              <AvatarFallback className="rounded-lg bg-red-500/10">
-                <Youtube className="h-8 w-8 text-red-500" />
-              </AvatarFallback>
-            )}
-          </Avatar>
+          {/* Avatar with status ring */}
+          <div className="relative shrink-0">
+            <Avatar className={cn(
+              "h-16 w-16 rounded-xl ring-2 ring-offset-2 ring-offset-background transition-all duration-300",
+              statusColors.ring,
+              "group-hover:scale-105"
+            )}>
+              {channel.channel_thumbnail ? (
+                <AvatarImage src={channel.channel_thumbnail} alt={channel.channel_title || 'Channel'} className="object-cover" />
+              ) : (
+                <AvatarFallback className="rounded-xl bg-red-500/10">
+                  <Youtube className="h-8 w-8 text-red-500" />
+                </AvatarFallback>
+              )}
+            </Avatar>
+            {/* Status dot */}
+            <div className={cn(
+              "absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-background",
+              statusColors.dot,
+              channel.auth_status === 'connected' && "animate-pulse"
+            )} />
+          </div>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <h3 className="font-semibold truncate">
+            {/* Header with title and badges */}
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
+              <h3 className="font-semibold text-lg truncate">
                 {channel.channel_title || 'Unnamed Channel'}
               </h3>
               {getStatusBadge()}
-              {isOwner && channel.owner_email && (
-                <Badge variant="outline" className="text-xs bg-blue-500/10 text-blue-600 border-blue-500/20">
-                  Owner: {channel.owner_email}
-                </Badge>
-              )}
             </div>
 
+            {/* Owner badge */}
+            {isOwner && channel.owner_email && (
+              <Badge variant="outline" className="text-xs bg-blue-500/5 text-blue-600 border-blue-500/20 mb-2">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Owner: {channel.owner_email}
+              </Badge>
+            )}
+
+            {/* Stats grid for connected channels */}
             {channel.auth_status === 'connected' && (
-              <div className="flex items-center gap-4 text-sm text-muted-foreground mb-2">
-                <span className="flex items-center gap-1">
-                  <Users className="h-3.5 w-3.5" />
-                  {channel.subscriber_count.toLocaleString()} subscribers
-                </span>
-                <span className="flex items-center gap-1">
-                  <Video className="h-3.5 w-3.5" />
-                  {channel.video_count} videos
-                </span>
-                {linkedTikTokAccount ? (
-                  <span className="flex items-center gap-1 text-primary">
-                    <LinkIcon className="h-3.5 w-3.5" />
-                    <span className="font-medium">@{linkedTikTokAccount.username}</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1 text-amber-500">
-                    <Unlink className="h-3.5 w-3.5" />
-                    Not linked
-                  </span>
-                )}
+              <div className="grid grid-cols-3 gap-2 mt-3 p-3 rounded-xl bg-muted/30 border border-border/30">
+                <div className="text-center p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-default">
+                  <Users className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-sm font-semibold">{channel.subscriber_count?.toLocaleString() || 0}</p>
+                  <p className="text-[10px] text-muted-foreground">Subscribers</p>
+                </div>
+                <div className="text-center p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-default">
+                  <Video className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className="text-sm font-semibold">{channel.video_count || 0}</p>
+                  <p className="text-[10px] text-muted-foreground">Videos</p>
+                </div>
+                <div className="text-center p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-default">
+                  <LinkIcon className="h-4 w-4 mx-auto mb-1 text-muted-foreground" />
+                  <p className={cn("text-sm font-semibold", linkedTikTokAccount ? "text-primary" : "text-amber-500")}>
+                    {linkedTikTokAccount ? '1' : '0'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">Linked</p>
+                </div>
               </div>
             )}
 
+            {/* No channel instructions */}
             {channel.auth_status === 'no_channel' && (
-              <div className="text-sm text-amber-600 mb-2">
-                <p className="mb-2">Your Google account doesn't have a YouTube channel yet.</p>
-                <div className="flex flex-col gap-1 text-muted-foreground">
-                  <span className="font-medium text-amber-600">Steps to connect:</span>
-                  <span>1. <a 
-                    href="https://www.youtube.com/create_channel" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    Create YouTube Channel
-                  </a></span>
-                  <span>2. We'll detect it automatically, or click "Re-authorize"</span>
+              <div className="mt-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                <p className="text-sm text-amber-600 mb-2 font-medium">Your Google account doesn't have a YouTube channel yet.</p>
+                <div className="flex flex-col gap-1.5 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-2">
+                    <span className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600 text-[10px] font-bold">1</span>
+                    <a 
+                      href="https://www.youtube.com/create_channel" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Create YouTube Channel
+                    </a>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-5 w-5 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-600 text-[10px] font-bold">2</span>
+                    We'll detect it automatically, or click "Re-authorize"
+                  </span>
                 </div>
                 {isPolling && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <span className="text-xs text-muted-foreground flex items-center gap-1">
-                      <RefreshCw className="h-3 w-3 animate-spin" />
-                      Next check in {secondsUntilCheck}s
+                  <div className="flex items-center gap-2 mt-3 pt-3 border-t border-amber-500/20">
+                    <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                      <RefreshCw className="h-3 w-3 animate-spin text-primary" />
+                      Next check in <span className="font-mono font-medium">{secondsUntilCheck}s</span>
                     </span>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={handleManualCheck}
                       disabled={isManualChecking}
-                      className="h-6 px-2 text-xs"
+                      className="h-6 px-2 text-xs ml-auto"
                     >
                       {isManualChecking ? (
                         <RefreshCw className="h-3 w-3 animate-spin" />
@@ -327,70 +407,74 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
             )}
 
             {/* TikTok Link Display & Dropdown */}
-            {linkedTikTokAccount ? (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 bg-primary/10 rounded-md px-2.5 py-1.5">
-                  <LinkIcon className="h-3.5 w-3.5 text-primary" />
-                  <span className="text-sm font-medium">@{linkedTikTokAccount.username}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    <Video className="h-2.5 w-2.5 mr-1" />
-                    {linkedAccountVideos.length} videos
-                  </Badge>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
-                      <RefreshCw className="h-3 w-3" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start">
-                    {tikTokAccounts.map((account) => (
-                      <DropdownMenuItem
-                        key={account.id}
-                        onClick={() => handleLinkTikTok(account.id)}
-                        className={account.id === channel.tiktok_account_id ? 'bg-accent' : ''}
-                      >
-                        @{account.username}
-                      </DropdownMenuItem>
-                    ))}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleLinkTikTok(null)}>
-                      <Unlink className="h-3.5 w-3.5 mr-2" />
-                      Unlink
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+            {channel.auth_status === 'connected' && (
+              <div className="mt-3">
+                {linkedTikTokAccount ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-3 py-2 border border-primary/20">
+                      <LinkIcon className="h-3.5 w-3.5 text-primary" />
+                      <span className="text-sm font-medium">@{linkedTikTokAccount.username}</span>
+                      <Badge variant="secondary" className="text-[10px] h-5">
+                        <Video className="h-2.5 w-2.5 mr-1" />
+                        {linkedAccountVideos.length}
+                      </Badge>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
+                          <RefreshCw className="h-3.5 w-3.5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="rounded-xl">
+                        {tikTokAccounts.map((account) => (
+                          <DropdownMenuItem
+                            key={account.id}
+                            onClick={() => handleLinkTikTok(account.id)}
+                            className={account.id === channel.tiktok_account_id ? 'bg-accent' : ''}
+                          >
+                            @{account.username}
+                          </DropdownMenuItem>
+                        ))}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => handleLinkTikTok(null)} className="text-destructive">
+                          <Unlink className="h-3.5 w-3.5 mr-2" />
+                          Unlink
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="h-8 px-3 text-xs rounded-lg border-dashed">
+                        <LinkIcon className="h-3 w-3 mr-1.5" />
+                        Link TikTok Account
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="rounded-xl">
+                      {tikTokAccounts.map((account) => (
+                        <DropdownMenuItem
+                          key={account.id}
+                          onClick={() => handleLinkTikTok(account.id)}
+                        >
+                          @{account.username}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
               </div>
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-                    <LinkIcon className="h-3 w-3 mr-1" />
-                    Link TikTok Account
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
-                  {tikTokAccounts.map((account) => (
-                    <DropdownMenuItem
-                      key={account.id}
-                      onClick={() => handleLinkTikTok(account.id)}
-                    >
-                      @{account.username}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
             )}
 
             {channel.auth_status === 'token_revoked' && (
-              <p className="text-xs text-amber-500 mt-1">
+              <p className="text-xs text-amber-500 mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
                 Refresh token revoked - please reconnect your channel
               </p>
             )}
 
             {/* Quota Indicator for connected channels */}
             {channel.auth_status === 'connected' && channelQuota && (
-              <div className="mt-3 pt-3 border-t">
+              <div className="mt-4 pt-4 border-t border-border/50">
                 <QuotaIndicator 
                   quota={channelQuota} 
                   dailyLimit={subscriptionData?.maxVideosPerDay || 2}
@@ -400,13 +484,14 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
             )}
           </div>
 
-          <div className="flex flex-col gap-2">
+          {/* Action buttons */}
+          <div className="flex flex-col gap-2 shrink-0">
             {channel.auth_status === 'no_channel' ? (
               <Button 
                 size="sm" 
                 onClick={handleAuthorize} 
                 disabled={isAuthorizing}
-                className="bg-amber-500 hover:bg-amber-600 text-white"
+                className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white shadow-lg shadow-amber-500/20"
               >
                 {isAuthorizing ? (
                   <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Re-authorizing...</>
@@ -415,7 +500,12 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                 )}
               </Button>
             ) : channel.auth_status !== 'connected' ? (
-              <Button size="sm" onClick={handleAuthorize} disabled={isAuthorizing}>
+              <Button 
+                size="sm" 
+                onClick={handleAuthorize} 
+                disabled={isAuthorizing}
+                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary shadow-lg shadow-primary/20"
+              >
                 {isAuthorizing ? (
                   <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Authorizing...</>
                 ) : (
@@ -425,17 +515,21 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
             ) : needsReconnect ? (
               <Button size="sm" variant="outline" onClick={handleAuthorize} disabled={isAuthorizing}>
                 <RotateCcw className={`h-4 w-4 mr-2 ${isAuthorizing ? 'animate-spin' : ''}`} />
-                {isAuthorizing ? 'Reconnecting...' : 'Reconnect Channel'}
+                {isAuthorizing ? 'Reconnecting...' : 'Reconnect'}
               </Button>
             ) : null}
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive">
+                <Button 
+                  size="sm" 
+                  variant="ghost" 
+                  className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="rounded-2xl">
                 <AlertDialogHeader>
                   <AlertDialogTitle>Remove YouTube Channel?</AlertDialogTitle>
                   <AlertDialogDescription>
@@ -444,10 +538,10 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
                   <AlertDialogAction
                     onClick={() => deleteChannel(channel.id)}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
                     disabled={isDeleting}
                   >
                     {isDeleting ? 'Removing...' : 'Remove'}
