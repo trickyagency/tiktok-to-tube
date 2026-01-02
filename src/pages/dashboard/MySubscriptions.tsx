@@ -405,7 +405,7 @@ export default function MySubscriptions() {
                       gradient
                     )}
                   >
-                    <Link to="/dashboard/upgrade-plans">
+                    <Link to="/dashboard/upgrade">
                     <Sparkles className="h-4 w-4 mr-2" />
                       Upgrade Plan
                     </Link>
