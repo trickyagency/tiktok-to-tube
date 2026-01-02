@@ -21,7 +21,7 @@ const Footer = () => {
 
           {/* Product */}
           <div>
-            <h4 className="font-semibold mb-4">Product</h4>
+            <h3 className="font-semibold mb-4 text-base">Product</h3>
             <ul className="space-y-2">
               <li>
                 <Link to="/#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -43,7 +43,7 @@ const Footer = () => {
 
           {/* Legal */}
           <div>
-            <h4 className="font-semibold mb-4">Legal</h4>
+            <h3 className="font-semibold mb-4 text-base">Legal</h3>
             <ul className="space-y-2">
               <li>
                 <Link to="/privacy" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -60,7 +60,7 @@ const Footer = () => {
 
           {/* Contact */}
           <div>
-            <h4 className="font-semibold mb-4">Contact</h4>
+            <h3 className="font-semibold mb-4 text-base">Contact</h3>
             <ul className="space-y-2">
               <li>
                 <Link to="/contact" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
