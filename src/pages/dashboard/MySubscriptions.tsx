@@ -130,60 +130,53 @@ function StatCard({
 // TikTok account card
 function AccountCard({ account, index }: { account: any; index: number }) {
   return (
-    <Card 
-      className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300"
-      style={{ animationDelay: `${index * 50}ms` }}
-    >
-      {/* Hover gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-      
-      <CardContent className="relative p-4">
-        <div className="flex items-center gap-3">
-          {/* Avatar with ring */}
-          <div className="relative">
-            <Avatar className="h-12 w-12 ring-2 ring-border group-hover:ring-primary/50 transition-all">
-              <AvatarImage src={account.avatar_url} alt={account.username} />
-              <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 text-white">
-                {account.username?.[0]?.toUpperCase() || 'T'}
-              </AvatarFallback>
-            </Avatar>
-            {/* Status indicator */}
-            <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">
-              <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+    <Link to="/dashboard/tiktok-accounts" className="block">
+      <Card 
+        className="group relative overflow-hidden bg-card/80 backdrop-blur-xl border-border/50 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
+        style={{ animationDelay: `${index * 50}ms` }}
+      >
+        {/* Hover gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-pink-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        
+        <CardContent className="relative p-4">
+          <div className="flex items-center gap-3">
+            {/* Avatar with ring */}
+            <div className="relative">
+              <Avatar className="h-12 w-12 ring-2 ring-border group-hover:ring-primary/50 transition-all">
+                <AvatarImage src={account.avatar_url} alt={account.username} />
+                <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 text-white">
+                  {account.username?.[0]?.toUpperCase() || 'T'}
+                </AvatarFallback>
+              </Avatar>
+              {/* Status indicator */}
+              <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">
+                <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+              </div>
             </div>
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold truncate">{account.display_name || account.username}</p>
-            <p className="text-xs text-muted-foreground truncate">@{account.username}</p>
-            <div className="flex items-center gap-2 mt-1.5">
-              <Badge variant="secondary" className="text-[10px] h-5 px-2">
-                <Video className="h-2.5 w-2.5 mr-1" />
-                {account.video_count || 0}
-              </Badge>
-              {account.youtube_channel && (
-                <Badge variant="outline" className="text-[10px] h-5 px-2 border-red-500/30 text-red-500">
-                  <ExternalLink className="h-2.5 w-2.5 mr-1" />
-                  YT
+            
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold truncate">{account.display_name || account.username}</p>
+              <p className="text-xs text-muted-foreground truncate">@{account.username}</p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <Badge variant="secondary" className="text-[10px] h-5 px-2">
+                  <Video className="h-2.5 w-2.5 mr-1" />
+                  {account.video_count || 0}
                 </Badge>
-              )}
+                {account.youtube_channel && (
+                  <Badge variant="outline" className="text-[10px] h-5 px-2 border-red-500/30 text-red-500">
+                    <ExternalLink className="h-2.5 w-2.5 mr-1" />
+                    YT
+                  </Badge>
+                )}
+              </div>
             </div>
+            
+            {/* Arrow indicator */}
+            <ArrowUpRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-          
-          {/* Quick action */}
-          <Button 
-            asChild 
-            size="icon" 
-            variant="ghost" 
-            className="opacity-0 group-hover:opacity-100 transition-opacity"
-          >
-            <Link to={`/dashboard/tiktok-accounts`}>
-              <ArrowUpRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </Link>
   );
 }
 
@@ -272,23 +265,6 @@ export default function MySubscriptions() {
   return (
     <DashboardLayout title="My Subscription" description="Manage your subscription and account usage">
       <div className="space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-              My Subscription
-              <Badge className={cn(
-                "bg-gradient-to-r text-white border-0 shadow-lg",
-                gradient,
-                `shadow-${planId === 'owner' ? 'amber' : planId === 'pro' ? 'purple' : 'blue'}-500/25`
-              )}>
-                <PlanIcon className="h-3 w-3 mr-1" />
-                {planName}
-              </Badge>
-            </h1>
-            <p className="text-muted-foreground mt-1">Manage your subscription and account usage</p>
-          </div>
-        </div>
 
         {/* Status Banner */}
         <SubscriptionStatusBanner />
