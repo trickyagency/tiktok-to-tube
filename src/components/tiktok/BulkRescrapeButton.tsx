@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
-const RESCRAPE_COOLDOWN_DAYS = 7;
+const RESCRAPE_COOLDOWN_DAYS = 15;
 
 interface BulkRescrapeButtonProps {
   disabled?: boolean;
@@ -76,7 +76,7 @@ export function BulkRescrapeButton({ disabled }: BulkRescrapeButtonProps) {
           </Button>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs">
-          <p>No accounts are ready for rescrape. Accounts become eligible 7 days after their last scrape.</p>
+          <p>No accounts are ready for rescrape. Accounts become eligible 15 days after their last scrape.</p>
         </TooltipContent>
       </Tooltip>
     );
