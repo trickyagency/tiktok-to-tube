@@ -88,6 +88,7 @@ const AppContent = () => {
         <Route path="/auth" element={<Auth />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/functions/v1/youtube-oauth" element={<YouTubeOAuthProxy />} />
+        <Route path="/functions/v1/youtube-oauth/*" element={<YouTubeOAuthProxy />} />
         <Route
           path="/dashboard"
           element={
