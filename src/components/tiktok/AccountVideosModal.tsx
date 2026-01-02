@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Pagination,
   PaginationContent,
@@ -11,10 +12,12 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Eye, Heart, MessageCircle, Share2, ExternalLink, Youtube } from 'lucide-react';
+import { Eye, Heart, MessageCircle, Share2, ExternalLink, Youtube, Upload, Video } from 'lucide-react';
 import { useScrapedVideos, ScrapedVideo } from '@/hooks/useScrapedVideos';
 import { TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { QueueVideoToYouTube } from '@/components/queue/QueueVideoToYouTube';
+
+type VideoFilter = 'all' | 'not_uploaded' | 'uploaded';
 
 interface AccountVideosModalProps {
   account: TikTokAccount | null;
@@ -137,32 +140,77 @@ export function AccountVideosModal({ account, open, onOpenChange }: AccountVideo
 
   const PAGE_SIZE = 20;
   const [page, setPage] = useState(1);
+  const [filter, setFilter] = useState<VideoFilter>('all');
 
   useEffect(() => {
-    if (open) setPage(1);
+    if (open) {
+      setPage(1);
+      setFilter('all');
+    }
   }, [open, account?.id]);
 
-  const total = videos?.length ?? 0;
+  // Filter videos based on selected tab
+  const filteredVideos = useMemo(() => {
+    if (!videos) return [];
+    switch (filter) {
+      case 'uploaded':
+        return videos.filter(v => v.is_published);
+      case 'not_uploaded':
+        return videos.filter(v => !v.is_published);
+      default:
+        return videos;
+    }
+  }, [videos, filter]);
+
+  // Count for each filter
+  const counts = useMemo(() => ({
+    all: videos?.length ?? 0,
+    uploaded: videos?.filter(v => v.is_published).length ?? 0,
+    not_uploaded: videos?.filter(v => !v.is_published).length ?? 0
+  }), [videos]);
+
+  const total = filteredVideos.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
 
   const pageVideos = useMemo(() => {
     const start = (page - 1) * PAGE_SIZE;
-    return videos?.slice(start, start + PAGE_SIZE) ?? [];
-  }, [page, videos]);
+    return filteredVideos.slice(start, start + PAGE_SIZE);
+  }, [page, filteredVideos]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             Videos from @{account?.username}
-            {typeof total === 'number' && (
-              <Badge variant="secondary" className="ml-2">
-                {total} videos
-              </Badge>
-            )}
+            <Badge variant="secondary">
+              {counts.all} total
+            </Badge>
           </DialogTitle>
         </DialogHeader>
+
+        {/* Filter tabs */}
+        <Tabs value={filter} onValueChange={(v) => setFilter(v as VideoFilter)} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="all" className="text-xs gap-1.5">
+              <Video className="h-3.5 w-3.5" />
+              All ({counts.all})
+            </TabsTrigger>
+            <TabsTrigger value="not_uploaded" className="text-xs gap-1.5">
+              <Upload className="h-3.5 w-3.5" />
+              Not Uploaded ({counts.not_uploaded})
+            </TabsTrigger>
+            <TabsTrigger value="uploaded" className="text-xs gap-1.5">
+              <Youtube className="h-3.5 w-3.5" />
+              Uploaded ({counts.uploaded})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         <ScrollArea className="h-[60vh] pr-4">
           {isLoading ? (

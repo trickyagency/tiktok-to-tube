@@ -54,10 +54,36 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { TikTokAccountWithOwner } from '@/hooks/useTikTokAccounts';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, differenceInDays } from 'date-fns';
 
 type SortField = 'username' | 'follower_count' | 'video_count' | 'last_scraped_at';
 type SortDirection = 'asc' | 'desc';
+
+const RESCRAPE_COOLDOWN_DAYS = 7;
+
+// Helper to determine scrape button state
+function getScrapeButtonState(account: TikTokAccountWithOwner, isScraping: boolean) {
+  const lastScrapedAt = account.last_scraped_at ? new Date(account.last_scraped_at) : null;
+  const daysSinceLastScrape = lastScrapedAt ? differenceInDays(new Date(), lastScrapedAt) : null;
+  const canRescrape = daysSinceLastScrape !== null && daysSinceLastScrape >= RESCRAPE_COOLDOWN_DAYS;
+  const daysUntilRescrape = daysSinceLastScrape !== null ? Math.max(0, RESCRAPE_COOLDOWN_DAYS - daysSinceLastScrape) : null;
+  const isScraped = account.scrape_status === 'completed' && lastScrapedAt !== null;
+  const isFailed = account.scrape_status === 'failed';
+
+  if (isScraping) {
+    return { label: 'Scraping...', disabled: true, showButton: true };
+  }
+  if (isFailed) {
+    return { label: 'Retry Scrape', disabled: false, showButton: true };
+  }
+  if (isScraped && !canRescrape) {
+    return { label: `Scraped (${daysUntilRescrape}d)`, disabled: true, showButton: false };
+  }
+  if (isScraped && canRescrape) {
+    return { label: 'ReScrape', disabled: false, showButton: true };
+  }
+  return { label: 'Scrape', disabled: false, showButton: true };
+}
 
 interface TikTokAccountsTableProps {
   accounts: TikTokAccountWithOwner[];
@@ -397,13 +423,23 @@ export function TikTokAccountsTable({
                         <Eye className="h-4 w-4 mr-2" />
                         View Videos
                       </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => onScrape(account.id)}
-                        disabled={isScraping === account.id}
-                      >
-                        <Video className="h-4 w-4 mr-2" />
-                        {isScraping === account.id ? 'Scraping...' : 'Scrape Now'}
-                      </DropdownMenuItem>
+                      {(() => {
+                        const scrapeState = getScrapeButtonState(account, isScraping === account.id);
+                        return scrapeState.showButton ? (
+                          <DropdownMenuItem 
+                            onClick={() => onScrape(account.id)}
+                            disabled={scrapeState.disabled}
+                          >
+                            <Video className="h-4 w-4 mr-2" />
+                            {scrapeState.label}
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem disabled className="text-muted-foreground">
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            {scrapeState.label}
+                          </DropdownMenuItem>
+                        );
+                      })()}
                       <DropdownMenuItem 
                         onClick={() => onSyncProfile(account.id)}
                         disabled={isSyncing === account.id}
