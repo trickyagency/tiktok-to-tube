@@ -399,14 +399,16 @@ export default function MySubscriptions() {
               {!isOwner && (
                 <div className="flex gap-3 pt-2">
                   <Button 
-                    onClick={handleRequestUpgrade}
+                    asChild
                     className={cn(
                       "flex-1 bg-gradient-to-r text-white border-0",
                       gradient
                     )}
                   >
+                    <Link to="/dashboard/upgrade-plans">
                     <Sparkles className="h-4 w-4 mr-2" />
-                    Upgrade Plan
+                      Upgrade Plan
+                    </Link>
                   </Button>
                   <Button 
                     variant="outline" 
