@@ -209,30 +209,44 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
   };
 
   const handleAuthorize = async () => {
+    const authRequestId = Math.random().toString(36).slice(2, 10);
+    console.log(`[Auth Flow][${authRequestId}] Starting authorization for channel:`, channel.id.slice(0, 8));
+    
     setIsAuthorizing(true);
     setAuthFailed(false);
     
     // Track if we've already detected completion
     let completed = false;
+    let pollErrors = 0;
+    const maxPollErrors = 3;
     
     const handleMessage = (event: MessageEvent) => {
       if (completed) return;
+      console.log(`[Auth Flow][${authRequestId}] Received message:`, event.data?.type);
+      
       if (event.data?.type === 'youtube-oauth-success') {
         completed = true;
+        console.log(`[Auth Flow][${authRequestId}] OAuth success via postMessage`);
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
         setAuthFailed(false);
         onAuthComplete?.();
       } else if (event.data?.type === 'youtube-oauth-error') {
         completed = true;
+        console.log(`[Auth Flow][${authRequestId}] OAuth error via postMessage:`, event.data?.error);
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
         setAuthFailed(true);
+        if (event.data?.error) {
+          toast.error(event.data.error);
+        }
       }
     };
     window.addEventListener('message', handleMessage);
     
     await startOAuth(channel.id);
+    
+    console.log(`[Auth Flow][${authRequestId}] OAuth popup opened, starting status polling`);
     
     // Start polling to detect auth completion even if postMessage fails
     const pollInterval = setInterval(async () => {
@@ -242,11 +256,31 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
       }
       
       try {
-        const { data } = await supabase
+        console.log(`[Auth Flow][${authRequestId}] Polling for status update...`);
+        
+        const { data, error } = await supabase
           .from('youtube_channels')
           .select('auth_status')
           .eq('id', channel.id)
           .single();
+        
+        if (error) {
+          pollErrors++;
+          console.warn(`[Auth Flow][${authRequestId}] Polling error (${pollErrors}/${maxPollErrors}):`, error.message);
+          
+          if (pollErrors >= maxPollErrors) {
+            console.error(`[Auth Flow][${authRequestId}] Max poll errors reached, stopping`);
+            clearInterval(pollInterval);
+            window.removeEventListener('message', handleMessage);
+            setIsAuthorizing(false);
+            toast.error('Failed to check authorization status. Please refresh the page.');
+          }
+          return;
+        }
+        
+        pollErrors = 0; // Reset on success
+        
+        console.log(`[Auth Flow][${authRequestId}] Current status:`, data?.auth_status);
         
         if (data?.auth_status && 
             data.auth_status !== 'authorizing' && 
@@ -255,6 +289,8 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
           clearInterval(pollInterval);
           window.removeEventListener('message', handleMessage);
           setIsAuthorizing(false);
+          
+          console.log(`[Auth Flow][${authRequestId}] Status changed to:`, data.auth_status);
           
           if (data.auth_status === 'connected') {
             toast.success('YouTube channel connected successfully!');
@@ -269,18 +305,27 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
           onAuthComplete?.();
         }
       } catch (err) {
-        console.error('Auth polling error:', err);
+        pollErrors++;
+        console.error(`[Auth Flow][${authRequestId}] Polling exception (${pollErrors}/${maxPollErrors}):`, err);
+        
+        if (pollErrors >= maxPollErrors) {
+          clearInterval(pollInterval);
+          window.removeEventListener('message', handleMessage);
+          setIsAuthorizing(false);
+        }
       }
     }, 3000);
     
-    // Stop polling after 60 seconds timeout
+    // Stop polling after 90 seconds timeout (increased from 60)
     setTimeout(() => {
       if (!completed) {
+        console.log(`[Auth Flow][${authRequestId}] Polling timeout reached`);
         clearInterval(pollInterval);
         window.removeEventListener('message', handleMessage);
         setIsAuthorizing(false);
+        // Don't mark as failed - user might still complete in popup
       }
-    }, 60000);
+    }, 90000);
   };
 
   const handleRefresh = async () => {
