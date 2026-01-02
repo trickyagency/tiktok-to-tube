@@ -7,7 +7,7 @@ import { ChevronDown, ChevronUp, BookOpen, ExternalLink } from 'lucide-react';
 import { OAUTH_REDIRECT_URI, JAVASCRIPT_ORIGIN } from '@/lib/api-config';
 
 export function GoogleCloudSetupGuide() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
 
   const steps = [
     {
