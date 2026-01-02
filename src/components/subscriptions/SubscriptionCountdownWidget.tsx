@@ -1,10 +1,9 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Clock, Crown, MessageCircle } from 'lucide-react';
+import { Clock, Crown } from 'lucide-react';
 import { format, differenceInDays } from 'date-fns';
-import { generateGeneralWhatsAppLink } from '@/lib/whatsapp';
 import { cn } from '@/lib/utils';
+import { QuickRenewButton } from './QuickRenewButton';
 import type { UserSubscription } from '@/hooks/useUserSubscription';
 
 interface SubscriptionCountdownWidgetProps {
@@ -60,9 +59,6 @@ export function SubscriptionCountdownWidget({
     };
   }, [subscription]);
 
-  const handleRenew = () => {
-    window.open(generateGeneralWhatsAppLink(), '_blank');
-  };
 
   // Ring configuration
   const size = 160;
@@ -224,19 +220,14 @@ export function SubscriptionCountdownWidget({
             </div>
           </div>
 
-          {/* Renewal button for expiring soon */}
+          {/* Quick Renew button for expiring soon */}
           {daysRemaining <= 14 && (
-            <Button
-              onClick={handleRenew}
-              className={cn(
-                "w-full mt-6 bg-gradient-to-r text-white border-0",
-                urgencyLevel === 'critical' && "from-red-500 to-rose-500 hover:from-red-600 hover:to-rose-600",
-                urgencyLevel === 'warning' && "from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
-              )}
-            >
-              <MessageCircle className="h-4 w-4 mr-2" />
-              Renew via WhatsApp
-            </Button>
+            <div className="w-full mt-6">
+              <QuickRenewButton
+                subscription={subscription}
+                variant="compact"
+              />
+            </div>
           )}
         </div>
       </CardContent>
