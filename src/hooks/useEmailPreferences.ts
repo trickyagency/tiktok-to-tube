@@ -7,6 +7,11 @@ export interface EmailPreferences {
   emailOnNewVideo: boolean;
   emailOnScheduleRun: boolean;
   emailDigestFrequency: 'none' | 'daily' | 'weekly';
+  // Subscription expiry reminders
+  emailOnExpiry14Days: boolean;
+  emailOnExpiry7Days: boolean;
+  emailOnExpiry3Days: boolean;
+  emailOnExpiry1Day: boolean;
 }
 
 const defaultPreferences: EmailPreferences = {
@@ -15,6 +20,11 @@ const defaultPreferences: EmailPreferences = {
   emailOnNewVideo: false,
   emailOnScheduleRun: false,
   emailDigestFrequency: 'none',
+  // Subscription expiry reminders - enabled by default
+  emailOnExpiry14Days: true,
+  emailOnExpiry7Days: true,
+  emailOnExpiry3Days: true,
+  emailOnExpiry1Day: true,
 };
 
 export const useEmailPreferences = () => {

@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, Loader2, AlertTriangle, Trash2, Camera, X } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, Loader2, AlertTriangle, Trash2, Camera, X, Clock } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
@@ -809,6 +809,73 @@ const Settings = () => {
                   onCheckedChange={(checked) => updatePreference('emailOnScheduleRun', checked)}
                   disabled={preferencesLoading}
                 />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Subscription Reminders */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Clock className="h-4 w-4" />
+                Subscription Reminders
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Receive email reminders before your subscription expires
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                      <span className="text-xs font-bold text-emerald-500">14</span>
+                    </div>
+                    <span className="text-sm">14 days before</span>
+                  </div>
+                  <Switch
+                    checked={preferences.emailOnExpiry14Days}
+                    onCheckedChange={(checked) => updatePreference('emailOnExpiry14Days', checked)}
+                    disabled={preferencesLoading}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center">
+                      <span className="text-xs font-bold text-amber-500">7</span>
+                    </div>
+                    <span className="text-sm">7 days before</span>
+                  </div>
+                  <Switch
+                    checked={preferences.emailOnExpiry7Days}
+                    onCheckedChange={(checked) => updatePreference('emailOnExpiry7Days', checked)}
+                    disabled={preferencesLoading}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-orange-500/10 flex items-center justify-center">
+                      <span className="text-xs font-bold text-orange-500">3</span>
+                    </div>
+                    <span className="text-sm">3 days before</span>
+                  </div>
+                  <Switch
+                    checked={preferences.emailOnExpiry3Days}
+                    onCheckedChange={(checked) => updatePreference('emailOnExpiry3Days', checked)}
+                    disabled={preferencesLoading}
+                  />
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full bg-red-500/10 flex items-center justify-center">
+                      <span className="text-xs font-bold text-red-500">1</span>
+                    </div>
+                    <span className="text-sm">1 day before</span>
+                  </div>
+                  <Switch
+                    checked={preferences.emailOnExpiry1Day}
+                    onCheckedChange={(checked) => updatePreference('emailOnExpiry1Day', checked)}
+                    disabled={preferencesLoading}
+                  />
+                </div>
               </div>
             </div>
 
