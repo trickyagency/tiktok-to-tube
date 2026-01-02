@@ -52,6 +52,8 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // Exclude OAuth callback route from SPA navigation fallback
+        navigateFallbackDenylist: [/^\/functions\/v1\//],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
