@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,6 +36,7 @@ import {
   generateUpgradeRequestWhatsAppLink
 } from '@/lib/whatsapp';
 import { cn } from '@/lib/utils';
+import { AccountVideosModal } from '@/components/tiktok/AccountVideosModal';
 
 // Plan features
 const planFeatures: Record<string, string[]> = {
@@ -129,7 +130,21 @@ function StatCard({
 }
 
 // TikTok account card
-function AccountCard({ account, index }: { account: any; index: number }) {
+function AccountCard({ 
+  account, 
+  index, 
+  onAvatarClick 
+}: { 
+  account: any; 
+  index: number;
+  onAvatarClick: (account: any) => void;
+}) {
+  const handleAvatarClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onAvatarClick(account);
+  };
+
   return (
     <a 
       href={`https://www.tiktok.com/@${account.username}`} 
@@ -146,9 +161,13 @@ function AccountCard({ account, index }: { account: any; index: number }) {
         
         <CardContent className="relative p-4">
           <div className="flex items-center gap-3">
-            {/* Avatar with ring */}
-            <div className="relative">
-              <Avatar className="h-12 w-12 ring-2 ring-border group-hover:ring-primary/50 transition-all">
+            {/* Clickable Avatar */}
+            <button
+              onClick={handleAvatarClick}
+              className="relative cursor-pointer hover:scale-105 transition-transform"
+              title="View scraped videos"
+            >
+              <Avatar className="h-12 w-12 ring-2 ring-border hover:ring-primary transition-all">
                 <AvatarImage src={account.avatar_url} alt={account.username} />
                 <AvatarFallback className="bg-gradient-to-br from-pink-500 to-purple-500 text-white">
                   {account.username?.[0]?.toUpperCase() || 'T'}
@@ -158,7 +177,7 @@ function AccountCard({ account, index }: { account: any; index: number }) {
               <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-emerald-500 border-2 border-background flex items-center justify-center">
                 <CheckCircle2 className="h-2.5 w-2.5 text-white" />
               </div>
-            </div>
+            </button>
             
             <div className="flex-1 min-w-0">
               <p className="font-semibold truncate">{account.display_name || account.username}</p>
@@ -222,6 +241,9 @@ export default function MySubscriptions() {
   const { data: subscription, isLoading: subLoading } = useCurrentUserSubscription();
   const { data: accounts = [], isLoading: accountsLoading } = useTikTokAccounts();
   const { data: limits, isLoading: limitsLoading } = useUserAccountLimits();
+  
+  const [selectedAccount, setSelectedAccount] = useState<any | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const isLoading = subLoading || limitsLoading;
 
@@ -519,7 +541,15 @@ export default function MySubscriptions() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {accounts.slice(0, 6).map((account, index) => (
-                <AccountCard key={account.id} account={account} index={index} />
+                <AccountCard 
+                  key={account.id} 
+                  account={account} 
+                  index={index}
+                  onAvatarClick={(acc) => {
+                    setSelectedAccount(acc);
+                    setIsModalOpen(true);
+                  }}
+                />
               ))}
               {accounts.length > 6 && (
                 <Card className="flex items-center justify-center bg-card/50 backdrop-blur-xl border-border/50 border-dashed min-h-[100px]">
@@ -533,6 +563,13 @@ export default function MySubscriptions() {
             </div>
           )}
         </div>
+
+        {/* Account Videos Modal */}
+        <AccountVideosModal
+          account={selectedAccount}
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+        />
       </div>
     </DashboardLayout>
   );
