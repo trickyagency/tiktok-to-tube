@@ -98,8 +98,8 @@ serve(async (req) => {
       }
 
       // Use channel's custom redirect URI - this MUST match what's configured in Google Cloud Console
-      // Default to custom domain URL (matches what users configure in Google Cloud Console)
-      const DEFAULT_REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
+      // Default to Supabase URL directly to avoid SPA routing issues with website domain
+      const DEFAULT_REDIRECT_URI = `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
       const callbackUrl = channel.google_redirect_uri || DEFAULT_REDIRECT_URI;
       
       console.log('Using callback URL:', callbackUrl);
@@ -211,7 +211,7 @@ serve(async (req) => {
       }
 
       // MUST use the same redirect URI that was used during authorization
-      const DEFAULT_REDIRECT_URI = 'https://repostflow.digitalautomators.com/functions/v1/youtube-oauth?action=callback';
+      const DEFAULT_REDIRECT_URI = `${SUPABASE_URL}/functions/v1/youtube-oauth?action=callback`;
       const callbackUrl = channel.google_redirect_uri || DEFAULT_REDIRECT_URI;
       
       console.log('Token exchange using callback URL:', callbackUrl);
