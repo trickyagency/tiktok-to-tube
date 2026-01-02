@@ -119,17 +119,13 @@ const SecuritySettings = () => {
   const verifiedFactor = factors.find(f => f.status === 'verified');
 
   return (
-    <Card className="border-0 shadow-sm bg-card/50 backdrop-blur-sm">
-      <CardHeader className="pb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2.5 rounded-xl bg-primary/10">
-            <Shield className="h-5 w-5 text-primary" />
-          </div>
-          <div>
-            <CardTitle className="text-lg">Security</CardTitle>
-            <CardDescription>Manage your password and two-factor authentication</CardDescription>
-          </div>
-        </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          Security
+        </CardTitle>
+        <CardDescription>Manage your password and two-factor authentication</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Change Password Section */}
