@@ -141,8 +141,22 @@ serve(async (req) => {
 
     let queued = 0;
     let skipped = 0;
+    const debugLog: any[] = [];
 
     for (const schedule of schedules) {
+      const scheduleDebug: any = {
+        scheduleId: schedule.id,
+        scheduleName: schedule.schedule_name,
+        scheduleUserId: schedule.user_id,
+        tiktokAccountId: schedule.tiktok_account_id,
+        youtubeChannelId: schedule.youtube_channel_id,
+        timezone: schedule.timezone || 'UTC',
+        publishTimes: schedule.publish_times,
+      };
+
+      console.log(`\n--- Processing Schedule: ${schedule.schedule_name} ---`);
+      console.log(`Schedule context: ${JSON.stringify(scheduleDebug)}`);
+
       const publishTimes = Array.isArray(schedule.publish_times) 
         ? schedule.publish_times 
         : JSON.parse(schedule.publish_times || '[]');
@@ -152,6 +166,9 @@ serve(async (req) => {
       // Check if current time matches any publish time
       if (!isTimeToPublish(publishTimes, timezone)) {
         console.log(`Schedule "${schedule.schedule_name}" - not time to publish`);
+        scheduleDebug.status = 'skipped';
+        scheduleDebug.reason = 'Not time to publish';
+        debugLog.push(scheduleDebug);
         skipped++;
         continue;
       }
@@ -170,16 +187,40 @@ serve(async (req) => {
 
       if (videosError) {
         console.error(`Error fetching videos for schedule "${schedule.schedule_name}":`, videosError);
+        scheduleDebug.status = 'error';
+        scheduleDebug.reason = `Video fetch error: ${videosError.message}`;
+        debugLog.push(scheduleDebug);
         continue;
       }
 
+      console.log(`Fetched ${unpublishedVideos?.length || 0} unpublished videos for account ${schedule.tiktok_account_id}`);
+      
+      // Log first few videos for debugging
+      if (unpublishedVideos && unpublishedVideos.length > 0) {
+        console.log('Sample videos (first 3):');
+        unpublishedVideos.slice(0, 3).forEach((v, i) => {
+          console.log(`  [${i + 1}] Video ID: ${v.id}, user_id: ${v.user_id}, tiktok_video_id: ${v.tiktok_video_id}`);
+        });
+      }
+
+      scheduleDebug.unpublishedVideoCount = unpublishedVideos?.length || 0;
+
       if (!unpublishedVideos || unpublishedVideos.length === 0) {
         console.log(`No unpublished videos for schedule "${schedule.schedule_name}"`);
+        scheduleDebug.status = 'skipped';
+        scheduleDebug.reason = 'No unpublished videos available';
+        debugLog.push(scheduleDebug);
         continue;
       }
 
       // Find a video that isn't already queued/processing/published
+      let videosChecked = 0;
+      let videosAlreadyQueued = 0;
+      let ownershipFailed = 0;
+      
       for (const video of unpublishedVideos) {
+        videosChecked++;
+        
         // Check if video is already in queue (queued, processing, OR published)
         const { data: existingQueue, error: queueCheckError } = await supabase
           .from('publish_queue')
@@ -195,6 +236,7 @@ serve(async (req) => {
 
         if (existingQueue) {
           console.log(`Video ${video.id} already ${existingQueue.status}, skipping`);
+          videosAlreadyQueued++;
           
           // If it was published, sync the scraped_videos table
           if (existingQueue.status === 'published') {
@@ -206,22 +248,48 @@ serve(async (req) => {
           continue;
         }
 
+        // IMPORTANT: Check ownership BEFORE selecting the video
+        // Log detailed ownership check info
+        console.log(`Ownership check for video ${video.id}:`);
+        console.log(`  - Schedule user_id: ${schedule.user_id}`);
+        console.log(`  - Video user_id: ${video.user_id}`);
+        console.log(`  - Match: ${schedule.user_id === video.user_id}`);
+
+        // Pre-validate ownership before full check
+        if (video.user_id !== schedule.user_id) {
+          console.warn(`OWNERSHIP MISMATCH: Video ${video.id} belongs to user ${video.user_id}, but schedule belongs to user ${schedule.user_id}`);
+          ownershipFailed++;
+          continue;
+        }
+
         // Found a valid video
         selectedVideo = video;
         break;
       }
 
+      scheduleDebug.videosChecked = videosChecked;
+      scheduleDebug.videosAlreadyQueued = videosAlreadyQueued;
+      scheduleDebug.ownershipFailed = ownershipFailed;
+
       if (!selectedVideo) {
-        console.log(`No available videos for schedule "${schedule.schedule_name}" (all already queued/published)`);
+        console.log(`No available videos for schedule "${schedule.schedule_name}"`);
+        console.log(`  Checked: ${videosChecked}, Already queued: ${videosAlreadyQueued}, Ownership failed: ${ownershipFailed}`);
+        scheduleDebug.status = 'skipped';
+        scheduleDebug.reason = `No valid videos: ${videosChecked} checked, ${videosAlreadyQueued} already queued, ${ownershipFailed} ownership mismatch`;
+        debugLog.push(scheduleDebug);
         continue;
       }
 
       const video = selectedVideo;
+      console.log(`Selected video: ${video.id} (tiktok_video_id: ${video.tiktok_video_id})`);
 
       // SECURITY: Validate that schedule, video, and channel all belong to the same user
       const ownershipCheck = await validateScheduleOwnership(supabase, schedule, video);
       if (!ownershipCheck.valid) {
         console.error(`SECURITY: Ownership validation failed for schedule "${schedule.schedule_name}": ${ownershipCheck.error}`);
+        scheduleDebug.status = 'error';
+        scheduleDebug.reason = `Ownership validation failed: ${ownershipCheck.error}`;
+        debugLog.push(scheduleDebug);
         continue;
       }
 
@@ -242,6 +310,9 @@ serve(async (req) => {
         // Continue with existing download URL if available
         if (!downloadUrl) {
           console.error(`No download URL available for video ${video.id}, skipping`);
+          scheduleDebug.status = 'error';
+          scheduleDebug.reason = 'No download URL available';
+          debugLog.push(scheduleDebug);
           continue;
         }
       }
@@ -260,20 +331,29 @@ serve(async (req) => {
 
       if (insertError) {
         console.error(`Failed to queue video for schedule "${schedule.schedule_name}":`, insertError);
+        scheduleDebug.status = 'error';
+        scheduleDebug.reason = `Queue insert error: ${insertError.message}`;
+        debugLog.push(scheduleDebug);
         continue;
       }
 
-      console.log(`Queued video ${video.id} for schedule "${schedule.schedule_name}"`);
+      console.log(`✓ Queued video ${video.id} for schedule "${schedule.schedule_name}"`);
+      scheduleDebug.status = 'queued';
+      scheduleDebug.queuedVideoId = video.id;
+      debugLog.push(scheduleDebug);
       queued++;
     }
 
-    console.log(`=== Schedule Processor Complete: ${queued} queued, ${skipped} skipped ===`);
+    console.log('\n=== Schedule Processor Complete ===');
+    console.log(`Summary: ${queued} queued, ${skipped} skipped (not time), ${schedules.length - queued - skipped} other`);
+    console.log('Debug log:', JSON.stringify(debugLog, null, 2));
 
     return new Response(JSON.stringify({
       success: true,
       queued,
       skipped,
       totalSchedules: schedules.length,
+      debugLog,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
