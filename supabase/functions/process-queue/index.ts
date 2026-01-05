@@ -17,6 +17,14 @@ const STUCK_TIMEOUT_MS = 5 * 60 * 1000;
 const UPLOAD_QUOTA_COST = 1600;
 const DEFAULT_DAILY_QUOTA = 10000;
 
+// Download retry configuration
+const DOWNLOAD_MAX_RETRIES = 3;
+const DOWNLOAD_BASE_DELAY_MS = 2000;
+const DOWNLOAD_MAX_DELAY_MS = 10000;
+const TIKWM_MAX_RETRIES = 2;
+const TIKWM_BASE_DELAY_MS = 3000;
+const TIKWM_MAX_DELAY_MS = 8000;
+
 // ============= Upload Logging Helpers =============
 
 async function createUploadLog(
@@ -183,16 +191,46 @@ async function getDirectVideoUrl(tiktokUrl: string): Promise<string> {
   return directUrl;
 }
 
-async function downloadVideo(videoUrl: string): Promise<{ blob: Blob; duration: number }> {
-  const startTime = Date.now();
-  let downloadUrl = videoUrl;
-
-  if (videoUrl.includes('tiktok.com')) {
-    downloadUrl = await getDirectVideoUrl(videoUrl);
+// Generic exponential backoff helper
+async function withExponentialBackoff<T>(
+  operation: () => Promise<T>,
+  options: {
+    maxRetries: number;
+    baseDelayMs: number;
+    maxDelayMs: number;
+    operationName: string;
   }
+): Promise<T> {
+  const { maxRetries, baseDelayMs, maxDelayMs, operationName } = options;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      console.log(`[${operationName}] Attempt ${attempt}/${maxRetries} failed: ${errorMsg}`);
+      
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      const delay = Math.min(
+        baseDelayMs * Math.pow(2, attempt - 1) + Math.random() * 1000,
+        maxDelayMs
+      );
+      
+      console.log(`[${operationName}] Waiting ${Math.round(delay)}ms before retry...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  
+  throw new Error(`${operationName} failed after ${maxRetries} attempts`);
+}
 
+// Single download attempt (no retries)
+async function attemptDownload(downloadUrl: string): Promise<Blob> {
   console.log(`Downloading from: ${downloadUrl.substring(0, 80)}...`);
-
+  
   const response = await fetch(downloadUrl, {
     headers: {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
@@ -201,16 +239,117 @@ async function downloadVideo(videoUrl: string): Promise<{ blob: Blob; duration: 
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to download video: ${response.status}`);
+    throw new Error(`HTTP ${response.status}`);
   }
 
   const blob = await response.blob();
-  console.log(`Downloaded video: ${blob.size} bytes, type: ${blob.type}`);
-
+  
   if (blob.size < 10000) {
-    throw new Error(`Downloaded file too small (${blob.size} bytes), likely not a video`);
+    throw new Error(`File too small (${blob.size} bytes)`);
+  }
+  
+  console.log(`Downloaded video: ${blob.size} bytes, type: ${blob.type}`);
+  return blob;
+}
+
+// Download video with multi-stage retry and exponential backoff
+async function downloadVideoWithRetry(
+  videoUrl: string,
+  videoPageUrl: string | null,
+  supabase: any,
+  videoId: string
+): Promise<{ blob: Blob; duration: number; refreshedUrl?: string }> {
+  const startTime = Date.now();
+  let currentUrl = videoUrl;
+  
+  // Handle TikTok page URLs (convert to direct URL first)
+  if (videoUrl.includes('tiktok.com') && !videoUrl.includes('v16-webapp')) {
+    console.log(`[Download] Converting TikTok page URL to direct URL...`);
+    try {
+      currentUrl = await getDirectVideoUrl(videoUrl);
+    } catch (e) {
+      console.log(`[Download] Could not convert TikTok URL, using as-is`);
+    }
+  }
+  
+  // Stage 1: Try original/converted URL with retries
+  console.log(`[Download] Stage 1: Trying URL with ${DOWNLOAD_MAX_RETRIES} retries...`);
+  try {
+    const blob = await withExponentialBackoff(
+      () => attemptDownload(currentUrl),
+      {
+        maxRetries: DOWNLOAD_MAX_RETRIES,
+        baseDelayMs: DOWNLOAD_BASE_DELAY_MS,
+        maxDelayMs: DOWNLOAD_MAX_DELAY_MS,
+        operationName: 'Download-OriginalURL',
+      }
+    );
+    
+    return { blob, duration: Date.now() - startTime };
+  } catch (originalError) {
+    console.log(`[Download] Original URL exhausted after ${DOWNLOAD_MAX_RETRIES} attempts`);
+  }
+  
+  // Stage 2: Refresh URL via TikWM and retry
+  if (videoPageUrl) {
+    console.log(`[Download] Stage 2: Refreshing URL via TikWM with ${TIKWM_MAX_RETRIES} retries...`);
+    try {
+      const freshUrl = await withExponentialBackoff(
+        () => getDirectVideoUrl(videoPageUrl),
+        {
+          maxRetries: TIKWM_MAX_RETRIES,
+          baseDelayMs: TIKWM_BASE_DELAY_MS,
+          maxDelayMs: TIKWM_MAX_DELAY_MS,
+          operationName: 'TikWM-Refresh',
+        }
+      );
+      
+      currentUrl = freshUrl;
+      
+      // Update DB with refreshed URL
+      await supabase
+        .from('scraped_videos')
+        .update({ download_url: freshUrl })
+        .eq('id', videoId);
+      
+      console.log(`[Download] URL refreshed, updated in database`);
+      
+      // Stage 3: Download with refreshed URL
+      console.log(`[Download] Stage 3: Downloading with refreshed URL (${DOWNLOAD_MAX_RETRIES} retries)...`);
+      const blob = await withExponentialBackoff(
+        () => attemptDownload(currentUrl),
+        {
+          maxRetries: DOWNLOAD_MAX_RETRIES,
+          baseDelayMs: DOWNLOAD_BASE_DELAY_MS,
+          maxDelayMs: DOWNLOAD_MAX_DELAY_MS,
+          operationName: 'Download-RefreshedURL',
+        }
+      );
+      
+      return { 
+        blob, 
+        duration: Date.now() - startTime, 
+        refreshedUrl: freshUrl 
+      };
+    } catch (refreshError) {
+      const msg = refreshError instanceof Error ? refreshError.message : 'Unknown';
+      console.error(`[Download] URL refresh + download failed: ${msg}`);
+    }
+  }
+  
+  throw new Error('All download attempts exhausted (up to 8 total attempts across 3 stages)');
+}
+
+// Legacy function for backwards compatibility
+async function downloadVideo(videoUrl: string): Promise<{ blob: Blob; duration: number }> {
+  const startTime = Date.now();
+  let downloadUrl = videoUrl;
+
+  if (videoUrl.includes('tiktok.com')) {
+    downloadUrl = await getDirectVideoUrl(videoUrl);
   }
 
+  const blob = await attemptDownload(downloadUrl);
   return { blob, duration: Date.now() - startTime };
 }
 
@@ -494,106 +633,93 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
       .update({ progress_phase: 'downloading', progress_percentage: 10 })
       .eq('id', queueId);
 
-    // Download video with fallback to replacement if download fails
-    console.log(`Downloading video for queue item ${queueId}...`);
-    let downloadResult;
+    // Download video with exponential backoff retries
+    console.log(`Downloading video for queue item ${queueId} with retry logic...`);
+    let downloadResult: { blob: Blob; duration: number; refreshedUrl?: string } | null = null;
     let currentVideo = video;
     
     try {
-      downloadResult = await downloadVideo(video.download_url);
+      // Use new retry-enabled download function
+      downloadResult = await downloadVideoWithRetry(
+        video.download_url,
+        video.video_url, // TikTok page URL for refresh
+        supabase,
+        video.id
+      );
+      
+      if (downloadResult.refreshedUrl) {
+        console.log(`Video ${video.id} URL was refreshed during download`);
+      }
     } catch (downloadError) {
       const downloadErrorMsg = downloadError instanceof Error ? downloadError.message : 'Download failed';
-      console.error(`Download failed for video ${video.id}: ${downloadErrorMsg}`);
+      console.error(`All download retries exhausted for video ${video.id}: ${downloadErrorMsg}`);
       
-      // STEP 1: Try to refresh the download URL using TikWM before marking as unavailable
-      console.log(`Attempting to refresh download URL for video ${video.id}...`);
-      let refreshedDownload = false;
+      // All retries exhausted - now mark as unavailable and try replacement
+      console.log(`Marking video ${video.id} as unavailable and searching for replacement...`);
       
-      if (video.video_url) {
-        try {
-          const freshDirectUrl = await getDirectVideoUrl(video.video_url);
-          console.log(`Got fresh direct URL, attempting download...`);
+      await supabase
+        .from('scraped_videos')
+        .update({ 
+          is_published: true,
+          download_url: null,
+        })
+        .eq('id', video.id);
+      
+      // Get the TikTok account ID from the scraped video
+      const { data: scrapedVideo } = await supabase
+        .from('scraped_videos')
+        .select('tiktok_account_id')
+        .eq('id', video.id)
+        .single();
+      
+      if (scrapedVideo) {
+        // Find a replacement video from same account
+        const { data: replacementVideo } = await supabase
+          .from('scraped_videos')
+          .select('*')
+          .eq('tiktok_account_id', scrapedVideo.tiktok_account_id)
+          .eq('is_published', false)
+          .neq('id', video.id)
+          .not('download_url', 'is', null)
+          .order('scraped_at', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        
+        if (replacementVideo) {
+          console.log(`Found replacement video: ${replacementVideo.id}`);
           
-          // Update the download_url in database with fresh URL
+          // Update queue item with replacement video
           await supabase
-            .from('scraped_videos')
-            .update({ download_url: freshDirectUrl })
-            .eq('id', video.id);
+            .from('publish_queue')
+            .update({ 
+              scraped_video_id: replacementVideo.id,
+              error_message: `Original video unavailable after ${DOWNLOAD_MAX_RETRIES * 2 + TIKWM_MAX_RETRIES} attempts, using replacement`,
+            })
+            .eq('id', queueId);
           
-          // Try downloading with fresh URL
-          downloadResult = await downloadVideo(freshDirectUrl);
-          refreshedDownload = true;
-          console.log(`Successfully downloaded video ${video.id} with refreshed URL`);
-        } catch (refreshError) {
-          const refreshErrorMsg = refreshError instanceof Error ? refreshError.message : 'Refresh failed';
-          console.error(`URL refresh failed for video ${video.id}: ${refreshErrorMsg}`);
-        }
-      }
-      
-      // STEP 2: If refresh failed, try to find a replacement video
-      if (!refreshedDownload) {
-        console.log(`Refresh failed, attempting to find replacement video...`);
-        
-        // Mark this video as unavailable (likely deleted from TikTok)
-        await supabase
-          .from('scraped_videos')
-          .update({ 
-            is_published: true,
-            download_url: null,
-          })
-          .eq('id', video.id);
-        
-        // Get the TikTok account ID from the scraped video
-        const { data: scrapedVideo } = await supabase
-          .from('scraped_videos')
-          .select('tiktok_account_id')
-          .eq('id', video.id)
-          .single();
-        
-        if (scrapedVideo) {
-          // Find a replacement video from same account
-          const { data: replacementVideo } = await supabase
-            .from('scraped_videos')
-            .select('*')
-            .eq('tiktok_account_id', scrapedVideo.tiktok_account_id)
-            .eq('is_published', false)
-            .neq('id', video.id)
-            .not('download_url', 'is', null)
-            .order('scraped_at', { ascending: true })
-            .limit(1)
-            .maybeSingle();
-          
-          if (replacementVideo) {
-            console.log(`Found replacement video: ${replacementVideo.id}`);
-            
-            // Update queue item with replacement video
+          // Try to download replacement with full retry logic
+          try {
+            downloadResult = await downloadVideoWithRetry(
+              replacementVideo.download_url,
+              replacementVideo.video_url,
+              supabase,
+              replacementVideo.id
+            );
+            currentVideo = replacementVideo;
+            console.log(`Successfully downloaded replacement video ${replacementVideo.id}`);
+          } catch (replacementError) {
+            // Mark replacement as unavailable too
             await supabase
-              .from('publish_queue')
-              .update({ 
-                scraped_video_id: replacementVideo.id,
-                error_message: `Original video unavailable, using replacement`,
-              })
-              .eq('id', queueId);
-            
-            // Try to download replacement
-            try {
-              downloadResult = await downloadVideo(replacementVideo.download_url);
-              currentVideo = replacementVideo;
-              console.log(`Successfully downloaded replacement video ${replacementVideo.id}`);
-            } catch (replacementError) {
-              // Mark replacement as unavailable too
-              await supabase
-                .from('scraped_videos')
-                .update({ is_published: true, download_url: null })
-                .eq('id', replacementVideo.id);
-              throw new Error(`Video unavailable and replacement also failed to download`);
-            }
-          } else {
-            throw new Error(`Video unavailable on TikTok and no replacement found`);
+              .from('scraped_videos')
+              .update({ is_published: true, download_url: null })
+              .eq('id', replacementVideo.id);
+            throw new Error(`Video unavailable and replacement also failed after all retries`);
           }
         } else {
-          throw new Error(`Video unavailable and could not find account for replacement`);
+          throw new Error(`Video unavailable on TikTok and no replacement found`);
         }
+      } else {
+        throw new Error(`Video unavailable and could not find account for replacement`);
       }
     }
     

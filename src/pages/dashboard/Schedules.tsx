@@ -16,6 +16,7 @@ import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialo
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
 import { OwnershipMismatchWidget } from '@/components/schedules/OwnershipMismatchWidget';
+import { IncorrectlyPublishedWidget } from '@/components/schedules/IncorrectlyPublishedWidget';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 import { toast } from 'sonner';
@@ -132,8 +133,9 @@ const Schedules = () => {
       description="Automate your video publishing with scheduled uploads"
     >
       <div className="space-y-6">
-        {/* Admin: Ownership Mismatch Widget */}
+        {/* Admin: Data Integrity Widgets */}
         <OwnershipMismatchWidget />
+        <IncorrectlyPublishedWidget />
 
         {/* Account Usage Summary */}
         <div className="flex flex-wrap items-center gap-3">
