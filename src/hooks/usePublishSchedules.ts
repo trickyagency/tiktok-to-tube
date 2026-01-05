@@ -27,7 +27,7 @@ export interface CreateScheduleInput {
 }
 
 export function usePublishSchedules() {
-  const { user } = useAuth();
+  const { user, isOwner } = useAuth();
   const queryClient = useQueryClient();
 
   const schedulesQuery = useQuery({
@@ -71,23 +71,25 @@ export function usePublishSchedules() {
         throw new Error(`A ${status} schedule already exists for this YouTube channel. Please ${existingSchedule.is_active ? 'edit' : 'activate or edit'} the existing schedule instead.`);
       }
 
-      // Check subscription limit for videos per day
-      const { data: subscription } = await supabase
-        .from('user_subscriptions')
-        .select('plan_id')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .maybeSingle();
+      // Check subscription limit for videos per day (skip for owner - unlimited)
+      if (!isOwner) {
+        const { data: subscription } = await supabase
+          .from('user_subscriptions')
+          .select('plan_id')
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
 
-      if (subscription) {
-        const { data: plan } = await supabase
-          .from('subscription_plans')
-          .select('max_videos_per_day')
-          .eq('id', subscription.plan_id)
-          .single();
+        if (subscription) {
+          const { data: plan } = await supabase
+            .from('subscription_plans')
+            .select('max_videos_per_day')
+            .eq('id', subscription.plan_id)
+            .single();
 
-        if (plan && input.publish_times.length > plan.max_videos_per_day) {
-          throw new Error(`Your subscription allows up to ${plan.max_videos_per_day} videos per day. Please upgrade to add more.`);
+          if (plan && input.publish_times.length > plan.max_videos_per_day) {
+            throw new Error(`Your subscription allows up to ${plan.max_videos_per_day} videos per day. Please upgrade to add more.`);
+          }
         }
       }
 
@@ -160,8 +162,8 @@ export function usePublishSchedules() {
 
   const toggleScheduleMutation = useMutation({
     mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
-      // If trying to activate, check for active subscription first
-      if (is_active) {
+      // If trying to activate, check for active subscription first (skip for owner - unlimited)
+      if (is_active && !isOwner) {
         const { data: subscription, error: subError } = await supabase
           .from('user_subscriptions')
           .select('status')

@@ -504,68 +504,102 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     } catch (downloadError) {
       const downloadErrorMsg = downloadError instanceof Error ? downloadError.message : 'Download failed';
       console.error(`Download failed for video ${video.id}: ${downloadErrorMsg}`);
-      console.log(`Attempting to find replacement video...`);
       
-      // Mark this video as unavailable (likely deleted from TikTok)
-      await supabase
-        .from('scraped_videos')
-        .update({ 
-          is_published: true,
-          download_url: null,
-        })
-        .eq('id', video.id);
+      // STEP 1: Try to refresh the download URL using TikWM before marking as unavailable
+      console.log(`Attempting to refresh download URL for video ${video.id}...`);
+      let refreshedDownload = false;
       
-      // Get the TikTok account ID from the schedule or scraped video
-      const { data: scrapedVideo } = await supabase
-        .from('scraped_videos')
-        .select('tiktok_account_id')
-        .eq('id', video.id)
-        .single();
-      
-      if (scrapedVideo) {
-        // Find a replacement video from same account
-        const { data: replacementVideo } = await supabase
-          .from('scraped_videos')
-          .select('*')
-          .eq('tiktok_account_id', scrapedVideo.tiktok_account_id)
-          .eq('is_published', false)
-          .neq('id', video.id)
-          .not('download_url', 'is', null)
-          .order('scraped_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        
-        if (replacementVideo) {
-          console.log(`Found replacement video: ${replacementVideo.id}`);
+      if (video.video_url) {
+        try {
+          const freshDirectUrl = await getDirectVideoUrl(video.video_url);
+          console.log(`Got fresh direct URL, attempting download...`);
           
-          // Update queue item with replacement video
+          // Update the download_url in database with fresh URL
           await supabase
-            .from('publish_queue')
-            .update({ 
-              scraped_video_id: replacementVideo.id,
-              error_message: `Original video unavailable, using replacement`,
-            })
-            .eq('id', queueId);
+            .from('scraped_videos')
+            .update({ download_url: freshDirectUrl })
+            .eq('id', video.id);
           
-          // Try to download replacement
-          try {
-            downloadResult = await downloadVideo(replacementVideo.download_url);
-            currentVideo = replacementVideo;
-            console.log(`Successfully downloaded replacement video ${replacementVideo.id}`);
-          } catch (replacementError) {
-            // Mark replacement as unavailable too
+          // Try downloading with fresh URL
+          downloadResult = await downloadVideo(freshDirectUrl);
+          refreshedDownload = true;
+          console.log(`Successfully downloaded video ${video.id} with refreshed URL`);
+        } catch (refreshError) {
+          const refreshErrorMsg = refreshError instanceof Error ? refreshError.message : 'Refresh failed';
+          console.error(`URL refresh failed for video ${video.id}: ${refreshErrorMsg}`);
+        }
+      }
+      
+      // STEP 2: If refresh failed, try to find a replacement video
+      if (!refreshedDownload) {
+        console.log(`Refresh failed, attempting to find replacement video...`);
+        
+        // Mark this video as unavailable (likely deleted from TikTok)
+        await supabase
+          .from('scraped_videos')
+          .update({ 
+            is_published: true,
+            download_url: null,
+          })
+          .eq('id', video.id);
+        
+        // Get the TikTok account ID from the scraped video
+        const { data: scrapedVideo } = await supabase
+          .from('scraped_videos')
+          .select('tiktok_account_id')
+          .eq('id', video.id)
+          .single();
+        
+        if (scrapedVideo) {
+          // Find a replacement video from same account
+          const { data: replacementVideo } = await supabase
+            .from('scraped_videos')
+            .select('*')
+            .eq('tiktok_account_id', scrapedVideo.tiktok_account_id)
+            .eq('is_published', false)
+            .neq('id', video.id)
+            .not('download_url', 'is', null)
+            .order('scraped_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+          
+          if (replacementVideo) {
+            console.log(`Found replacement video: ${replacementVideo.id}`);
+            
+            // Update queue item with replacement video
             await supabase
-              .from('scraped_videos')
-              .update({ is_published: true, download_url: null })
-              .eq('id', replacementVideo.id);
-            throw new Error(`Video unavailable and replacement also failed to download`);
+              .from('publish_queue')
+              .update({ 
+                scraped_video_id: replacementVideo.id,
+                error_message: `Original video unavailable, using replacement`,
+              })
+              .eq('id', queueId);
+            
+            // Try to download replacement
+            try {
+              downloadResult = await downloadVideo(replacementVideo.download_url);
+              currentVideo = replacementVideo;
+              console.log(`Successfully downloaded replacement video ${replacementVideo.id}`);
+            } catch (replacementError) {
+              // Mark replacement as unavailable too
+              await supabase
+                .from('scraped_videos')
+                .update({ is_published: true, download_url: null })
+                .eq('id', replacementVideo.id);
+              throw new Error(`Video unavailable and replacement also failed to download`);
+            }
+          } else {
+            throw new Error(`Video unavailable on TikTok and no replacement found`);
           }
         } else {
-          throw new Error(`Video unavailable on TikTok and no replacement found`);
+          throw new Error(`Video unavailable and could not find account for replacement`);
         }
-      } else {
-        throw new Error(`Video unavailable and could not find account for replacement`);
       }
+    }
+    
+    // Ensure we have a valid download result
+    if (!downloadResult) {
+      throw new Error('Failed to download video - no download result available');
     }
     
     downloadDuration = downloadResult.duration;

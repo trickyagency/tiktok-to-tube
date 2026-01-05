@@ -58,6 +58,7 @@ export interface TikTokAccount {
 
 export interface TikTokAccountWithOwner extends TikTokAccount {
   owner_email?: string;
+  owner_name?: string;
 }
 
 export function useTikTokAccounts() {
@@ -75,19 +76,23 @@ export function useTikTokAccounts() {
       if (accountsError) throw accountsError;
       if (!accounts || accounts.length === 0) return [] as TikTokAccountWithOwner[];
 
-      // If owner, fetch all profiles to get owner emails
+      // If owner, fetch all profiles to get owner emails and names
       if (isOwner) {
         const userIds = [...new Set(accounts.map(a => a.user_id))];
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id, email')
+          .select('id, email, full_name')
           .in('id', userIds);
 
-        const profileMap = new Map(profiles?.map(p => [p.id, p.email]) || []);
-        return accounts.map(account => ({
-          ...account,
-          owner_email: profileMap.get(account.user_id),
-        })) as TikTokAccountWithOwner[];
+        const profileMap = new Map(profiles?.map(p => [p.id, { email: p.email, name: p.full_name }]) || []);
+        return accounts.map(account => {
+          const profile = profileMap.get(account.user_id);
+          return {
+            ...account,
+            owner_email: profile?.email,
+            owner_name: profile?.name,
+          };
+        }) as TikTokAccountWithOwner[];
       }
 
       return accounts as TikTokAccountWithOwner[];
