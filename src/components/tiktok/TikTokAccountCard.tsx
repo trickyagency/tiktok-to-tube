@@ -248,10 +248,18 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
 
             {/* Status badges */}
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              {isOwner && account.owner_email && (
-                <Badge variant="outline" className="text-xs px-2 py-0 h-5 bg-blue-500/10 text-blue-600 border-blue-500/20">
-                  {account.owner_email}
-                </Badge>
+              {isOwner && (account.owner_email || account.owner_name) && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline" className="text-xs px-2 py-0 h-5 bg-blue-500/10 text-blue-600 border-blue-500/20 max-w-[180px] truncate cursor-help">
+                      Added by: {account.owner_name || account.owner_email}
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p className="font-medium">{account.owner_name || 'Unknown'}</p>
+                    <p className="text-xs text-muted-foreground">{account.owner_email}</p>
+                  </TooltipContent>
+                </Tooltip>
               )}
               {isScraping && (
                 <Badge className="text-xs px-2 py-0 h-5 bg-primary/20 text-primary border-primary/30 animate-pulse">

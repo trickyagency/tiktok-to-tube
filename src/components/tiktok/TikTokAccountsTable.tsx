@@ -393,9 +393,14 @@ export function TikTokAccountsTable({
                 <TableCell>{getStatusBadge(account)}</TableCell>
                 {isOwner && (
                   <TableCell>
-                    <span className="text-xs text-muted-foreground truncate max-w-[150px] block">
-                      {account.owner_email || '-'}
-                    </span>
+                    <div className="flex flex-col max-w-[180px]">
+                      <span className="text-xs font-medium truncate">
+                        {account.owner_name || '-'}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {account.owner_email || '-'}
+                      </span>
+                    </div>
                   </TableCell>
                 )}
                 <TableCell>
