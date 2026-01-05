@@ -208,7 +208,7 @@ async function fetchAllVideos(secUid: string, username: string, onProgress?: (cu
 async function scrapeVideosInBackground(
   supabase: any,
   accountId: string,
-  userId: string,
+  accountOwnerId: string,
   userInfo: TikWMUserInfo,
   cleanUsername: string
 ) {
@@ -262,7 +262,7 @@ async function scrapeVideosInBackground(
       // Batch insert new videos (increased batch size to 200)
       if (newVideos.length > 0) {
         const videosToInsert = newVideos.map(video => ({
-          user_id: userId,
+          user_id: accountOwnerId, // Use TikTok account owner's ID, not the scraping user
           tiktok_account_id: accountId,
           tiktok_video_id: video.id,
           title: video.title || null,
@@ -545,10 +545,14 @@ Deno.serve(async (req) => {
 
     console.log(`Account saved: ${account.id}`);
 
+    // Get the TikTok account owner's user_id (for cases where admin scrapes on behalf of user)
+    const accountOwnerId = account.user_id || user.id;
+    console.log(`Account owner ID: ${accountOwnerId}, Scraping user ID: ${user.id}`);
+
     // Start background scraping using EdgeRuntime.waitUntil
     // This allows us to return immediately while scraping continues
     EdgeRuntime.waitUntil(
-      scrapeVideosInBackground(supabase, account.id, user.id, userInfo, cleanUsername)
+      scrapeVideosInBackground(supabase, account.id, accountOwnerId, userInfo, cleanUsername)
     );
 
     // Return immediate response - scraping continues in background
