@@ -129,9 +129,10 @@ Deno.serve(async (req) => {
     }
 
     const accountId = runRecord.tiktok_account_id;
-    const userId = runRecord.user_id;
-
-    console.log(`[Webhook] Found run for account ${accountId}`);
+    // Use the TikTok account owner's user_id, not the user who triggered the scrape
+    const accountOwnerId = runRecord.tiktok_accounts?.user_id || runRecord.user_id;
+    
+    console.log(`[Webhook] Found run for account ${accountId}, owner: ${accountOwnerId}, run user: ${runRecord.user_id}`);
 
     // Handle different statuses
     if (status === 'FAILED' || status === 'ABORTED' || status === 'TIMED-OUT') {
@@ -260,7 +261,7 @@ Deno.serve(async (req) => {
           || video.videoUrl; // Fallback to page URL if no direct URL available
 
         return {
-          user_id: userId,
+          user_id: accountOwnerId, // Use TikTok account owner's ID, not the scraping user
           tiktok_account_id: accountId,
           tiktok_video_id: videoId,
           title: video.videoDescription?.substring(0, 255) || null,
