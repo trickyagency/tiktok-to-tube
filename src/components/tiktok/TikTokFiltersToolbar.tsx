@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 
 interface TikTokFiltersToolbarProps {
   searchQuery: string;
@@ -25,6 +26,9 @@ interface TikTokFiltersToolbarProps {
   isOwner?: boolean;
   totalCount: number;
   filteredCount: number;
+  dateFrom?: Date;
+  dateTo?: Date;
+  onDateChange: (range: { from?: Date; to?: Date }) => void;
 }
 
 export const TikTokFiltersToolbar = ({
@@ -42,13 +46,17 @@ export const TikTokFiltersToolbar = ({
   isOwner = false,
   totalCount,
   filteredCount,
+  dateFrom,
+  dateTo,
+  onDateChange,
 }: TikTokFiltersToolbarProps) => {
-  const hasActiveFilters = searchQuery || statusFilter !== "all" || ownerFilter;
+  const hasActiveFilters = searchQuery || statusFilter !== "all" || ownerFilter || dateFrom || dateTo;
 
   const clearFilters = () => {
     onSearchChange("");
     onStatusFilterChange("all");
     if (onOwnerFilterChange) onOwnerFilterChange("");
+    onDateChange({ from: undefined, to: undefined });
   };
 
   return (
@@ -83,6 +91,14 @@ export const TikTokFiltersToolbar = ({
               <SelectItem value="private">Private</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Date Filter */}
+          <DateRangePicker
+            from={dateFrom}
+            to={dateTo}
+            onDateChange={onDateChange}
+            className="w-auto"
+          />
 
           {/* Owner Filter (only for owners) */}
           {isOwner && ownerEmails.length > 0 && onOwnerFilterChange && (
