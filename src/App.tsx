@@ -13,6 +13,7 @@ import LandingPage from "./pages/LandingPage";
 
 // Lazy load all other pages
 const Auth = lazy(() => import("./pages/Auth"));
+const AuthCallback = lazy(() => import("./pages/AuthCallback"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const YouTubeOAuthProxy = lazy(() => import("./pages/YouTubeOAuthProxy"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -100,6 +101,7 @@ const AppContent = () => {
           <Route path="/terms" element={<TermsOfService />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/auth" element={<Auth />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/functions/v1/youtube-oauth" element={<YouTubeOAuthProxy />} />
           <Route path="/functions/v1/youtube-oauth/*" element={<YouTubeOAuthProxy />} />

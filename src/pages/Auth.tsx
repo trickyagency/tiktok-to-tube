@@ -38,6 +38,15 @@ const Auth = () => {
     }
   }, [user, authLoading, navigate, mfaRequired]);
 
+  // Handle auth tokens in URL hash (fallback if user lands here with confirmation tokens)
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    if (hashParams.get('access_token') || hashParams.get('type') === 'signup') {
+      // Redirect to callback handler with the hash
+      navigate('/auth/callback' + window.location.hash, { replace: true });
+    }
+  }, [navigate]);
+
   useEffect(() => {
     document.title = "Sign In | RepostFlow";
   }, []);
