@@ -1,9 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
+import SystemHealthWidget from '@/components/dashboard/SystemHealthWidget';
+import TodayProgressWidget from '@/components/dashboard/TodayProgressWidget';
+import DashboardInsightsCard from '@/components/dashboard/DashboardInsightsCard';
+import KeyboardHints from '@/components/dashboard/KeyboardHints';
 import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons';
 import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
 import { UploadLogDetails } from '@/components/history/UploadLogDetails';
@@ -11,6 +15,7 @@ import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminde
 import { UploadProgressWidget } from '@/components/dashboard/UploadProgressWidget';
 import { useWelcomeModal } from '@/hooks/useWelcomeModal';
 import { useWelcomeEmail } from '@/hooks/useWelcomeEmail';
+import { usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -18,9 +23,9 @@ import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useUploadHistory } from '@/hooks/useUploadHistory';
-import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle, AlertCircle, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
+import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertCircle, CheckCircle2, XCircle, Loader2, Clock, Zap } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, startOfToday, subDays } from 'date-fns';
 
 const Dashboard = () => {
   const [showQuickFixDialog, setShowQuickFixDialog] = useState(false);
@@ -35,98 +40,172 @@ const Dashboard = () => {
   
   const { channels: youtubeChannels, isLoading: isLoadingYouTube } = useYouTubeChannels();
   const { data: tikTokAccounts = [], isLoading: isLoadingTikTok } = useTikTokAccounts();
+  const { schedules = [] } = usePublishSchedules();
   const { 
     queue: queueItems, 
     isLoading: isLoadingQueue, 
     mismatchedCount,
     mismatchedItems,
     reassignMismatched, 
-    isReassigning 
+    isReassigning,
+    failedItems = [],
   } = usePublishQueue();
   const { history: uploadHistory, isLoading: isLoadingHistory } = useUploadHistory();
 
   const isLoading = isLoadingYouTube || isLoadingTikTok || isLoadingQueue || isLoadingHistory;
 
+  // Computed stats
   const pendingCount = queueItems.filter(item => item.status === 'queued').length;
-  const completedCount = uploadHistory.length;
+  const completedCount = uploadHistory.filter(item => item.status === 'published').length;
+  const failedCount = failedItems?.length || queueItems.filter(item => item.status === 'failed').length;
+  const activeSchedules = schedules.filter(s => s.is_active).length;
+
+  // Today's progress
+  const todayUploads = useMemo(() => {
+    return uploadHistory.filter(item => 
+      item.status === 'published' && isToday(new Date(item.processed_at || item.created_at))
+    ).length;
+  }, [uploadHistory]);
+
+  const yesterdayUploads = useMemo(() => {
+    const yesterday = subDays(startOfToday(), 1);
+    return uploadHistory.filter(item => 
+      item.status === 'published' && isYesterday(new Date(item.processed_at || item.created_at))
+    ).length;
+  }, [uploadHistory]);
+
+  // Daily goal (based on active schedules)
+  const dailyGoal = useMemo(() => {
+    return schedules.reduce((sum, s) => sum + (s.videos_per_day || 0), 0) || 5;
+  }, [schedules]);
+
+  // Last sync time (most recent activity)
+  const lastSync = useMemo(() => {
+    if (uploadHistory.length === 0) return null;
+    return new Date(uploadHistory[0].created_at);
+  }, [uploadHistory]);
 
   // Check for YouTube channels that need reconnection
-  // Check for YouTube channels that need reconnection (only when refresh token is revoked, not when access token expires)
   const channelsNeedingReconnect = youtubeChannels.filter(channel => 
     channel.auth_status === 'failed' || 
     channel.auth_status === 'token_revoked' ||
     (channel.auth_status === 'connected' && !channel.refresh_token)
   );
 
+  // Primary stats (reduced to 4)
   const stats = [
     { 
       title: 'YouTube Channels', 
       value: youtubeChannels.length, 
       icon: Youtube, 
       description: 'Connected channels',
-      gradientClass: 'stat-gradient-1'
+      gradientClass: 'stat-gradient-1',
+      href: '/dashboard/youtube',
     },
     { 
       title: 'TikTok Accounts', 
       value: tikTokAccounts.length, 
       icon: Video, 
       description: 'Monitored accounts',
-      gradientClass: 'stat-gradient-2'
+      gradientClass: 'stat-gradient-2',
+      href: '/dashboard/tiktok',
     },
     { 
       title: 'Videos Queued', 
       value: pendingCount, 
       icon: Calendar, 
       description: 'Pending uploads',
-      gradientClass: 'stat-gradient-3'
+      gradientClass: 'stat-gradient-3',
+      href: '/dashboard/queue',
     },
     { 
       title: 'Videos Published', 
       value: completedCount, 
       icon: TrendingUp, 
       description: 'Total uploads',
-      gradientClass: 'stat-gradient-4'
-    },
-    { 
-      title: 'Queue Issues', 
-      value: mismatchedCount, 
-      icon: AlertTriangle, 
-      description: mismatchedCount === 0 ? 'No mismatches' : 'Account mismatches',
-      gradientClass: mismatchedCount > 0 ? 'bg-amber-500/10 border border-amber-500/20' : 'stat-gradient-1',
-      isWarning: mismatchedCount > 0,
-      href: '/dashboard/queue?showMismatched=true',
-      tooltip: 'Account mismatches occur when a video from one TikTok account is queued to a YouTube channel linked to a different TikTok account. Click to view and resolve these issues.',
-      action: mismatchedCount > 0 ? {
-        label: 'Quick Fix',
-        onClick: () => setShowQuickFixDialog(true),
-        isLoading: isReassigning,
-      } : undefined,
+      gradientClass: 'stat-gradient-4',
+      href: '/dashboard/history',
     },
   ];
 
-  const quickActions = [
-    {
-      title: 'Add YouTube Channel',
-      description: 'Connect a new YouTube channel',
-      icon: Youtube,
-      link: '/dashboard/youtube',
-      color: 'text-red-500',
-    },
-    {
-      title: 'Add TikTok Account',
-      description: 'Monitor a TikTok creator',
-      icon: Video,
-      link: '/dashboard/tiktok',
-      color: 'text-pink-500',
-    },
-    {
-      title: 'View Queue',
-      description: `${pendingCount} videos pending`,
-      icon: Calendar,
-      link: '/dashboard/queue',
-      color: 'text-blue-500',
-    },
-  ];
+  // Dynamic quick actions based on user state
+  const quickActions = useMemo(() => {
+    const actions = [];
+    
+    if (youtubeChannels.length === 0) {
+      actions.push({
+        title: 'Connect YouTube Channel',
+        description: 'Required to start publishing',
+        icon: Youtube,
+        link: '/dashboard/youtube',
+        color: 'text-destructive',
+        highlight: true,
+      });
+    } else if (channelsNeedingReconnect.length > 0) {
+      actions.push({
+        title: 'Reconnect YouTube',
+        description: `${channelsNeedingReconnect.length} channel${channelsNeedingReconnect.length > 1 ? 's' : ''} need attention`,
+        icon: Youtube,
+        link: '/dashboard/youtube',
+        color: 'text-warning',
+        highlight: true,
+      });
+    }
+    
+    if (tikTokAccounts.length === 0) {
+      actions.push({
+        title: 'Add TikTok Account',
+        description: 'Monitor a TikTok creator',
+        icon: Video,
+        link: '/dashboard/tiktok',
+        color: 'text-pink-500',
+      });
+    }
+    
+    if (pendingCount > 0) {
+      actions.push({
+        title: 'View Queue',
+        description: `${pendingCount} video${pendingCount > 1 ? 's' : ''} pending`,
+        icon: Calendar,
+        link: '/dashboard/queue',
+        color: 'text-primary',
+      });
+    }
+
+    if (mismatchedCount > 0) {
+      actions.push({
+        title: 'Fix Queue Issues',
+        description: `${mismatchedCount} mismatch${mismatchedCount > 1 ? 'es' : ''} detected`,
+        icon: Zap,
+        link: '/dashboard/queue?showMismatched=true',
+        color: 'text-warning',
+        onClick: () => setShowQuickFixDialog(true),
+      });
+    }
+    
+    // Fill with default actions if needed
+    if (youtubeChannels.length > 0 && actions.length < 3) {
+      actions.push({
+        title: 'Add YouTube Channel',
+        description: 'Connect another channel',
+        icon: Youtube,
+        link: '/dashboard/youtube',
+        color: 'text-red-500',
+      });
+    }
+    
+    if (tikTokAccounts.length > 0 && actions.length < 3) {
+      actions.push({
+        title: 'Add TikTok Account',
+        description: 'Monitor more creators',
+        icon: Video,
+        link: '/dashboard/tiktok',
+        color: 'text-pink-500',
+      });
+    }
+
+    return actions.slice(0, 4);
+  }, [youtubeChannels, tikTokAccounts, pendingCount, channelsNeedingReconnect, mismatchedCount]);
 
   const recentActivity = uploadHistory.slice(0, 5);
 
@@ -151,6 +230,8 @@ const Dashboard = () => {
         youtubeCount={youtubeChannels.length}
         tiktokCount={tikTokAccounts.length}
         hasSchedule={queueItems.length > 0}
+        publishedToday={todayUploads}
+        publishedThisWeek={completedCount}
       />
 
       {/* Subscription Renewal Reminder Banner */}
@@ -179,22 +260,48 @@ const Dashboard = () => {
         </Alert>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-6">
-        {stats.map((stat) => (
-          <AnimatedStatCard
-            key={stat.title}
-            title={stat.title}
-            value={stat.value}
-            icon={stat.icon}
-            description={stat.description}
-            gradientClass={stat.gradientClass}
-            isWarning={'isWarning' in stat ? stat.isWarning : false}
-            href={'href' in stat ? stat.href : undefined}
-            tooltip={'tooltip' in stat ? stat.tooltip : undefined}
-            action={'action' in stat ? stat.action : undefined}
-          />
+      {/* Primary Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+        {stats.map((stat, index) => (
+          <div key={stat.title} className="animate-fade-in" style={{ animationDelay: `${index * 50}ms` }}>
+            <AnimatedStatCard
+              title={stat.title}
+              value={stat.value}
+              icon={stat.icon}
+              description={stat.description}
+              gradientClass={stat.gradientClass}
+              href={stat.href}
+            />
+          </div>
         ))}
+      </div>
+
+      {/* Insights Row - 3 cards */}
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+          <SystemHealthWidget
+            youtubeConnected={youtubeChannels.length}
+            tiktokConnected={tikTokAccounts.length}
+            activeSchedules={activeSchedules}
+            lastSync={lastSync}
+            hasErrors={failedCount > 0 || channelsNeedingReconnect.length > 0}
+          />
+        </div>
+        <div className="animate-fade-in" style={{ animationDelay: '250ms' }}>
+          <TodayProgressWidget
+            uploaded={todayUploads}
+            goal={dailyGoal}
+            yesterdayCount={yesterdayUploads}
+          />
+        </div>
+        <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
+          <DashboardInsightsCard
+            queuedCount={pendingCount}
+            newVideosCount={0}
+            failedCount={failedCount}
+            channelsNeedingReconnect={channelsNeedingReconnect.length}
+          />
+        </div>
       </div>
 
       {/* Real-time Upload Progress Widget */}
@@ -203,22 +310,30 @@ const Dashboard = () => {
       {/* Quick Actions + Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Quick Actions */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Plus className="h-5 w-5 text-primary" />
-              Quick Actions
-            </CardTitle>
-            <CardDescription>Get started with common tasks</CardDescription>
+        <Card className="lg:col-span-1 border-0 bg-card/50">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Plus className="h-4 w-4 text-primary" />
+                Quick Actions
+              </CardTitle>
+              <KeyboardHints />
+            </div>
+            <CardDescription className="text-xs">Get started with common tasks</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2">
             {quickActions.map((action) => (
               <Link
                 key={action.title}
                 to={action.link}
-                className="group flex items-center gap-4 p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/50 transition-all"
+                onClick={action.onClick}
+                className={`group flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                  action.highlight 
+                    ? 'border-primary/30 bg-primary/5 hover:bg-primary/10' 
+                    : 'border-transparent hover:border-border hover:bg-muted/50'
+                }`}
               >
-                <div className={`p-2 rounded-lg bg-muted ${action.color}`}>
+                <div className={`p-2 rounded-lg bg-muted/80 ${action.color}`}>
                   <action.icon className="h-4 w-4" />
                 </div>
                 <div className="flex-1 min-w-0">
@@ -232,17 +347,17 @@ const Dashboard = () => {
         </Card>
 
         {/* Recent Activity */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="flex flex-row items-center justify-between">
+        <Card className="lg:col-span-2 border-0 bg-card/50">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Activity className="h-4 w-4 text-primary" />
                 Recent Activity
               </CardTitle>
-              <CardDescription>Latest uploads and actions</CardDescription>
+              <CardDescription className="text-xs">Latest uploads and actions</CardDescription>
             </div>
             {recentActivity.length > 0 && (
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className="text-xs">
                 <Link to="/dashboard/history">View All</Link>
               </Button>
             )}
@@ -250,52 +365,75 @@ const Dashboard = () => {
           <CardContent>
             {recentActivity.length > 0 ? (
               <TooltipProvider>
-                <div className="space-y-4">
-                  {recentActivity.map((item) => (
+                <div className="space-y-2">
+                  {recentActivity.map((item, index) => (
                     <UploadLogDetails
                       key={item.id}
                       queueItemId={item.id}
                       trigger={
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors">
-                              <div className="mt-0.5">
+                            <div 
+                              className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors animate-fade-in"
+                              style={{ animationDelay: `${index * 50}ms` }}
+                            >
+                              {/* Thumbnail */}
+                              {item.scraped_video?.thumbnail_url ? (
+                                <img 
+                                  src={item.scraped_video.thumbnail_url} 
+                                  alt="" 
+                                  className="w-12 h-8 object-cover rounded"
+                                />
+                              ) : (
+                                <div className="w-12 h-8 rounded bg-muted flex items-center justify-center">
+                                  <Video className="h-4 w-4 text-muted-foreground" />
+                                </div>
+                              )}
+                              
+                              {/* Status Icon */}
+                              <div className="flex-shrink-0">
                                 {item.status === 'published' ? (
-                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                  <CheckCircle2 className="h-4 w-4 text-success" />
                                 ) : item.status === 'failed' ? (
-                                  <XCircle className="h-5 w-5 text-destructive" />
+                                  <XCircle className="h-4 w-4 text-destructive" />
                                 ) : item.status === 'processing' ? (
-                                  <Loader2 className="h-5 w-5 text-yellow-500 animate-spin" />
+                                  <Loader2 className="h-4 w-4 text-warning animate-spin" />
                                 ) : (
-                                  <Clock className="h-5 w-5 text-muted-foreground" />
+                                  <Clock className="h-4 w-4 text-muted-foreground" />
                                 )}
                               </div>
+                              
+                              {/* Content */}
                               <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm truncate">
                                   {item.scraped_video?.title || 'Untitled Video'}
                                 </p>
-                                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                                  → {item.youtube_channel?.channel_title || 'Unknown Channel'}
-                                </p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                    item.status === 'published' 
-                                      ? 'bg-success/10 text-success'
-                                      : item.status === 'failed'
-                                        ? 'bg-destructive/10 text-destructive'
-                                        : 'bg-muted text-muted-foreground'
-                                  }`}>
-                                    {item.status}
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">
-                                    {format(new Date(item.created_at), 'MMM d, h:mm a')}
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-xs text-muted-foreground truncate">
+                                    → {item.youtube_channel?.channel_title || 'Unknown'}
                                   </span>
                                 </div>
                               </div>
+                              
+                              {/* Timestamp & Status */}
+                              <div className="flex flex-col items-end gap-1">
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                                  item.status === 'published' 
+                                    ? 'bg-success/10 text-success'
+                                    : item.status === 'failed'
+                                      ? 'bg-destructive/10 text-destructive'
+                                      : 'bg-muted text-muted-foreground'
+                                }`}>
+                                  {item.status}
+                                </span>
+                                <span className="text-[10px] text-muted-foreground">
+                                  {format(new Date(item.created_at), 'h:mm a')}
+                                </span>
+                              </div>
                             </div>
                           </TooltipTrigger>
-                          <TooltipContent side="top">
-                            <p>Uploaded to: {item.youtube_channel?.channel_title || 'Unknown Channel'}</p>
+                          <TooltipContent side="top" className="text-xs">
+                            <p>Click for details</p>
                           </TooltipContent>
                         </Tooltip>
                       }
