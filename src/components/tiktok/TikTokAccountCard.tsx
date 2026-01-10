@@ -165,7 +165,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
       
       {/* Index number badge */}
       {typeof index === 'number' && (
-        <div className="absolute top-3 left-3 h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center border border-primary/20 z-10">
+        <div className="absolute top-3 left-3 h-6 w-6 rounded-full bg-blue-500 text-white text-xs font-semibold flex items-center justify-center z-10">
           {index + 1}
         </div>
       )}
