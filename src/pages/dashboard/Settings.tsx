@@ -784,6 +784,25 @@ const Settings = () => {
                   disabled={preferencesLoading}
                 />
               </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Video className="h-4 w-4 text-blue-500" />
+                  <div className="space-y-0.5">
+                    <Label htmlFor="videos-synced" className="text-sm font-medium cursor-pointer">
+                      Videos Synced by Owner
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Get notified when the platform owner syncs videos for your account
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="videos-synced"
+                  checked={preferences.emailOnVideosSynced}
+                  onCheckedChange={(checked) => updatePreference('emailOnVideosSynced', checked)}
+                  disabled={preferencesLoading}
+                />
+              </div>
             </div>
 
             <Separator />

@@ -8,6 +8,7 @@ import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons
 import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
 import { UploadLogDetails } from '@/components/history/UploadLogDetails';
 import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminderBanner';
+import { UploadProgressWidget } from '@/components/dashboard/UploadProgressWidget';
 import { useWelcomeModal } from '@/hooks/useWelcomeModal';
 import { useWelcomeEmail } from '@/hooks/useWelcomeEmail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -195,6 +196,9 @@ const Dashboard = () => {
           />
         ))}
       </div>
+
+      {/* Real-time Upload Progress Widget */}
+      <UploadProgressWidget />
 
       {/* Quick Actions + Recent Activity */}
       <div className="grid gap-6 lg:grid-cols-3">
