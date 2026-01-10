@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Activity, CheckCircle2, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight, Play, Pause, Search, X, SortAsc } from 'lucide-react';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
 import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
@@ -41,6 +42,8 @@ const Schedules = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortOption>('created');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   // Check subscription limits
   const maxVideosPerDay = subscription?.plan?.max_videos_per_day || 2;
@@ -120,9 +123,20 @@ const Schedules = () => {
         if (!matchesName && !matchesTikTok && !matchesYouTube) return false;
       }
       
+      // Date filter
+      if (dateFrom || dateTo) {
+        const createdAt = new Date(schedule.created_at);
+        if (dateFrom && createdAt < dateFrom) return false;
+        if (dateTo) {
+          const endOfToDay = new Date(dateTo);
+          endOfToDay.setHours(23, 59, 59, 999);
+          if (createdAt > endOfToDay) return false;
+        }
+      }
+      
       return true;
     });
-  }, [enrichedSchedules, statusFilter, searchQuery]);
+  }, [enrichedSchedules, statusFilter, searchQuery, dateFrom, dateTo]);
 
   // Sort schedules
   const sortedSchedules = useMemo(() => {
@@ -174,11 +188,13 @@ const Schedules = () => {
   const queuedCount = queue?.filter(q => q.status === 'queued' || q.status === 'processing').length || 0;
 
   // Check if filters are active
-  const hasActiveFilters = searchQuery || statusFilter !== 'all';
+  const hasActiveFilters = searchQuery || statusFilter !== 'all' || dateFrom || dateTo;
 
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
+    setDateFrom(undefined);
+    setDateTo(undefined);
   };
 
   return (
@@ -289,6 +305,17 @@ const Schedules = () => {
             </div>
             
             <div className="flex items-center gap-2 flex-wrap">
+              {/* Date Range Filter */}
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                onDateChange={(range) => {
+                  setDateFrom(range.from);
+                  setDateTo(range.to);
+                }}
+                className="w-auto"
+              />
+              
               {/* Status Filter */}
               <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
                 <SelectTrigger className="w-[130px]">
