@@ -3,23 +3,18 @@ import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { 
   Loader2, 
-  XCircle, 
-  RefreshCw, 
   ChevronDown, 
   ChevronUp,
   Upload,
   Download,
-  CheckCircle,
-  AlertCircle
+  CheckCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface UploadProgressWidgetProps {
-  maxFailures?: number;
   showIfEmpty?: boolean;
 }
 
@@ -52,35 +47,18 @@ const getPhaseIcon = (phase: string | null) => {
 };
 
 export const UploadProgressWidget = ({ 
-  maxFailures = 5,
   showIfEmpty = false 
 }: UploadProgressWidgetProps) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  const [retryingId, setRetryingId] = useState<string | null>(null);
   
-  const { 
-    queue,
-    retryQueueItem,
-    retryAllFailed,
-    isRetryingAll
-  } = usePublishQueue();
+  const { queue } = usePublishQueue();
 
-  const handleRetry = async (id: string) => {
-    setRetryingId(id);
-    try {
-      await retryQueueItem(id);
-    } finally {
-      setRetryingId(null);
-    }
-  };
-
-  // Filter for processing and failed items
+  // Filter for processing items only
   const processingItems = queue.filter(
     item => item.status === 'processing' || item.status === 'uploading'
   );
-  const failedItems = queue.filter(item => item.status === 'failed').slice(0, maxFailures);
   
-  const hasActivity = processingItems.length > 0 || failedItems.length > 0;
+  const hasActivity = processingItems.length > 0;
 
   // Don't render if no activity and showIfEmpty is false
   if (!hasActivity && !showIfEmpty) {
@@ -100,14 +78,6 @@ export const UploadProgressWidget = ({
                   ({processingItems.length} processing)
                 </span>
               </>
-            ) : failedItems.length > 0 ? (
-              <>
-                <AlertCircle className="h-4 w-4 text-destructive" />
-                <span>Recent Failures</span>
-                <span className="text-xs text-destructive font-normal">
-                  ({failedItems.length} failed)
-                </span>
-              </>
             ) : (
               <>
                 <CheckCircle className="h-4 w-4 text-success" />
@@ -115,36 +85,18 @@ export const UploadProgressWidget = ({
               </>
             )}
           </CardTitle>
-          <div className="flex items-center gap-2">
-            {failedItems.length > 1 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 text-xs"
-                onClick={() => retryAllFailed()}
-                disabled={isRetryingAll}
-              >
-                {isRetryingAll ? (
-                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-3 w-3 mr-1" />
-                )}
-                Retry All
-              </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            onClick={() => setIsExpanded(!isExpanded)}
+          >
+            {isExpanded ? (
+              <ChevronUp className="h-4 w-4" />
+            ) : (
+              <ChevronDown className="h-4 w-4" />
             )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 w-7 p-0"
-              onClick={() => setIsExpanded(!isExpanded)}
-            >
-              {isExpanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+          </Button>
         </div>
       </CardHeader>
       
@@ -206,73 +158,8 @@ export const UploadProgressWidget = ({
               </div>
             ))}
 
-            {/* Failed Items */}
-            {failedItems.length > 0 && processingItems.length > 0 && (
-              <div className="border-t border-border pt-3 mt-3">
-                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
-                  <XCircle className="h-3 w-3 text-destructive" />
-                  Recent Failures
-                </p>
-              </div>
-            )}
-            
-            {failedItems.map((item) => (
-              <TooltipProvider key={item.id}>
-                <div 
-                  className="flex items-center gap-3 p-3 rounded-lg bg-destructive/5 border border-destructive/10"
-                >
-                  {/* Thumbnail */}
-                  <div className="h-10 w-10 rounded overflow-hidden bg-muted flex-shrink-0">
-                    {item.scraped_video?.thumbnail_url ? (
-                      <img 
-                        src={item.scraped_video.thumbnail_url} 
-                        alt="" 
-                        className="h-full w-full object-cover opacity-60"
-                      />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center">
-                        <XCircle className="h-4 w-4 text-destructive" />
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">
-                      {item.scraped_video?.title || 'Untitled Video'}
-                    </p>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <p className="text-xs text-destructive truncate cursor-help">
-                          {item.error_message || 'Unknown error'}
-                        </p>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" className="max-w-xs">
-                        <p>{item.error_message || 'Unknown error'}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
-                  
-                  {/* Retry Button */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 shrink-0"
-                    onClick={() => handleRetry(item.id)}
-                    disabled={retryingId === item.id}
-                  >
-                    {retryingId === item.id ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-3 w-3" />
-                    )}
-                  </Button>
-                </div>
-              </TooltipProvider>
-            ))}
-
             {/* View All Link */}
-            {(processingItems.length > 0 || failedItems.length > 0) && (
+            {processingItems.length > 0 && (
               <div className="pt-2 text-center">
                 <Button variant="link" size="sm" className="text-xs" asChild>
                   <Link to="/dashboard/queue">View Full Queue →</Link>

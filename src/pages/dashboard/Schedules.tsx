@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Activity, CheckCircle2, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight, Play, Pause } from 'lucide-react';
+import { Calendar, Activity, CheckCircle2, ListVideo, AlertTriangle, ArrowUpRight, ArrowRight, Play, Pause, Search, X, SortAsc } from 'lucide-react';
 import { usePublishSchedules, PublishSchedule } from '@/hooks/usePublishSchedules';
 import { useScheduleAnalytics } from '@/hooks/useScheduleAnalytics';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CreateScheduleDialog } from '@/components/schedules/CreateScheduleDialog';
 import { EditScheduleDialog } from '@/components/schedules/EditScheduleDialog';
 import { ScheduleCard } from '@/components/schedules/ScheduleCard';
@@ -20,6 +22,9 @@ import { IncorrectlyPublishedWidget } from '@/components/schedules/IncorrectlyPu
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
 import { toast } from 'sonner';
+
+type StatusFilter = 'all' | 'active' | 'paused';
+type SortOption = 'created' | 'name' | 'videos';
 
 const Schedules = () => {
   const { schedules, isLoading, refetch, toggleSchedule } = usePublishSchedules();
@@ -31,6 +36,11 @@ const Schedules = () => {
   const [editingSchedule, setEditingSchedule] = useState<PublishSchedule | null>(null);
   const [selectedSchedules, setSelectedSchedules] = useState<Set<string>>(new Set());
   const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  
+  // Filter & Search State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('created');
 
   // Check subscription limits
   const maxVideosPerDay = subscription?.plan?.max_videos_per_day || 2;
@@ -59,26 +69,6 @@ const Schedules = () => {
   };
 
   const clearSelection = () => setSelectedSchedules(new Set());
-
-  const toggleSelectAllActive = () => {
-    const activeIds = new Set(activeSchedules.map(s => s.id));
-    const allActiveSelected = activeSchedules.every(s => selectedSchedules.has(s.id));
-    if (allActiveSelected) {
-      setSelectedSchedules(new Set([...selectedSchedules].filter(id => !activeIds.has(id))));
-    } else {
-      setSelectedSchedules(new Set([...selectedSchedules, ...activeIds]));
-    }
-  };
-
-  const toggleSelectAllPaused = () => {
-    const pausedIds = new Set(pausedSchedules.map(s => s.id));
-    const allPausedSelected = pausedSchedules.every(s => selectedSchedules.has(s.id));
-    if (allPausedSelected) {
-      setSelectedSchedules(new Set([...selectedSchedules].filter(id => !pausedIds.has(id))));
-    } else {
-      setSelectedSchedules(new Set([...selectedSchedules, ...pausedIds]));
-    }
-  };
 
   const handleBulkToggle = async (activate: boolean) => {
     setIsBulkUpdating(true);
@@ -114,9 +104,65 @@ const Schedules = () => {
     };
   });
 
-  // Separate active and paused schedules
-  const activeSchedules = enrichedSchedules.filter(s => s.is_active);
-  const pausedSchedules = enrichedSchedules.filter(s => !s.is_active);
+  // Filter and search schedules
+  const filteredSchedules = useMemo(() => {
+    return enrichedSchedules.filter(schedule => {
+      // Status filter
+      if (statusFilter === 'active' && !schedule.is_active) return false;
+      if (statusFilter === 'paused' && schedule.is_active) return false;
+      
+      // Search filter (by schedule name, TikTok username, or YouTube channel)
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        const matchesName = schedule.schedule_name?.toLowerCase().includes(query);
+        const matchesTikTok = schedule.tiktok_account?.username?.toLowerCase().includes(query);
+        const matchesYouTube = schedule.youtube_channel?.channel_title?.toLowerCase().includes(query);
+        if (!matchesName && !matchesTikTok && !matchesYouTube) return false;
+      }
+      
+      return true;
+    });
+  }, [enrichedSchedules, statusFilter, searchQuery]);
+
+  // Sort schedules
+  const sortedSchedules = useMemo(() => {
+    return [...filteredSchedules].sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return (a.schedule_name || '').localeCompare(b.schedule_name || '');
+        case 'videos':
+          return (b.publish_times?.length || 0) - (a.publish_times?.length || 0);
+        case 'created':
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+  }, [filteredSchedules, sortBy]);
+
+  // Separate active and paused schedules from sorted results
+  const activeSchedules = sortedSchedules.filter(s => s.is_active);
+  const pausedSchedules = sortedSchedules.filter(s => !s.is_active);
+
+  // Select all helpers based on filtered results
+  const toggleSelectAllActive = () => {
+    const activeIds = new Set(activeSchedules.map(s => s.id));
+    const allActiveSelected = activeSchedules.every(s => selectedSchedules.has(s.id));
+    if (allActiveSelected) {
+      setSelectedSchedules(new Set([...selectedSchedules].filter(id => !activeIds.has(id))));
+    } else {
+      setSelectedSchedules(new Set([...selectedSchedules, ...activeIds]));
+    }
+  };
+
+  const toggleSelectAllPaused = () => {
+    const pausedIds = new Set(pausedSchedules.map(s => s.id));
+    const allPausedSelected = pausedSchedules.every(s => selectedSchedules.has(s.id));
+    if (allPausedSelected) {
+      setSelectedSchedules(new Set([...selectedSchedules].filter(id => !pausedIds.has(id))));
+    } else {
+      setSelectedSchedules(new Set([...selectedSchedules, ...pausedIds]));
+    }
+  };
 
   // Calculate account usage stats
   const tiktokAccountsWithSchedules = new Set(schedules.map(s => s.tiktok_account_id)).size;
@@ -126,6 +172,14 @@ const Schedules = () => {
 
   // Count videos in queue
   const queuedCount = queue?.filter(q => q.status === 'queued' || q.status === 'processing').length || 0;
+
+  // Check if filters are active
+  const hasActiveFilters = searchQuery || statusFilter !== 'all';
+
+  const clearFilters = () => {
+    setSearchQuery('');
+    setStatusFilter('all');
+  };
 
   return (
     <DashboardLayout
@@ -220,6 +274,61 @@ const Schedules = () => {
           )}
         </div>
 
+        {/* Filter & Search Toolbar */}
+        {enrichedSchedules.length > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between bg-muted/30 p-4 rounded-lg border">
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search schedules..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Status Filter */}
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+                <SelectTrigger className="w-[130px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active Only</SelectItem>
+                  <SelectItem value="paused">Paused Only</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Sort By */}
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+                <SelectTrigger className="w-[150px]">
+                  <SortAsc className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="created">Newest First</SelectItem>
+                  <SelectItem value="name">Name (A-Z)</SelectItem>
+                  <SelectItem value="videos">Videos/Day</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              {/* Clear Filters */}
+              {hasActiveFilters && (
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={clearFilters}
+                >
+                  <X className="h-4 w-4 mr-1" />
+                  Clear
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Bulk Action Toolbar */}
         {selectedSchedules.size > 0 && (
           <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border border-border rounded-lg py-3 px-4 flex items-center justify-between gap-4 shadow-sm">
@@ -284,7 +393,7 @@ const Schedules = () => {
           </CardContent>
         </Card>
 
-        {/* Active Schedules Section */}
+        {/* Schedule List */}
         {isLoading ? (
           <Card>
             <CardContent className="p-6">
@@ -326,6 +435,20 @@ const Schedules = () => {
               </div>
             </CardContent>
           </Card>
+        ) : sortedSchedules.length === 0 && hasActiveFilters ? (
+          /* No Results State */
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center">
+              <Search className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">No schedules found</h3>
+              <p className="text-muted-foreground mb-4">
+                No schedules match your search "{searchQuery}"
+              </p>
+              <Button variant="outline" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </CardContent>
+          </Card>
         ) : (
           <>
             {/* Active Schedules */}
@@ -341,15 +464,22 @@ const Schedules = () => {
                   <span className="text-sm text-muted-foreground">({activeSchedules.length})</span>
                 </div>
                 <div className="space-y-4">
-                  {activeSchedules.map((schedule) => (
-                    <ScheduleCard
-                      key={schedule.id}
-                      schedule={schedule}
-                      onEdit={() => handleEditSchedule(schedule)}
-                      isSelected={selectedSchedules.has(schedule.id)}
-                      onToggleSelect={() => toggleSelection(schedule.id)}
-                      showCheckbox
-                    />
+                  {activeSchedules.map((schedule, index) => (
+                    <div key={schedule.id} className="flex gap-3 items-start">
+                      {/* Numbering */}
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-sm font-semibold text-primary mt-4">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <ScheduleCard
+                          schedule={schedule}
+                          onEdit={() => handleEditSchedule(schedule)}
+                          isSelected={selectedSchedules.has(schedule.id)}
+                          onToggleSelect={() => toggleSelection(schedule.id)}
+                          showCheckbox
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -368,15 +498,22 @@ const Schedules = () => {
                   <span className="text-sm text-muted-foreground">({pausedSchedules.length})</span>
                 </div>
                 <div className="space-y-4">
-                  {pausedSchedules.map((schedule) => (
-                    <ScheduleCard
-                      key={schedule.id}
-                      schedule={schedule}
-                      onEdit={() => handleEditSchedule(schedule)}
-                      isSelected={selectedSchedules.has(schedule.id)}
-                      onToggleSelect={() => toggleSelection(schedule.id)}
-                      showCheckbox
-                    />
+                  {pausedSchedules.map((schedule, index) => (
+                    <div key={schedule.id} className="flex gap-3 items-start">
+                      {/* Numbering */}
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-muted-foreground mt-4">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1">
+                        <ScheduleCard
+                          schedule={schedule}
+                          onEdit={() => handleEditSchedule(schedule)}
+                          isSelected={selectedSchedules.has(schedule.id)}
+                          onToggleSelect={() => toggleSelection(schedule.id)}
+                          showCheckbox
+                        />
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>
