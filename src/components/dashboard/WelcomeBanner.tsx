@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { ArrowRight, CheckCircle2, Circle, Sparkles, TrendingUp } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Circle, Sparkles } from 'lucide-react';
 
 interface SetupStep {
   id: string;
@@ -16,17 +16,9 @@ interface WelcomeBannerProps {
   youtubeCount: number;
   tiktokCount: number;
   hasSchedule: boolean;
-  publishedToday?: number;
-  publishedThisWeek?: number;
 }
 
-const WelcomeBanner = ({ 
-  youtubeCount, 
-  tiktokCount, 
-  hasSchedule,
-  publishedToday = 0,
-  publishedThisWeek = 0,
-}: WelcomeBannerProps) => {
+const WelcomeBanner = ({ youtubeCount, tiktokCount, hasSchedule }: WelcomeBannerProps) => {
   const { user } = useAuth();
 
   const steps: SetupStep[] = [
@@ -67,44 +59,29 @@ const WelcomeBanner = ({
 
   const userName = user?.email?.split('@')[0] || 'there';
 
-  // Streamlined completed state with platform social proof
   if (isComplete) {
     return (
-      <div className="relative overflow-hidden rounded-xl gradient-primary p-5 text-white mb-6">
+      <div className="relative overflow-hidden rounded-xl gradient-primary p-6 text-white mb-6">
         <div className="absolute inset-0 bg-grid-pattern opacity-10" />
-        <div className="absolute -top-20 -right-20 w-40 h-40 bg-white/10 rounded-full blur-3xl" />
-        <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="hidden sm:flex h-12 w-12 rounded-full bg-white/20 items-center justify-center backdrop-blur-sm">
-              <Sparkles className="h-6 w-6" />
+        <div className="relative flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="h-5 w-5" />
+              <span className="text-sm font-medium opacity-90">All set up!</span>
             </div>
-            <div>
-              <h2 className="text-xl font-bold">
-                {getGreeting()}, {userName}!
-              </h2>
-              <div className="flex items-center gap-3 text-sm text-white/90 mt-1">
-                <span className="flex items-center gap-1.5 bg-white/10 px-2 py-0.5 rounded-full">
-                  <TrendingUp className="h-3.5 w-3.5" />
-                  {publishedToday} today
-                </span>
-                <span className="flex items-center gap-1.5 bg-white/10 px-2 py-0.5 rounded-full">
-                  {publishedThisWeek} this week
-                </span>
-              </div>
-            </div>
+            <h2 className="text-2xl font-bold mb-1">
+              {getGreeting()}, {userName}!
+            </h2>
+            <p className="text-white/80">
+              Your automation is ready. Check your queue for pending uploads.
+            </p>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="hidden md:block text-right">
-              <p className="text-xs text-white/70">Join the automation revolution</p>
-              <p className="text-sm font-semibold">1,000+ Videos Published</p>
-            </div>
-            <Button asChild variant="secondary" size="sm" className="bg-white text-primary hover:bg-white/90 border-0 font-medium shadow-lg">
-              <Link to="/dashboard/queue">
-                View Queue
-                <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-              </Link>
-            </Button>
-          </div>
+          <Button asChild variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-0">
+            <Link to="/dashboard/queue">
+              View Queue
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
         </div>
       </div>
     );
