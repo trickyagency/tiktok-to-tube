@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Lightbulb, ArrowRight, Video, Youtube, Clock, Sparkles } from 'lucide-react';
+import { Lightbulb, ArrowRight, Video, Clock, Sparkles, TrendingUp, Rocket, Timer } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface Insight {
@@ -7,42 +7,32 @@ interface Insight {
   message: string;
   icon: React.ElementType;
   link?: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: 'success' | 'positive' | 'info' | 'achievement';
 }
 
 interface DashboardInsightsCardProps {
   queuedCount: number;
   newVideosCount: number;
-  failedCount: number;
-  channelsNeedingReconnect: number;
+  publishedThisWeek?: number;
+  totalPublished?: number;
 }
 
 const DashboardInsightsCard = ({
   queuedCount,
   newVideosCount,
-  failedCount,
-  channelsNeedingReconnect,
+  publishedThisWeek = 0,
+  totalPublished = 0,
 }: DashboardInsightsCardProps) => {
   const insights: Insight[] = [];
 
-  // Generate insights based on data
-  if (channelsNeedingReconnect > 0) {
+  // Positive insights only - no failures!
+  if (publishedThisWeek > 0) {
     insights.push({
-      id: 'reconnect',
-      message: `${channelsNeedingReconnect} YouTube channel${channelsNeedingReconnect > 1 ? 's' : ''} need${channelsNeedingReconnect === 1 ? 's' : ''} reconnection`,
-      icon: Youtube,
-      link: '/dashboard/youtube',
-      priority: 'high',
-    });
-  }
-
-  if (failedCount > 0) {
-    insights.push({
-      id: 'failed',
-      message: `${failedCount} upload${failedCount > 1 ? 's' : ''} failed - review and retry`,
-      icon: Clock,
-      link: '/dashboard/queue?status=failed',
-      priority: 'high',
+      id: 'published-week',
+      message: `You published ${publishedThisWeek} video${publishedThisWeek > 1 ? 's' : ''} this week`,
+      icon: TrendingUp,
+      link: '/dashboard/history',
+      priority: 'success',
     });
   }
 
@@ -52,36 +42,61 @@ const DashboardInsightsCard = ({
       message: `${queuedCount} video${queuedCount > 1 ? 's' : ''} ready to publish`,
       icon: Video,
       link: '/dashboard/queue',
-      priority: 'medium',
+      priority: 'positive',
+    });
+  }
+
+  // Time savings insight (estimate based on published count)
+  const hoursSaved = Math.round((totalPublished * 5) / 60); // ~5 min per video
+  if (hoursSaved > 0) {
+    insights.push({
+      id: 'time-saved',
+      message: `Automation saved you ~${hoursSaved} hour${hoursSaved > 1 ? 's' : ''}`,
+      icon: Timer,
+      priority: 'info',
     });
   }
 
   if (newVideosCount > 0) {
     insights.push({
       id: 'new',
-      message: `${newVideosCount} new video${newVideosCount > 1 ? 's' : ''} scraped today`,
+      message: `${newVideosCount} new video${newVideosCount > 1 ? 's' : ''} scraped`,
       icon: Sparkles,
       link: '/dashboard/tiktok',
-      priority: 'low',
+      priority: 'positive',
     });
   }
 
-  // If no insights, show a positive message
+  // Milestone insights
+  const milestones = [10, 25, 50, 100, 250, 500, 1000];
+  const nextMilestone = milestones.find(m => m > totalPublished);
+  if (nextMilestone && totalPublished >= nextMilestone * 0.8) {
+    insights.push({
+      id: 'milestone',
+      message: `Almost at ${nextMilestone} videos milestone!`,
+      icon: Rocket,
+      priority: 'achievement',
+    });
+  }
+
+  // Default positive message
   if (insights.length === 0) {
     insights.push({
-      id: 'all-good',
-      message: 'Everything is running smoothly!',
+      id: 'ready',
+      message: 'Ready to automate your content!',
       icon: Sparkles,
-      priority: 'low',
+      priority: 'info',
     });
   }
 
   const getPriorityStyles = (priority: Insight['priority']) => {
     switch (priority) {
-      case 'high':
-        return 'bg-destructive/10 text-destructive border-destructive/20';
-      case 'medium':
+      case 'success':
+        return 'bg-success/10 text-success border-success/20';
+      case 'positive':
         return 'bg-primary/10 text-primary border-primary/20';
+      case 'achievement':
+        return 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20';
       default:
         return 'bg-muted text-muted-foreground border-transparent';
     }

@@ -4,9 +4,10 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import WelcomeBanner from '@/components/dashboard/WelcomeBanner';
 import WelcomeModal from '@/components/dashboard/WelcomeModal';
 import AnimatedStatCard from '@/components/dashboard/AnimatedStatCard';
-import SystemHealthWidget from '@/components/dashboard/SystemHealthWidget';
+import PlatformStatsWidget from '@/components/dashboard/PlatformStatsWidget';
 import TodayProgressWidget from '@/components/dashboard/TodayProgressWidget';
 import DashboardInsightsCard from '@/components/dashboard/DashboardInsightsCard';
+import AchievementBadges from '@/components/dashboard/AchievementBadges';
 import KeyboardHints from '@/components/dashboard/KeyboardHints';
 import { DashboardLoadingState } from '@/components/dashboard/DashboardSkeletons';
 import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDialog';
@@ -23,9 +24,10 @@ import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useUploadHistory } from '@/hooks/useUploadHistory';
-import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertCircle, CheckCircle2, XCircle, Loader2, Clock, Zap } from 'lucide-react';
+import { useAnalytics } from '@/hooks/useAnalytics';
+import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertCircle, CheckCircle2, Loader2, Clock, Trophy } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { format, isToday, isYesterday, startOfToday, subDays } from 'date-fns';
+import { format, isToday, isYesterday, startOfToday, subDays, startOfWeek } from 'date-fns';
 
 const Dashboard = () => {
   const [showQuickFixDialog, setShowQuickFixDialog] = useState(false);
@@ -48,17 +50,20 @@ const Dashboard = () => {
     mismatchedItems,
     reassignMismatched, 
     isReassigning,
-    failedItems = [],
   } = usePublishQueue();
   const { history: uploadHistory, isLoading: isLoadingHistory } = useUploadHistory();
+  const { data: analyticsData } = useAnalytics();
 
   const isLoading = isLoadingYouTube || isLoadingTikTok || isLoadingQueue || isLoadingHistory;
 
   // Computed stats
   const pendingCount = queueItems.filter(item => item.status === 'queued').length;
   const completedCount = uploadHistory.filter(item => item.status === 'published').length;
-  const failedCount = failedItems?.length || queueItems.filter(item => item.status === 'failed').length;
   const activeSchedules = schedules.filter(s => s.is_active).length;
+
+  // Platform-wide stats from analytics
+  const platformPublishedVideos = analyticsData?.platformStats?.publishedVideos || completedCount;
+  const totalUsers = analyticsData?.totalUsers || 0;
 
   // Today's progress
   const todayUploads = useMemo(() => {
@@ -71,6 +76,14 @@ const Dashboard = () => {
     const yesterday = subDays(startOfToday(), 1);
     return uploadHistory.filter(item => 
       item.status === 'published' && isYesterday(new Date(item.processed_at || item.created_at))
+    ).length;
+  }, [uploadHistory]);
+
+  // Weekly published count
+  const publishedThisWeek = useMemo(() => {
+    const weekStart = startOfWeek(new Date());
+    return uploadHistory.filter(item => 
+      item.status === 'published' && new Date(item.processed_at || item.created_at) >= weekStart
     ).length;
   }, [uploadHistory]);
 
@@ -92,14 +105,30 @@ const Dashboard = () => {
     (channel.auth_status === 'connected' && !channel.refresh_token)
   );
 
-  // Primary stats (reduced to 4)
+  // Primary stats (5 cards - conversion focused)
   const stats = [
+    { 
+      title: 'Platform Videos', 
+      value: platformPublishedVideos, 
+      icon: TrendingUp, 
+      description: 'Published globally',
+      gradientClass: 'stat-gradient-1',
+      href: '/dashboard/history',
+    },
+    { 
+      title: 'Your Published', 
+      value: completedCount, 
+      icon: Trophy, 
+      description: 'Your success stories',
+      gradientClass: 'stat-gradient-2',
+      href: '/dashboard/history',
+    },
     { 
       title: 'YouTube Channels', 
       value: youtubeChannels.length, 
       icon: Youtube, 
       description: 'Connected channels',
-      gradientClass: 'stat-gradient-1',
+      gradientClass: 'stat-gradient-3',
       href: '/dashboard/youtube',
     },
     { 
@@ -107,24 +136,16 @@ const Dashboard = () => {
       value: tikTokAccounts.length, 
       icon: Video, 
       description: 'Monitored accounts',
-      gradientClass: 'stat-gradient-2',
+      gradientClass: 'stat-gradient-4',
       href: '/dashboard/tiktok',
     },
     { 
       title: 'Videos Queued', 
       value: pendingCount, 
       icon: Calendar, 
-      description: 'Pending uploads',
-      gradientClass: 'stat-gradient-3',
+      description: 'Ready to publish',
+      gradientClass: 'stat-gradient-1',
       href: '/dashboard/queue',
-    },
-    { 
-      title: 'Videos Published', 
-      value: completedCount, 
-      icon: TrendingUp, 
-      description: 'Total uploads',
-      gradientClass: 'stat-gradient-4',
-      href: '/dashboard/history',
     },
   ];
 
@@ -172,14 +193,14 @@ const Dashboard = () => {
       });
     }
 
-    if (mismatchedCount > 0) {
+    // Add view history if user has published content
+    if (completedCount > 0 && actions.length < 3) {
       actions.push({
-        title: 'Fix Queue Issues',
-        description: `${mismatchedCount} mismatch${mismatchedCount > 1 ? 'es' : ''} detected`,
-        icon: Zap,
-        link: '/dashboard/queue?showMismatched=true',
-        color: 'text-warning',
-        onClick: () => setShowQuickFixDialog(true),
+        title: 'View History',
+        description: `${completedCount} published video${completedCount > 1 ? 's' : ''}`,
+        icon: TrendingUp,
+        link: '/dashboard/history',
+        color: 'text-success',
       });
     }
     
@@ -205,7 +226,7 @@ const Dashboard = () => {
     }
 
     return actions.slice(0, 4);
-  }, [youtubeChannels, tikTokAccounts, pendingCount, channelsNeedingReconnect, mismatchedCount]);
+  }, [youtubeChannels, tikTokAccounts, pendingCount, channelsNeedingReconnect, completedCount]);
 
   const recentActivity = uploadHistory.slice(0, 5);
 
@@ -276,15 +297,12 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Insights Row - 3 cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
+      {/* Insights Row - 4 cards for conversion focus */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
         <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
-          <SystemHealthWidget
-            youtubeConnected={youtubeChannels.length}
-            tiktokConnected={tikTokAccounts.length}
-            activeSchedules={activeSchedules}
-            lastSync={lastSync}
-            hasErrors={failedCount > 0 || channelsNeedingReconnect.length > 0}
+          <PlatformStatsWidget
+            totalPlatformVideos={platformPublishedVideos}
+            totalUsers={totalUsers}
           />
         </div>
         <div className="animate-fade-in" style={{ animationDelay: '250ms' }}>
@@ -298,8 +316,16 @@ const Dashboard = () => {
           <DashboardInsightsCard
             queuedCount={pendingCount}
             newVideosCount={0}
-            failedCount={failedCount}
-            channelsNeedingReconnect={channelsNeedingReconnect.length}
+            publishedThisWeek={publishedThisWeek}
+            totalPublished={completedCount}
+          />
+        </div>
+        <div className="animate-fade-in" style={{ animationDelay: '350ms' }}>
+          <AchievementBadges
+            publishedCount={completedCount}
+            youtubeChannels={youtubeChannels.length}
+            tiktokAccounts={tikTokAccounts.length}
+            schedulesActive={activeSchedules}
           />
         </div>
       </div>
@@ -394,8 +420,6 @@ const Dashboard = () => {
                               <div className="flex-shrink-0">
                                 {item.status === 'published' ? (
                                   <CheckCircle2 className="h-4 w-4 text-success" />
-                                ) : item.status === 'failed' ? (
-                                  <XCircle className="h-4 w-4 text-destructive" />
                                 ) : item.status === 'processing' ? (
                                   <Loader2 className="h-4 w-4 text-warning animate-spin" />
                                 ) : (
@@ -420,8 +444,8 @@ const Dashboard = () => {
                                 <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
                                   item.status === 'published' 
                                     ? 'bg-success/10 text-success'
-                                    : item.status === 'failed'
-                                      ? 'bg-destructive/10 text-destructive'
+                                    : item.status === 'processing'
+                                      ? 'bg-warning/10 text-warning'
                                       : 'bg-muted text-muted-foreground'
                                 }`}>
                                   {item.status}
