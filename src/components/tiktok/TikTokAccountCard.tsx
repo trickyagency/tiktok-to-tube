@@ -18,11 +18,12 @@ interface TikTokAccountCardProps {
   account: TikTokAccountWithOwner;
   onViewVideos: (account: TikTokAccountWithOwner) => void;
   isApifyConfigured: boolean;
+  index?: number;
 }
 
 const RESCRAPE_COOLDOWN_DAYS = 15;
 
-export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: TikTokAccountCardProps) {
+export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, index }: TikTokAccountCardProps) {
   const { isOwner } = useAuth();
   const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
   const scrapeVideos = useScrapeVideos();
@@ -162,7 +163,14 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured }: 
       {/* Health indicator stripe */}
       <div className={`absolute top-0 left-0 right-0 h-1 ${healthStatus.color} transition-colors`} />
       
-      <CardContent className="p-5">
+      {/* Index number badge */}
+      {typeof index === 'number' && (
+        <div className="absolute top-3 left-3 h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center border border-primary/20 z-10">
+          {index + 1}
+        </div>
+      )}
+      
+      <CardContent className="p-5 pt-6">
         <div className="flex items-start gap-4">
           {/* Avatar with status indicator */}
           <div className="relative shrink-0">

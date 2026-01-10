@@ -305,6 +305,7 @@ export function TikTokAccountsTable({
                   aria-label="Select all"
                 />
               </TableHead>
+            <TableHead className="w-[50px] text-center">#</TableHead>
               <TableHead className="w-[50px]"></TableHead>
               <TableHead 
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
@@ -349,7 +350,7 @@ export function TikTokAccountsTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedAccounts.map((account) => (
+          {paginatedAccounts.map((account, index) => (
               <TableRow 
                 key={account.id} 
                 className={`group transition-colors border-border/30 ${selectedIds.has(account.id) ? 'bg-primary/5' : ''}`}
@@ -360,6 +361,9 @@ export function TikTokAccountsTable({
                     onCheckedChange={() => toggleSelect(account.id)}
                     aria-label={`Select ${account.username}`}
                   />
+                </TableCell>
+                <TableCell className="text-center text-sm font-medium text-muted-foreground tabular-nums">
+                  {startIndex + index + 1}
                 </TableCell>
                 <TableCell>
                   <Avatar className="h-9 w-9 ring-1 ring-border/50">

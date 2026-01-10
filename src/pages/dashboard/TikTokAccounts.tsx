@@ -355,12 +355,13 @@ const TikTokAccounts = () => {
             />
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {sortedAccounts.map((account) => (
+              {sortedAccounts.map((account, index) => (
                 <TikTokAccountCard
                   key={account.id}
                   account={account}
                   onViewVideos={handleViewVideos}
                   isApifyConfigured={isApifyUsable ?? false}
+                  index={index}
                 />
               ))}
             </div>
