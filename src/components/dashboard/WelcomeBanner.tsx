@@ -57,7 +57,7 @@ const WelcomeBanner = ({ youtubeCount, tiktokCount, hasSchedule }: WelcomeBanner
     return 'Good evening';
   };
 
-  const userName = user?.email?.split('@')[0] || 'there';
+  const userName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'there';
 
   if (isComplete) {
     return (
