@@ -39,6 +39,8 @@ const TikTokAccounts = () => {
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState('username');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
   
   // Dialog state for empty state callbacks
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -68,7 +70,7 @@ const TikTokAccounts = () => {
     return [...new Set(emails)];
   }, [accounts, isOwner]);
 
-  // Filter accounts based on search, status, and owner filter
+  // Filter accounts based on search, status, owner, and date filter
   const filteredAccounts = useMemo(() => {
     if (!accounts) return [];
     
@@ -92,9 +94,21 @@ const TikTokAccounts = () => {
       const matchesOwner = ownerFilter === 'all' || 
         (account as any).owner_email === ownerFilter;
       
-      return matchesSearch && matchesStatus && matchesOwner;
+      // Date filter
+      let matchesDate = true;
+      if (dateFrom || dateTo) {
+        const createdAt = new Date(account.created_at);
+        if (dateFrom && createdAt < dateFrom) matchesDate = false;
+        if (dateTo) {
+          const endOfToDay = new Date(dateTo);
+          endOfToDay.setHours(23, 59, 59, 999);
+          if (createdAt > endOfToDay) matchesDate = false;
+        }
+      }
+      
+      return matchesSearch && matchesStatus && matchesOwner && matchesDate;
     });
-  }, [accounts, searchQuery, statusFilter, ownerFilter]);
+  }, [accounts, searchQuery, statusFilter, ownerFilter, dateFrom, dateTo]);
 
   // Sort accounts
   const sortedAccounts = useMemo(() => {
@@ -143,13 +157,20 @@ const TikTokAccounts = () => {
     deleteAccount.mutate(accountId);
   };
 
+  const handleDateChange = (range: { from?: Date; to?: Date }) => {
+    setDateFrom(range.from);
+    setDateTo(range.to);
+  };
+
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
     setOwnerFilter('all');
+    setDateFrom(undefined);
+    setDateTo(undefined);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || ownerFilter !== 'all';
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || ownerFilter !== 'all' || !!dateFrom || !!dateTo;
 
   const totalFollowers = accounts?.reduce((sum, a) => sum + (a.follower_count || 0), 0) || 0;
 
@@ -311,6 +332,9 @@ const TikTokAccounts = () => {
             isOwner={isOwner}
             totalCount={accounts?.length || 0}
             filteredCount={sortedAccounts.length}
+            dateFrom={dateFrom}
+            dateTo={dateTo}
+            onDateChange={handleDateChange}
           />
         ) : null}
 
