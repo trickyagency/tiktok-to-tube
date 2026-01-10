@@ -18,6 +18,7 @@ import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { usePublishQueue } from '@/hooks/usePublishQueue';
 import { useUploadHistory } from '@/hooks/useUploadHistory';
+import { usePlatformStats } from '@/hooks/usePlatformStats';
 import { Youtube, Video, Calendar, TrendingUp, Plus, ArrowRight, Activity, AlertTriangle, AlertCircle, CheckCircle2, XCircle, Loader2, Clock } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { format } from 'date-fns';
@@ -44,11 +45,11 @@ const Dashboard = () => {
     isReassigning 
   } = usePublishQueue();
   const { history: uploadHistory, isLoading: isLoadingHistory } = useUploadHistory();
+  const { data: platformStats, isLoading: isLoadingPlatformStats } = usePlatformStats();
 
-  const isLoading = isLoadingYouTube || isLoadingTikTok || isLoadingQueue || isLoadingHistory;
+  const isLoading = isLoadingYouTube || isLoadingTikTok || isLoadingQueue || isLoadingHistory || isLoadingPlatformStats;
 
   const pendingCount = queueItems.filter(item => item.status === 'queued').length;
-  const completedCount = uploadHistory.length;
 
   // Check for YouTube channels that need reconnection
   // Check for YouTube channels that need reconnection (only when refresh token is revoked, not when access token expires)
@@ -82,9 +83,9 @@ const Dashboard = () => {
     },
     { 
       title: 'Videos Published', 
-      value: completedCount, 
+      value: platformStats?.totalPublishedVideos || 0, 
       icon: TrendingUp, 
-      description: 'Total uploads',
+      description: 'Platform uploads',
       gradientClass: 'stat-gradient-4'
     },
     { 
