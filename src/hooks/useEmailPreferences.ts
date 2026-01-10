@@ -12,6 +12,8 @@ export interface EmailPreferences {
   emailOnExpiry7Days: boolean;
   emailOnExpiry3Days: boolean;
   emailOnExpiry1Day: boolean;
+  // Video sync notification (when owner scrapes for user)
+  emailOnVideosSynced: boolean;
 }
 
 const defaultPreferences: EmailPreferences = {
@@ -25,6 +27,8 @@ const defaultPreferences: EmailPreferences = {
   emailOnExpiry7Days: true,
   emailOnExpiry3Days: true,
   emailOnExpiry1Day: true,
+  // Video sync notification - enabled by default
+  emailOnVideosSynced: true,
 };
 
 export const useEmailPreferences = () => {

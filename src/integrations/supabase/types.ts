@@ -1102,6 +1102,7 @@ export type Database = {
         Args: { p_channel_id: string; p_quota_cost?: number }
         Returns: boolean
       }
+      fix_ownership_mismatches: { Args: never; Returns: number }
       get_cron_history: {
         Args: { limit_rows?: number }
         Returns: {
@@ -1122,6 +1123,24 @@ export type Database = {
           jobid: number
           jobname: string
           schedule: string
+        }[]
+      }
+      get_incorrectly_published_videos: {
+        Args: never
+        Returns: {
+          account_owner_id: string
+          incorrectly_published_count: number
+          tiktok_account_id: string
+          username: string
+        }[]
+      }
+      get_ownership_mismatches: {
+        Args: never
+        Returns: {
+          account_owner_id: string
+          mismatched_video_count: number
+          tiktok_account_id: string
+          username: string
         }[]
       }
       get_user_auth_metadata: {
@@ -1146,6 +1165,7 @@ export type Database = {
       }
       is_apify_configured: { Args: never; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      restore_incorrectly_published_videos: { Args: never; Returns: number }
     }
     Enums: {
       app_role: "admin" | "user" | "owner"

@@ -209,6 +209,7 @@ async function scrapeVideosInBackground(
   supabase: any,
   accountId: string,
   accountOwnerId: string,
+  scrapingUserId: string,
   userInfo: TikWMUserInfo,
   cleanUsername: string
 ) {
@@ -290,6 +291,45 @@ async function scrapeVideosInBackground(
           
           // Update progress
           await updateProgress(Math.min(i + 200, videosToInsert.length), videosToInsert.length);
+        }
+      // Send notification email if owner scraped for another user and new videos were imported
+        if (scrapingUserId !== accountOwnerId && newVideos.length > 0) {
+          console.log(`[Background] Owner scrape detected: sending notification to ${accountOwnerId}`);
+          try {
+            // Check if scraping user is owner
+            const { data: scrapingUserRole } = await supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', scrapingUserId)
+              .single();
+
+            if (scrapingUserRole?.role === 'owner') {
+              // Call the notification edge function
+              const notifyResponse = await fetch(
+                `${Deno.env.get('SUPABASE_URL')}/functions/v1/scrape-notification`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  },
+                  body: JSON.stringify({
+                    accountOwnerId,
+                    username: cleanUsername,
+                    videosImported: newVideos.length,
+                  }),
+                }
+              );
+              
+              if (!notifyResponse.ok) {
+                console.error('[Background] Failed to send notification:', await notifyResponse.text());
+              } else {
+                console.log('[Background] Notification email sent successfully');
+              }
+            }
+          } catch (notifyError) {
+            console.error('[Background] Error sending notification:', notifyError);
+          }
         }
       }
     }
@@ -552,7 +592,7 @@ Deno.serve(async (req) => {
     // Start background scraping using EdgeRuntime.waitUntil
     // This allows us to return immediately while scraping continues
     EdgeRuntime.waitUntil(
-      scrapeVideosInBackground(supabase, account.id, accountOwnerId, userInfo, cleanUsername)
+      scrapeVideosInBackground(supabase, account.id, accountOwnerId, user.id, userInfo, cleanUsername)
     );
 
     // Return immediate response - scraping continues in background

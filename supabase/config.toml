@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.signup-confirmation]
 verify_jwt = false
+
+[functions.scrape-notification]
+verify_jwt = false
