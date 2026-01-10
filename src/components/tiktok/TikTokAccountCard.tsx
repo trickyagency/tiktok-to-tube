@@ -13,34 +13,38 @@ import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
 import { AccountYouTubeSettingsDialog } from './AccountYouTubeSettingsDialog';
-
 interface TikTokAccountCardProps {
   account: TikTokAccountWithOwner;
   onViewVideos: (account: TikTokAccountWithOwner) => void;
   isApifyConfigured: boolean;
-  index?: number;
 }
-
 const RESCRAPE_COOLDOWN_DAYS = 15;
-
-export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, index }: TikTokAccountCardProps) {
-  const { isOwner } = useAuth();
+export function TikTokAccountCard({
+  account,
+  onViewVideos,
+  isApifyConfigured
+}: TikTokAccountCardProps) {
+  const {
+    isOwner
+  } = useAuth();
   const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
   const scrapeVideos = useScrapeVideos();
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
   const resetAccount = useResetTikTokAccount();
-  const { data: publishedCount = 0 } = usePublishedVideosCount(account.id);
-  const { data: limits } = useUserAccountLimits();
-  
+  const {
+    data: publishedCount = 0
+  } = usePublishedVideosCount(account.id);
+  const {
+    data: limits
+  } = useUserAccountLimits();
   const hasYouTubeSettings = !!(account.youtube_description || account.youtube_tags);
-  
   const subscriptionStatus = limits?.subscriptionStatus ?? 'none';
   const subscriptionMessage = limits?.subscriptionMessage ?? '';
   const canScrape = subscriptionStatus === 'active' || limits?.isUnlimited;
   const isScraping = account.scrape_status === 'scraping' || scrapeVideos.isPending;
   const isRefreshing = refreshAccount.isPending;
-  
+
   // 7-day rescrape cooldown logic
   const lastScrapedAt = account.last_scraped_at ? new Date(account.last_scraped_at) : null;
   const daysSinceLastScrape = lastScrapedAt ? differenceInDays(new Date(), lastScrapedAt) : null;
@@ -49,63 +53,76 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
   const isScraped = account.scrape_status === 'completed' && lastScrapedAt !== null;
   const isFailed = account.scrape_status === 'failed';
   const isPending = account.scrape_status === 'pending' || !lastScrapedAt;
-  
+
   // Progress tracking
   const progressCurrent = account.scrape_progress_current || 0;
   const progressTotal = account.scrape_progress_total || 0;
-  const progressPercentage = progressTotal > 0 ? Math.round((progressCurrent / progressTotal) * 100) : 0;
-
+  const progressPercentage = progressTotal > 0 ? Math.round(progressCurrent / progressTotal * 100) : 0;
   const handleScrapeVideos = () => {
-    scrapeVideos.mutate({ accountId: account.id, username: account.username });
+    scrapeVideos.mutate({
+      accountId: account.id,
+      username: account.username
+    });
   };
-
   const handleSyncProfile = () => {
-    refreshAccount.mutate({ accountId: account.id, username: account.username });
+    refreshAccount.mutate({
+      accountId: account.id,
+      username: account.username
+    });
   };
-
   const handleDelete = () => {
     if (confirm(`Delete @${account.username} and all scraped videos?`)) {
       deleteAccount.mutate(account.id);
     }
   };
-
   const openTikTokProfile = () => {
     window.open(`https://www.tiktok.com/@${account.username}`, '_blank');
   };
-
   const handleReset = () => {
     resetAccount.mutate(account.id);
   };
 
   // Show reset button if scraping for more than 5 minutes
   const scrapingStartedAt = new Date(account.updated_at);
-  const isStuckScraping = isScraping && (Date.now() - scrapingStartedAt.getTime() > 5 * 60 * 1000);
-
+  const isStuckScraping = isScraping && Date.now() - scrapingStartedAt.getTime() > 5 * 60 * 1000;
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
   };
-
   const isAccountUnavailable = account.account_status === 'private' || account.account_status === 'deleted' || account.account_status === 'not_found';
 
   // Health status indicator
   const getHealthStatus = () => {
     if (account.account_status === 'deleted' || account.account_status === 'not_found') {
-      return { color: 'bg-destructive', label: 'Deleted' };
+      return {
+        color: 'bg-destructive',
+        label: 'Deleted'
+      };
     }
     if (account.account_status === 'private') {
-      return { color: 'bg-amber-500', label: 'Private' };
+      return {
+        color: 'bg-amber-500',
+        label: 'Private'
+      };
     }
     if (account.scrape_status === 'failed') {
-      return { color: 'bg-destructive', label: 'Failed' };
+      return {
+        color: 'bg-destructive',
+        label: 'Failed'
+      };
     }
     if (account.scrape_status === 'completed') {
-      return { color: 'bg-emerald-500', label: 'Healthy' };
+      return {
+        color: 'bg-emerald-500',
+        label: 'Healthy'
+      };
     }
-    return { color: 'bg-muted-foreground', label: 'Pending' };
+    return {
+      color: 'bg-muted-foreground',
+      label: 'Pending'
+    };
   };
-
   const healthStatus = getHealthStatus();
 
   // Determine button state
@@ -155,34 +172,22 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
       tooltip: 'Import videos from TikTok'
     };
   };
-
   const buttonConfig = getButtonConfig();
-
-  return (
-    <Card className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 border-border/50 ${isScraping ? 'ring-2 ring-primary/30 shadow-lg shadow-primary/10' : ''} ${isAccountUnavailable ? 'opacity-80' : ''}`}>
+  return <Card className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 border-border/50 ${isScraping ? 'ring-2 ring-primary/30 shadow-lg shadow-primary/10' : ''} ${isAccountUnavailable ? 'opacity-80' : ''}`}>
       {/* Health indicator stripe */}
       <div className={`absolute top-0 left-0 right-0 h-1 ${healthStatus.color} transition-colors`} />
       
-      {/* Index number badge */}
-      {typeof index === 'number' && (
-        <div className="absolute top-3 left-3 h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center border border-primary/20 z-10">
-          {index + 1}
-        </div>
-      )}
-      
-      <CardContent className="p-5 pt-6">
+      <CardContent className="p-5">
         <div className="flex items-start gap-4">
           {/* Avatar with status indicator */}
-          <div className="relative shrink-0">
+          <div className="relative shrink-0 text-primary-foreground bg-primary">
             <Avatar className={`h-14 w-14 ring-2 ring-background shadow-md transition-transform group-hover:scale-105 ${isAccountUnavailable ? 'grayscale' : ''}`}>
               <AvatarImage src={account.avatar_url || undefined} alt={account.username} />
               <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                 {account.username[0]?.toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            {isScraping && (
-              <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-            )}
+            {isScraping && <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />}
             {/* Health dot indicator */}
             <div className={`absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full border-2 border-background ${healthStatus.color} flex items-center justify-center`}>
               {account.account_status === 'private' && <Lock className="h-2 w-2 text-white" />}
@@ -221,32 +226,20 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
                   <DropdownMenuItem onClick={() => setYoutubeSettingsOpen(true)}>
                     <Settings className="h-4 w-4 mr-2" />
                     YouTube Settings
-                    {hasYouTubeSettings && (
-                      <Badge variant="secondary" className="ml-auto text-xs py-0 px-1.5">
+                    {hasYouTubeSettings && <Badge variant="secondary" className="ml-auto text-xs py-0 px-1.5">
                         Set
-                      </Badge>
-                    )}
+                      </Badge>}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleSyncProfile} disabled={isRefreshing || isScraping}>
-                    {isRefreshing ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                    )}
+                    {isRefreshing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <RefreshCw className="h-4 w-4 mr-2" />}
                     Sync Profile
                   </DropdownMenuItem>
-                  {isScraping && (
-                    <DropdownMenuItem onClick={handleReset} disabled={resetAccount.isPending}>
+                  {isScraping && <DropdownMenuItem onClick={handleReset} disabled={resetAccount.isPending}>
                       <RotateCcw className="h-4 w-4 mr-2" />
                       Cancel Scrape
-                    </DropdownMenuItem>
-                  )}
+                    </DropdownMenuItem>}
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
-                    onClick={handleDelete} 
-                    className="text-destructive focus:text-destructive"
-                    disabled={deleteAccount.isPending}
-                  >
+                  <DropdownMenuItem onClick={handleDelete} className="text-destructive focus:text-destructive" disabled={deleteAccount.isPending}>
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete Account
                   </DropdownMenuItem>
@@ -256,8 +249,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
 
             {/* Status badges */}
             <div className="flex items-center gap-1.5 mt-2 flex-wrap">
-              {isOwner && (account.owner_email || account.owner_name) && (
-                <Tooltip>
+              {isOwner && (account.owner_email || account.owner_name) && <Tooltip>
                   <TooltipTrigger asChild>
                     <Badge variant="outline" className="text-xs px-2 py-0 h-5 bg-blue-500/10 text-blue-600 border-blue-500/20 max-w-[180px] truncate cursor-help">
                       Added by: {account.owner_name || account.owner_email}
@@ -267,16 +259,12 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
                     <p className="font-medium">{account.owner_name || 'Unknown'}</p>
                     <p className="text-xs text-muted-foreground">{account.owner_email}</p>
                   </TooltipContent>
-                </Tooltip>
-              )}
-              {isScraping && (
-                <Badge className="text-xs px-2 py-0 h-5 bg-primary/20 text-primary border-primary/30 animate-pulse">
+                </Tooltip>}
+              {isScraping && <Badge className="text-xs px-2 py-0 h-5 bg-primary/20 text-primary border-primary/30 animate-pulse">
                   <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                   Importing
-                </Badge>
-              )}
-              {!isScraping && isScraped && !canRescrape && (
-                <Tooltip>
+                </Badge>}
+              {!isScraping && isScraped && !canRescrape && <Tooltip>
                   <TooltipTrigger asChild>
                     <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-emerald-600 border-emerald-500/30 bg-emerald-500/10 cursor-help">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -286,38 +274,27 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
                   <TooltipContent>
                     <p>Scraped {daysSinceLastScrape} days ago • ReScrape available in {daysUntilRescrape} days</p>
                   </TooltipContent>
-                </Tooltip>
-              )}
-              {!isScraping && isScraped && canRescrape && (
-                <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-primary border-primary/30 bg-primary/10">
+                </Tooltip>}
+              {!isScraping && isScraped && canRescrape && <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-primary border-primary/30 bg-primary/10">
                   <RefreshCw className="h-3 w-3 mr-1" />
                   ReScrape Available
-                </Badge>
-              )}
-              {!isScraping && isFailed && (
-                <Badge variant="destructive" className="text-xs px-2 py-0 h-5">
+                </Badge>}
+              {!isScraping && isFailed && <Badge variant="destructive" className="text-xs px-2 py-0 h-5">
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Failed
-                </Badge>
-              )}
-              {!isScraping && isPending && !isAccountUnavailable && (
-                <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-amber-600 border-amber-500/30 bg-amber-500/10">
+                </Badge>}
+              {!isScraping && isPending && !isAccountUnavailable && <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-amber-600 border-amber-500/30 bg-amber-500/10">
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Not scraped
-                </Badge>
-              )}
-              {account.account_status === 'private' && (
-                <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-amber-500 border-amber-500/30 bg-amber-500/10">
+                </Badge>}
+              {account.account_status === 'private' && <Badge variant="outline" className="text-xs px-2 py-0 h-5 text-amber-500 border-amber-500/30 bg-amber-500/10">
                   <Lock className="h-3 w-3 mr-1" />
                   Private
-                </Badge>
-              )}
-              {(account.account_status === 'deleted' || account.account_status === 'not_found') && (
-                <Badge variant="destructive" className="text-xs px-2 py-0 h-5">
+                </Badge>}
+              {(account.account_status === 'deleted' || account.account_status === 'not_found') && <Badge variant="destructive" className="text-xs px-2 py-0 h-5">
                   <UserX className="h-3 w-3 mr-1" />
                   Deleted
-                </Badge>
-              )}
+                </Badge>}
             </div>
           </div>
         </div>
@@ -351,83 +328,51 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
 
 
         {/* Progress bar during scraping */}
-        {isScraping && (
-          <div className="mt-4 space-y-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
+        {isScraping && <div className="mt-4 space-y-2 p-3 rounded-lg bg-primary/5 border border-primary/20">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">Importing videos...</span>
               <span className="font-medium text-primary tabular-nums">
                 {progressCurrent} / {progressTotal > 0 ? `~${progressTotal}` : '?'}
               </span>
             </div>
-            <Progress 
-              value={progressPercentage} 
-              className="h-1.5"
-            />
+            <Progress value={progressPercentage} className="h-1.5" />
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-1.5 text-muted-foreground">
                 <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-                {progressCurrent === 0 
-                  ? 'Connecting to TikTok API...'
-                  : progressCurrent < (progressTotal || Infinity)
-                  ? 'Downloading metadata...'
-                  : 'Saving to database...'
-                }
+                {progressCurrent === 0 ? 'Connecting to TikTok API...' : progressCurrent < (progressTotal || Infinity) ? 'Downloading metadata...' : 'Saving to database...'}
               </div>
-              {isStuckScraping && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleReset}
-                  disabled={resetAccount.isPending}
-                  className="h-5 px-2 text-xs text-muted-foreground hover:text-destructive"
-                >
+              {isStuckScraping && <Button variant="ghost" size="sm" onClick={handleReset} disabled={resetAccount.isPending} className="h-5 px-2 text-xs text-muted-foreground hover:text-destructive">
                   <RotateCcw className="h-3 w-3 mr-1" />
                   Reset
-                </Button>
-              )}
+                </Button>}
             </div>
-          </div>
-        )}
+          </div>}
 
         {/* Last sync info with rescrape countdown */}
-        {!isScraping && lastScrapedAt && (
-          <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
+        {!isScraping && lastScrapedAt && <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
             <span className="flex items-center gap-1">
               <Video className="h-3 w-3" />
               Scraped {formatDistanceToNow(lastScrapedAt)} ago
             </span>
-            {isScraped && !canRescrape && daysUntilRescrape !== null && (
-              <span className="flex items-center gap-1 text-muted-foreground">
+            {isScraped && !canRescrape && daysUntilRescrape !== null && <span className="flex items-center gap-1 text-muted-foreground">
                 <Clock className="h-3 w-3" />
                 ReScrape in {daysUntilRescrape}d
-              </span>
-            )}
-          </div>
-        )}
+              </span>}
+          </div>}
 
         {/* Action button */}
         <div className="mt-4">
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button
-                  variant={buttonConfig.variant}
-                  size="sm"
-                  onClick={handleScrapeVideos}
-                  disabled={buttonConfig.disabled}
-                  className={`w-full h-9 ${isScraped && !canRescrape ? 'opacity-60' : ''}`}
-                >
+                <Button variant={buttonConfig.variant} size="sm" onClick={handleScrapeVideos} disabled={buttonConfig.disabled} className={`w-full h-9 ${isScraped && !canRescrape ? 'opacity-60' : ''}`}>
                   {buttonConfig.icon}
                   {buttonConfig.label}
                 </Button>
               </TooltipTrigger>
               <TooltipContent className="max-w-xs">
                 <p>
-                  {!canScrape 
-                    ? subscriptionMessage 
-                    : !isApifyConfigured 
-                    ? 'Scraper API key not configured' 
-                    : buttonConfig.tooltip}
+                  {!canScrape ? subscriptionMessage : !isApifyConfigured ? 'Scraper API key not configured' : buttonConfig.tooltip}
                 </p>
               </TooltipContent>
             </Tooltip>
@@ -435,11 +380,6 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
         </div>
       </CardContent>
 
-      <AccountYouTubeSettingsDialog
-        account={account}
-        open={youtubeSettingsOpen}
-        onOpenChange={setYoutubeSettingsOpen}
-      />
-    </Card>
-  );
+      <AccountYouTubeSettingsDialog account={account} open={youtubeSettingsOpen} onOpenChange={setYoutubeSettingsOpen} />
+    </Card>;
 }
