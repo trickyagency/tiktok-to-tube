@@ -272,7 +272,7 @@ export function TikTokAccountsTable({
       {hasSelection && (
         <div className="flex items-center gap-3 p-3 mb-4 bg-primary/5 border border-primary/20 rounded-lg animate-fade-in">
           <span className="text-sm font-medium">
-            {selectedIds.size} account{selectedIds.size > 1 ? 's' : ''} selected
+            {selectedIds.size} of {accounts.length} account{accounts.length !== 1 ? 's' : ''} selected
           </span>
           <div className="flex-1" />
           <Button variant="outline" size="sm" onClick={handleBulkScrape} className="h-8">
