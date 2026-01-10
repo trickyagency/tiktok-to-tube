@@ -56,6 +56,9 @@ const Settings = () => {
   // Account deletion state
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  
+  // Email verification state
+  const [isResendingVerification, setIsResendingVerification] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
   // Email branding state
@@ -346,6 +349,41 @@ const Settings = () => {
     return 'U';
   };
 
+  const isEmailVerified = (): boolean => {
+    return !!user?.email_confirmed_at;
+  };
+
+  const getEmailVerifiedDate = (): string | null => {
+    if (!user?.email_confirmed_at) return null;
+    return new Date(user.email_confirmed_at).toLocaleDateString();
+  };
+
+  const handleResendVerification = async () => {
+    setIsResendingVerification(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: user?.email || '',
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      
+      if (error) throw error;
+      
+      toast.success('Verification email sent', {
+        description: 'Check your inbox and click the verification link.'
+      });
+    } catch (error: any) {
+      console.error('Failed to resend verification:', error);
+      toast.error('Failed to send verification email', {
+        description: error.message || 'Please try again later'
+      });
+    } finally {
+      setIsResendingVerification(false);
+    }
+  };
+
   const isValidHex = (color: string) => /^#[0-9A-Fa-f]{6}$/.test(color);
 
   return (
@@ -417,6 +455,37 @@ const Settings = () => {
                 >
                   {showEmailChange ? 'Cancel' : 'Change'}
                 </Button>
+              </div>
+              
+              {/* Email Verification Status */}
+              <div className="flex items-center gap-2 text-sm">
+                {isEmailVerified() ? (
+                  <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Verified on {getEmailVerifiedDate()}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span>Email not verified</span>
+                    <Button 
+                      variant="link" 
+                      size="sm" 
+                      className="h-auto p-0 ml-1 text-amber-600 dark:text-amber-400 underline hover:text-amber-700 dark:hover:text-amber-300"
+                      onClick={handleResendVerification}
+                      disabled={isResendingVerification}
+                    >
+                      {isResendingVerification ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Sending...
+                        </>
+                      ) : (
+                        'Resend verification email'
+                      )}
+                    </Button>
+                  </div>
+                )}
               </div>
               
               {showEmailChange && (
