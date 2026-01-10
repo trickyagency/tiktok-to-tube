@@ -200,8 +200,9 @@ export function YouTubeChannelsTable({
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent border-b border-border/50 bg-muted/30">
+              <TableHead className="w-[50px] text-center">#</TableHead>
               <TableHead className="w-[50px]"></TableHead>
-              <TableHead 
+              <TableHead
                 className="cursor-pointer hover:text-foreground transition-colors"
                 onClick={() => handleSort('channel_title')}
               >
@@ -245,6 +246,9 @@ export function YouTubeChannelsTable({
                   index % 2 === 0 ? "bg-transparent" : "bg-muted/10"
                 )}
               >
+                <TableCell className="text-center text-sm font-medium text-muted-foreground tabular-nums py-3">
+                  {startIndex + index + 1}
+                </TableCell>
                 <TableCell className="py-3">
                   <Avatar className="h-9 w-9 rounded-lg transition-transform group-hover:scale-105">
                     {channel.channel_thumbnail ? (
@@ -327,7 +331,7 @@ export function YouTubeChannelsTable({
             ))}
             {sortedChannels.length === 0 && (
               <TableRow>
-                <TableCell colSpan={isOwner ? 8 : 7} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={isOwner ? 9 : 8} className="h-32 text-center text-muted-foreground">
                   <div className="flex flex-col items-center gap-2">
                     <Youtube className="h-8 w-8 text-muted-foreground/50" />
                     <span>No channels found</span>

@@ -53,6 +53,7 @@ import {
 interface YouTubeChannelCardProps {
   channel: YouTubeChannelWithOwner;
   onAuthComplete?: () => void;
+  index?: number;
 }
 
 // Status color mapping
@@ -113,7 +114,7 @@ const getStatusColors = (status: string | null) => {
   }
 };
 
-export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCardProps) {
+export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeChannelCardProps) {
   const { isOwner } = useAuth();
   const [isAuthorizing, setIsAuthorizing] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -408,6 +409,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete }: YouTubeChannelCa
         "absolute top-0 left-0 right-0 h-1 bg-gradient-to-r",
         statusColors.gradient
       )} />
+
+      {/* Index number badge */}
+      {typeof index === 'number' && (
+        <div className="absolute top-3 left-3 h-6 w-6 rounded-full bg-primary/10 text-primary text-xs font-semibold flex items-center justify-center border border-primary/20 z-10">
+          {index + 1}
+        </div>
+      )}
 
       {/* Loading overlay during OAuth */}
       {isAuthorizing && (

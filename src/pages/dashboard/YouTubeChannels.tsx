@@ -319,6 +319,7 @@ const YouTubeChannels = () => {
                       <YouTubeChannelCard 
                         channel={channel} 
                         onAuthComplete={refetch}
+                        index={index}
                       />
                     </div>
                   ))}
@@ -348,6 +349,7 @@ const YouTubeChannels = () => {
                       <YouTubeChannelCard 
                         channel={channel} 
                         onAuthComplete={refetch}
+                        index={pendingChannels.length + index}
                       />
                     </div>
                   ))}
@@ -377,6 +379,7 @@ const YouTubeChannels = () => {
                       <YouTubeChannelCard 
                         channel={channel}
                         onAuthComplete={refetch}
+                        index={pendingChannels.length + failedChannels.length + index}
                       />
                     </div>
                   ))}
