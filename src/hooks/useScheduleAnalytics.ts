@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { startOfMonth, endOfMonth, subDays, format } from 'date-fns';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface ScheduleStats {
   scheduleId: string;
@@ -29,23 +30,36 @@ export interface ScheduleTrend {
 }
 
 export function useScheduleAnalytics() {
+  const { user } = useAuth();
+  
   return useQuery({
-    queryKey: ['schedule-analytics-overview'],
+    queryKey: ['schedule-analytics-overview', user?.id],
     queryFn: async (): Promise<ScheduleOverviewStats> => {
+      if (!user?.id) {
+        return {
+          activeSchedules: 0,
+          totalSchedules: 0,
+          totalUploadsThisMonth: 0,
+          avgSuccessRate: 100,
+        };
+      }
+
       const monthStart = startOfMonth(new Date());
       const monthEnd = endOfMonth(new Date());
 
-      // Fetch all schedules
+      // Fetch user's schedules only
       const { data: schedules, error: schedulesError } = await supabase
         .from('publish_schedules')
-        .select('id, is_active');
+        .select('id, is_active')
+        .eq('user_id', user.id);
 
       if (schedulesError) throw schedulesError;
 
-      // Fetch this month's queue items
+      // Fetch this month's queue items for the current user only
       const { data: queueItems, error: queueError } = await supabase
         .from('publish_queue')
         .select('status, processed_at')
+        .eq('user_id', user.id)
         .gte('created_at', monthStart.toISOString())
         .lte('created_at', monthEnd.toISOString());
 
@@ -66,6 +80,7 @@ export function useScheduleAnalytics() {
         avgSuccessRate,
       };
     },
+    enabled: !!user?.id,
   });
 }
 

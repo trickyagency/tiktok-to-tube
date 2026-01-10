@@ -412,7 +412,7 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
 
       {/* Index number badge */}
       {typeof index === 'number' && (
-        <div className="absolute top-3 left-3 h-6 w-6 rounded-full bg-blue-500 text-white text-xs font-semibold flex items-center justify-center z-10">
+        <div className="absolute top-3 left-3 h-6 w-6 rounded-full bg-blue-500 text-white text-xs font-semibold flex items-center justify-center z-10 shadow-md shadow-blue-500/30">
           {index + 1}
         </div>
       )}
