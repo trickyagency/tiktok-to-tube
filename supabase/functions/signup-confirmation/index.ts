@@ -173,7 +173,7 @@ serve(async (req) => {
       email,
       password,
       options: {
-        redirectTo: `${siteUrl}/dashboard`,
+        redirectTo: `${siteUrl}/auth/callback`,
       },
     });
 
