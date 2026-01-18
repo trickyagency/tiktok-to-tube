@@ -30,10 +30,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useScrapedVideos } from '@/hooks/useScrapedVideos';
 import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
+import { useYouTubeQuotaRealtime } from '@/hooks/useYouTubeQuotaRealtime';
 import { useCurrentUserSubscription } from '@/hooks/useCurrentUserSubscription';
 import { useChannelHealth, useHealthCheck } from '@/hooks/useChannelHealth';
 import { formatDistanceToNow } from 'date-fns';
 import { QuotaIndicator } from '@/components/quota/QuotaIndicator';
+import { MiniQuotaBar } from '@/components/quota/MiniQuotaBar';
 import { EditCredentialsDialog } from '@/components/youtube/EditCredentialsDialog';
 import { ChannelHealthBadge } from '@/components/youtube/ChannelHealthBadge';
 import { ChannelIssueBanner } from '@/components/youtube/ChannelIssueBanner';
@@ -171,6 +173,9 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
   const { data: quotaData } = useYouTubeQuota(channel.id);
   const channelQuota = quotaData?.[0];
   const { data: subscriptionData } = useCurrentUserSubscription();
+  
+  // Enable realtime updates for quota
+  useYouTubeQuotaRealtime();
   
   // Channel health hook for health monitoring
   const { health: channelHealth, isLoading: isHealthLoading } = useChannelHealth(channel.id);
@@ -538,6 +543,15 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
               {channel.auth_status === 'connected' && !isHealthLoading && (
                 <ChannelHealthBadge channelId={channel.id} compact showActions={false} />
               )}
+            </div>
+            
+            {/* Mini Quota Bar - always visible for all statuses */}
+            <div className="mb-2">
+              <MiniQuotaBar 
+                quota={channelQuota} 
+                dailyLimit={subscriptionData?.maxVideosPerDay || 2}
+                isUnlimited={subscriptionData?.isUnlimited}
+              />
             </div>
 
             {/* Owner badge */}

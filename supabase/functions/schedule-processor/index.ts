@@ -9,6 +9,10 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+// YouTube API quota constants
+const UPLOAD_QUOTA_COST = 1600;
+const DEFAULT_DAILY_QUOTA = 10000;
+
 // Get current time in a specific timezone
 function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: number; timeString: string } {
   const now = new Date();
@@ -34,6 +38,54 @@ function isTimeToPublish(publishTimes: string[], timezone: string): boolean {
   console.log(`Publish times: ${JSON.stringify(publishTimes)}`);
   
   return publishTimes.some(time => time === timeString);
+}
+
+// Check quota availability for a channel BEFORE queuing
+async function checkChannelQuota(supabase: any, channelId: string): Promise<{
+  available: boolean;
+  uploadsRemaining: number;
+  reason?: string;
+}> {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data, error } = await supabase
+    .from('youtube_quota_usage')
+    .select('quota_used, quota_limit, is_paused, uploads_count')
+    .eq('youtube_channel_id', channelId)
+    .eq('date', today)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Failed to check quota:', error.message);
+    return { available: true, uploadsRemaining: 6 }; // Allow on error
+  }
+
+  if (!data) {
+    // No usage yet today - full quota available
+    const defaultUploads = Math.floor(DEFAULT_DAILY_QUOTA / UPLOAD_QUOTA_COST);
+    return { available: true, uploadsRemaining: defaultUploads };
+  }
+
+  if (data.is_paused) {
+    console.log(`Channel ${channelId} is paused - not queuing`);
+    return { available: false, uploadsRemaining: 0, reason: 'Channel paused by user' };
+  }
+
+  const quotaLimit = data.quota_limit || DEFAULT_DAILY_QUOTA;
+  const quotaUsed = data.quota_used || 0;
+  const remaining = quotaLimit - quotaUsed;
+  const uploadsRemaining = Math.floor(remaining / UPLOAD_QUOTA_COST);
+
+  if (uploadsRemaining <= 0) {
+    console.log(`Channel ${channelId} quota exhausted: ${quotaUsed}/${quotaLimit}`);
+    return { 
+      available: false, 
+      uploadsRemaining: 0, 
+      reason: `Quota exhausted (${data.uploads_count || 0} uploads today)` 
+    };
+  }
+
+  return { available: true, uploadsRemaining };
 }
 
 // Validate that schedule, video, and channel all belong to the same user
@@ -141,6 +193,7 @@ serve(async (req) => {
 
     let queued = 0;
     let skipped = 0;
+    let quotaSkipped = 0;
     const debugLog: any[] = [];
 
     for (const schedule of schedules) {
@@ -174,6 +227,20 @@ serve(async (req) => {
       }
 
       console.log(`Schedule "${schedule.schedule_name}" - TIME TO PUBLISH!`);
+
+      // *** CHECK QUOTA BEFORE PROCEEDING ***
+      const quotaCheck = await checkChannelQuota(supabase, schedule.youtube_channel_id);
+      if (!quotaCheck.available) {
+        console.log(`Schedule "${schedule.schedule_name}" - quota not available: ${quotaCheck.reason}`);
+        scheduleDebug.status = 'skipped';
+        scheduleDebug.reason = `Quota unavailable: ${quotaCheck.reason}`;
+        debugLog.push(scheduleDebug);
+        quotaSkipped++;
+        continue;
+      }
+      
+      console.log(`Schedule "${schedule.schedule_name}" - quota available (${quotaCheck.uploadsRemaining} uploads remaining)`);
+      scheduleDebug.quotaRemaining = quotaCheck.uploadsRemaining;
 
       // Get unpublished videos from the linked TikTok account, try to find one that hasn't been uploaded
       let selectedVideo = null;
@@ -345,13 +412,14 @@ serve(async (req) => {
     }
 
     console.log('\n=== Schedule Processor Complete ===');
-    console.log(`Summary: ${queued} queued, ${skipped} skipped (not time), ${schedules.length - queued - skipped} other`);
+    console.log(`Summary: ${queued} queued, ${skipped} skipped (not time), ${quotaSkipped} skipped (quota), ${schedules.length - queued - skipped - quotaSkipped} other`);
     console.log('Debug log:', JSON.stringify(debugLog, null, 2));
 
     return new Response(JSON.stringify({
       success: true,
       queued,
       skipped,
+      quotaSkipped,
       totalSchedules: schedules.length,
       debugLog,
     }), {

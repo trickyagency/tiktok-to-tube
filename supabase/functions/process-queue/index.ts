@@ -121,6 +121,79 @@ async function trackQuotaUsage(supabase: any, channelId: string): Promise<void> 
   }
 }
 
+// Check if we need to auto-pause channel after upload to prevent hitting quota limit
+async function checkAndAutoPauseIfNeeded(supabase: any, channelId: string, userId: string): Promise<void> {
+  const today = new Date().toISOString().split('T')[0];
+  
+  const { data, error } = await supabase
+    .from('youtube_quota_usage')
+    .select('quota_used, quota_limit, uploads_count, is_paused')
+    .eq('youtube_channel_id', channelId)
+    .eq('date', today)
+    .maybeSingle();
+
+  if (error || !data) {
+    console.log('Could not check quota for auto-pause:', error?.message);
+    return;
+  }
+
+  if (data.is_paused) {
+    return; // Already paused
+  }
+
+  const quotaLimit = data.quota_limit || DEFAULT_DAILY_QUOTA;
+  const quotaUsed = data.quota_used || 0;
+  const remainingQuota = quotaLimit - quotaUsed;
+  const canDoMoreUploads = remainingQuota >= UPLOAD_QUOTA_COST;
+
+  if (!canDoMoreUploads) {
+    console.log(`Auto-pausing channel ${channelId} - quota exhausted (${quotaUsed}/${quotaLimit})`);
+    
+    // Auto-pause the channel
+    await supabase
+      .from('youtube_quota_usage')
+      .update({ is_paused: true })
+      .eq('youtube_channel_id', channelId)
+      .eq('date', today);
+
+    // Update channel auth_status to reflect quota issue
+    await supabase
+      .from('youtube_channels')
+      .update({
+        auth_status: 'quota_exceeded',
+        auth_error_code: 'quota_auto_pause',
+        auth_error_message: `Daily quota exhausted after ${data.uploads_count} uploads. Will resume when quota resets at midnight PT.`,
+        auth_error_at: new Date().toISOString(),
+      })
+      .eq('id', channelId);
+
+    // Get channel info for notification
+    const { data: channel } = await supabase
+      .from('youtube_channels')
+      .select('channel_title')
+      .eq('id', channelId)
+      .single();
+
+    // Try to send notification about quota exhausted
+    try {
+      await supabase.functions.invoke('youtube-auth-notification', {
+        body: {
+          channelId,
+          userId,
+          channelName: channel?.channel_title || 'Unknown Channel',
+          issueType: 'quota_exceeded',
+        }
+      });
+      console.log('Sent quota exhausted notification');
+    } catch (notifError) {
+      console.error('Failed to send quota notification:', notifError);
+    }
+  } else if (remainingQuota < UPLOAD_QUOTA_COST * 2) {
+    // Warning: Only 1 upload remaining
+    console.log(`Warning: Channel ${channelId} has only 1 upload remaining (${remainingQuota} quota left)`);
+  }
+}
+
 // ============= Core Functions =============
 
 async function refreshAccessToken(supabase: any, channel: any): Promise<{ token: string; duration: number }> {
@@ -818,6 +891,9 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
 
     // Track quota usage after successful upload
     await trackQuotaUsage(supabase, queueItem.youtube_channel_id);
+    
+    // Check if we should auto-pause the channel to prevent quota issues
+    await checkAndAutoPauseIfNeeded(supabase, queueItem.youtube_channel_id, channel.user_id);
 
     const finalizeDuration = Date.now() - finalizeStartTime;
     const totalDuration = Date.now() - overallStartTime;
