@@ -21,7 +21,8 @@ import {
   AlertTriangle,
   Copy,
   Settings,
-  KeyRound
+  KeyRound,
+  Activity
 } from 'lucide-react';
 import { YouTubeChannelWithOwner, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,7 +30,8 @@ import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useScrapedVideos } from '@/hooks/useScrapedVideos';
 import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
 import { useCurrentUserSubscription } from '@/hooks/useCurrentUserSubscription';
-import { useChannelHealth } from '@/hooks/useChannelHealth';
+import { useChannelHealth, useHealthCheck } from '@/hooks/useChannelHealth';
+import { formatDistanceToNow } from 'date-fns';
 import { QuotaIndicator } from '@/components/quota/QuotaIndicator';
 import { EditCredentialsDialog } from '@/components/youtube/EditCredentialsDialog';
 import { ChannelHealthBadge } from '@/components/youtube/ChannelHealthBadge';
@@ -161,6 +163,7 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
   
   // Channel health hook for health monitoring
   const { health: channelHealth, isLoading: isHealthLoading } = useChannelHealth(channel.id);
+  const { checkHealth, isChecking: isCheckingHealth } = useHealthCheck();
   
   // Determine if channel is healthy enough to perform actions
   const isChannelHealthy = channel.auth_status === 'connected' && 
@@ -364,6 +367,16 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
     setIsRefreshing(true);
     await refreshToken(channel.id);
     setIsRefreshing(false);
+  };
+
+  const handleHealthCheck = async () => {
+    try {
+      await checkHealth(channel.id);
+      toast.success('Health check completed');
+    } catch (error) {
+      console.error('Health check failed:', error);
+      toast.error('Health check failed');
+    }
   };
 
   const handleLinkTikTok = async (accountId: string | null) => {
@@ -763,7 +776,41 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
                 <RotateCcw className={`h-4 w-4 mr-2 ${isAuthorizing ? 'animate-spin' : ''}`} />
                 {isAuthorizing ? 'Reconnecting...' : 'Reconnect'}
               </Button>
-            ) : null}
+            ) : (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleHealthCheck}
+                      disabled={isCheckingHealth}
+                      className="gap-2"
+                    >
+                      {isCheckingHealth ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 animate-spin" />
+                          Checking...
+                        </>
+                      ) : (
+                        <>
+                          <Activity className="h-4 w-4" />
+                          Check Health
+                        </>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Run an immediate health check</p>
+                    {channelHealth?.last_health_check_at && (
+                      <p className="text-xs text-muted-foreground">
+                        Last checked: {formatDistanceToNow(new Date(channelHealth.last_health_check_at), { addSuffix: true })}
+                      </p>
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
 
             <AlertDialog>
               <AlertDialogTrigger asChild>
