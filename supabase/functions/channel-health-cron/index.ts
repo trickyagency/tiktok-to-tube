@@ -279,7 +279,7 @@ serve(async (req) => {
             errorDescription: tokenData.error_description,
           }));
           
-          // Update last check time and error info
+          // Update channel_health with error info
           await supabase
             .from("channel_health")
             .update({ 
@@ -287,14 +287,30 @@ serve(async (req) => {
               last_error_message: tokenData.error_description || tokenData.error,
               last_error_code: tokenData.error,
               last_error_at: new Date().toISOString(),
+              status: 'issues_auth',
+              previous_status: health.status,
+              status_changed_at: health.status !== 'issues_auth' ? new Date().toISOString() : undefined,
+              consecutive_failures: (health.consecutive_failures || 0) + 1,
             })
             .eq("id", health.id);
+
+          // ALSO update youtube_channels auth_status to 'failed' for realtime UI sync
+          await supabase
+            .from("youtube_channels")
+            .update({
+              auth_status: "failed",
+              auth_error_code: tokenData.error,
+              auth_error_message: tokenData.error_description || tokenData.error,
+              auth_error_at: new Date().toISOString(),
+              last_health_check_at: new Date().toISOString(),
+            })
+            .eq("id", channel.id);
 
           results.push({
             channelId: channel.id,
             channelTitle: channel.channel_title || 'Unknown',
             previousStatus: health.status,
-            newStatus: health.status,
+            newStatus: 'issues_auth',
             action: 'still_failing',
             error: tokenData.error
           });
@@ -322,19 +338,38 @@ serve(async (req) => {
             error: apiError.slice(0, 200),
           }));
           
+          // Determine the issue type based on status code
+          const issueStatus = apiResponse.status === 403 ? 'issues_quota' : 'issues_config';
+          
           await supabase
             .from("channel_health")
             .update({ 
               last_health_check_at: new Date().toISOString(),
-              last_error_message: `API check failed: ${apiResponse.status}`
+              last_error_message: `API check failed: ${apiResponse.status}`,
+              status: issueStatus,
+              previous_status: health.status,
+              status_changed_at: health.status !== issueStatus ? new Date().toISOString() : undefined,
+              consecutive_failures: (health.consecutive_failures || 0) + 1,
             })
             .eq("id", health.id);
+
+          // ALSO update youtube_channels auth_status to 'failed' for realtime UI sync
+          await supabase
+            .from("youtube_channels")
+            .update({
+              auth_status: "failed",
+              auth_error_code: `api_${apiResponse.status}`,
+              auth_error_message: `API check failed: ${apiResponse.status}`,
+              auth_error_at: new Date().toISOString(),
+              last_health_check_at: new Date().toISOString(),
+            })
+            .eq("id", channel.id);
 
           results.push({
             channelId: channel.id,
             channelTitle: channel.channel_title || 'Unknown',
             previousStatus: health.status,
-            newStatus: health.status,
+            newStatus: issueStatus,
             action: 'still_failing',
             error: `API status: ${apiResponse.status}`
           });

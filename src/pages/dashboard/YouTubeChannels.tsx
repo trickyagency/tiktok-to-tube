@@ -17,6 +17,7 @@ import {
 } from '@/components/youtube/YouTubeChannelsSkeleton';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useBulkHealthCheck } from '@/hooks/useChannelHealth';
+import { useYouTubeChannelsRealtime } from '@/hooks/useYouTubeChannelsRealtime';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,9 @@ const YouTubeChannels = () => {
   const [showValidateDialog, setShowValidateDialog] = useState(false);
   
   const { checkAllChannels, isChecking: isBulkChecking, progress } = useBulkHealthCheck();
+
+  // Enable realtime updates for instant status changes
+  useYouTubeChannelsRealtime();
 
   useEffect(() => {
     document.title = "YouTube Channels | RepostFlow";
