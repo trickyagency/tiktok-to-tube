@@ -22,7 +22,8 @@ import {
   Copy,
   Settings,
   KeyRound,
-  Activity
+  Activity,
+  BarChart3
 } from 'lucide-react';
 import { YouTubeChannelWithOwner, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
@@ -113,6 +114,16 @@ const getStatusColors = (status: string | null) => {
         border: 'border-orange-500/30',
         dot: 'bg-orange-500',
         glow: 'shadow-orange-500/20'
+      };
+    case 'quota_exceeded':
+      return {
+        gradient: 'from-violet-500 via-violet-400 to-violet-500',
+        ring: 'ring-violet-500/30',
+        bg: 'bg-violet-500/10',
+        text: 'text-violet-600',
+        border: 'border-violet-500/30',
+        dot: 'bg-violet-500',
+        glow: 'shadow-violet-500/20'
       };
     case 'failed':
     case 'token_revoked':
@@ -405,6 +416,13 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
           <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
             <AlertTriangle className="h-3 w-3" />
             API Not Enabled
+          </Badge>
+        );
+      case 'quota_exceeded':
+        return (
+          <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
+            <BarChart3 className="h-3 w-3" />
+            Quota Exceeded
           </Badge>
         );
       case 'token_revoked':

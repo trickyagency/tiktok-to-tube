@@ -46,6 +46,10 @@ export function useYouTubeChannelsRealtime() {
               toast.success(`${channelTitle} is now connected`, {
                 description: 'Health check passed successfully',
               });
+            } else if (newChannel.auth_status === 'quota_exceeded') {
+              toast.warning(`${channelTitle} has exceeded quota`, {
+                description: 'Uploads paused until quota resets at midnight PT',
+              });
             } else if (newChannel.auth_status === 'failed' || newChannel.auth_status === 'token_revoked') {
               toast.error(`${channelTitle} has issues`, {
                 description: 'Please reconnect or check credentials',
