@@ -60,6 +60,134 @@ export interface ChannelHealthWithActions extends ChannelHealth {
 }
 
 /**
+ * API Response Contract for channel status
+ * Matches the production-grade specification
+ */
+export interface ChannelStatusResponse {
+  channel_id: string;
+  platform: 'youtube';
+  status: string;
+  issue: {
+    code: string;
+    summary: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    last_checked_at: string | null;
+    next_retry_at: string | null;
+    recommended_action: string;
+    technical_message?: string;
+    help_url?: string;
+  } | null;
+  health: {
+    success_rate: number;
+    consecutive_failures: number;
+    consecutive_successes: number;
+    circuit_state: string;
+    total_operations: number;
+  };
+  actions: Array<{
+    type: 'AUTHORIZE' | 'EDIT_CREDENTIALS' | 'OPEN_CONSOLE' | 'CONTACT_SUPPORT' | 'WAIT';
+    label: string;
+    url?: string;
+    variant: 'default' | 'outline' | 'destructive';
+  }>;
+}
+
+/**
+ * Transform health data to the API response contract format
+ */
+export function formatChannelStatus(
+  health: ChannelHealthWithActions | null,
+  channelId: string
+): ChannelStatusResponse {
+  if (!health) {
+    return {
+      channel_id: channelId,
+      platform: 'youtube',
+      status: 'healthy',
+      issue: null,
+      health: {
+        success_rate: 100,
+        consecutive_failures: 0,
+        consecutive_successes: 0,
+        circuit_state: 'closed',
+        total_operations: 0,
+      },
+      actions: [],
+    };
+  }
+
+  // Build issue object if there's an error
+  const issue = health.classifiedError ? {
+    code: health.classifiedError.code,
+    summary: health.classifiedError.userMessage,
+    severity: health.classifiedError.severity,
+    last_checked_at: health.last_health_check_at,
+    next_retry_at: health.next_retry_at,
+    recommended_action: health.classifiedError.recommendedAction,
+    technical_message: health.classifiedError.technicalMessage,
+    help_url: health.classifiedError.helpUrl,
+  } : null;
+
+  // Build actions array
+  const actions: ChannelStatusResponse['actions'] = [];
+  
+  if (health.classifiedError) {
+    switch (health.classifiedError.recommendedAction) {
+      case 'USER_REAUTH':
+        actions.push({
+          type: 'AUTHORIZE',
+          label: 'Reconnect Channel',
+          variant: 'default',
+        });
+        break;
+      case 'USER_CONFIG':
+        actions.push({
+          type: 'EDIT_CREDENTIALS',
+          label: 'Edit Credentials',
+          variant: 'default',
+        });
+        actions.push({
+          type: 'OPEN_CONSOLE',
+          label: 'Open Google Console',
+          url: 'https://console.cloud.google.com/apis/credentials',
+          variant: 'outline',
+        });
+        break;
+      case 'CONTACT_SUPPORT':
+        actions.push({
+          type: 'CONTACT_SUPPORT',
+          label: 'Contact Support',
+          variant: 'outline',
+        });
+        break;
+      case 'WAIT_AND_RETRY':
+      case 'AUTO_RETRY':
+        actions.push({
+          type: 'WAIT',
+          label: 'Will retry automatically',
+          variant: 'outline',
+        });
+        break;
+    }
+  }
+
+  return {
+    channel_id: channelId,
+    platform: 'youtube',
+    status: health.status,
+    issue,
+    health: {
+      success_rate: health.success_rate,
+      consecutive_failures: health.consecutive_failures,
+      consecutive_successes: health.consecutive_successes,
+      circuit_state: health.circuit_state,
+      total_operations: health.total_successes + health.total_failures,
+    },
+    actions,
+  };
+}
+
+/**
  * Hook to fetch health data for a specific channel
  */
 export function useChannelHealth(channelId: string | undefined) {

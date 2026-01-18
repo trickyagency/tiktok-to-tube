@@ -236,6 +236,69 @@ const CIRCUIT_BREAKER_CONFIG = {
   failureThreshold: 5,        // Open circuit after 5 consecutive failures
   successThreshold: 2,        // Close circuit after 2 consecutive successes in half-open
   halfOpenDelay: 5 * 60 * 1000, // Try half-open after 5 minutes
+  suspendThreshold: 5,        // Suspend channel after 5 failures (for non-auth/config issues)
+};
+
+// =========================================
+// Notification Deduplication with SHA-256
+// =========================================
+
+async function createNotificationHash(channelId: string, errorCode: string, severity: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${channelId}:${errorCode}:${severity}`);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
+// =========================================
+// State Transition Rules
+// =========================================
+
+const STATE_TRANSITIONS: Record<string, Record<string, string | ((failures: number) => string)>> = {
+  healthy: {
+    AUTH: 'issues_auth',
+    QUOTA: 'issues_quota',
+    CONFIG: 'issues_config',
+    PERMISSION: 'issues_permission',
+    RATE_LIMIT: 'degraded',
+    PLATFORM_DOWN: 'degraded',
+    NETWORK: 'degraded',
+  },
+  connected: {
+    AUTH: 'issues_auth',
+    QUOTA: 'degraded',
+    CONFIG: 'issues_config',
+    PERMISSION: 'issues_permission',
+    RATE_LIMIT: 'degraded',
+    PLATFORM_DOWN: 'degraded',
+  },
+  degraded: {
+    success: 'healthy',
+    repeated_failure: (failures: number) => failures >= CIRCUIT_BREAKER_CONFIG.suspendThreshold ? 'suspended' : 'degraded',
+  },
+  issues_auth: {
+    success: 'healthy',
+    repeated_failure: (failures: number) => failures >= CIRCUIT_BREAKER_CONFIG.suspendThreshold ? 'suspended' : 'issues_auth',
+  },
+  issues_quota: {
+    success: 'healthy',
+    quota_reset: 'healthy',
+  },
+  issues_config: {
+    success: 'healthy',
+  },
+  issues_permission: {
+    success: 'healthy',
+    repeated_failure: (failures: number) => failures >= CIRCUIT_BREAKER_CONFIG.suspendThreshold ? 'suspended' : 'issues_permission',
+  },
+  suspended: {
+    success: 'healthy', // Only way out is success (user re-auth)
+  },
+  reauthorizing: {
+    success: 'healthy',
+    failure: 'issues_auth',
+  },
 };
 
 // =========================================
@@ -434,22 +497,42 @@ serve(async (req) => {
           request_id: requestId,
         });
       
-      // Send notification if needed
+      // Send notification if needed (with SHA-256 deduplication)
       if (classifiedError.severity === 'critical' || classifiedError.severity === 'high') {
-        // Check notification cooldown
+        // Create notification hash for deduplication
+        const notificationHash = await createNotificationHash(channelId, classifiedError.code, classifiedError.severity);
+        
+        // Check if notification was sent in last 24h with same hash
         const cooldownMs = classifiedError.severity === 'critical' ? 3600000 : 7200000;
         const cooldownUntil = new Date(Date.now() - cooldownMs).toISOString();
         
         const { data: recentNotification } = await supabase
           .from('notification_log')
-          .select('id')
-          .eq('channel_id', channelId)
-          .eq('notification_type', 'auth_issue')
+          .select('id, duplicate_count')
+          .eq('notification_key', notificationHash)
           .gte('sent_at', cooldownUntil)
           .limit(1)
-          .single();
+          .maybeSingle();
         
-        if (!recentNotification) {
+        // If duplicate found, increment counter and skip
+        if (recentNotification) {
+          await supabase
+            .from('notification_log')
+            .update({ 
+              duplicate_count: (recentNotification.duplicate_count || 0) + 1,
+              is_rate_limited: true,
+            })
+            .eq('id', recentNotification.id);
+          
+          console.log(JSON.stringify({
+            requestId,
+            level: 'info',
+            message: 'Skipping duplicate notification',
+            channelId: channelId.slice(0, 8),
+            hash: notificationHash,
+            duplicateCount: (recentNotification.duplicate_count || 0) + 1,
+          }));
+        } else {
           // Get channel info for notification
           const { data: channel } = await supabase
             .from('youtube_channels')
@@ -468,21 +551,30 @@ serve(async (req) => {
               },
             });
             
-            // Log notification
+            // Log notification with hash for deduplication
             await supabase
               .from('notification_log')
               .insert({
                 user_id: userId,
                 channel_id: channelId,
                 notification_type: 'auth_issue',
-                notification_key: `${channelId}_auth_issue_${new Date().toISOString().split('T')[0]}`,
+                notification_key: notificationHash,
                 error_code: classifiedError.code,
                 error_category: classifiedError.category,
                 severity: classifiedError.severity,
                 delivery_status: 'sent',
                 sent_at: new Date().toISOString(),
                 cooldown_until: new Date(Date.now() + cooldownMs).toISOString(),
+                duplicate_count: 0,
               });
+              
+            console.log(JSON.stringify({
+              requestId,
+              level: 'info',
+              message: 'Notification sent',
+              channelId: channelId.slice(0, 8),
+              hash: notificationHash,
+            }));
           } catch (notifyError) {
             console.error('Failed to send notification:', notifyError);
           }
