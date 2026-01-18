@@ -19,6 +19,35 @@ interface UploadRequest {
   privacy_status?: 'public' | 'unlisted' | 'private';
 }
 
+// Helper to record health events via the channel-health-engine
+async function recordHealthEvent(
+  supabase: any,
+  action: 'record_success' | 'record_failure',
+  channelId: string,
+  userId: string,
+  operation: string,
+  errorDetails?: {
+    code?: string;
+    message?: string;
+    httpStatus?: number;
+  }
+) {
+  try {
+    await supabase.functions.invoke('channel-health-engine', {
+      body: {
+        action,
+        channelId,
+        userId,
+        operation,
+        ...(errorDetails && { error: errorDetails }),
+      },
+    });
+  } catch (e) {
+    console.warn('Failed to record health event:', e);
+    // Don't fail the main operation if health tracking fails
+  }
+}
+
 // Helper to refresh access token if expired
 async function refreshAccessToken(supabase: any, channel: any): Promise<string> {
   const tokenExpiresAt = new Date(channel.token_expires_at);
@@ -46,37 +75,18 @@ async function refreshAccessToken(supabase: any, channel: any): Promise<string> 
     if (tokenData.error) {
       console.error('Token refresh error:', tokenData);
       
-      // Check if this is a revoked token error
-      const revokedErrors = ['invalid_grant', 'unauthorized_client', 'access_denied'];
-      if (revokedErrors.includes(tokenData.error)) {
-        console.log('Token appears to be revoked, updating channel auth_status to token_revoked...');
-        
-        // Update channel auth_status to 'token_revoked'
-        await supabase
-          .from('youtube_channels')
-          .update({
-            auth_status: 'token_revoked',
-            is_connected: false,
-          })
-          .eq('id', channel.id);
-        
-        // Send notification email
-        try {
-          console.log('Sending token revoked notification email...');
-          await supabase.functions.invoke('youtube-auth-notification', {
-            body: {
-              channelId: channel.id,
-              userId: channel.user_id,
-              channelName: channel.channel_title || channel.channel_handle || 'Unknown Channel',
-              issueType: 'token_revoked',
-            },
-          });
-          console.log('Token revoked notification email sent successfully');
-        } catch (notifyError) {
-          console.error('Failed to send auth notification:', notifyError);
-          // Don't fail the main operation if notification fails
+      // Record failure via health engine
+      await recordHealthEvent(
+        supabase,
+        'record_failure',
+        channel.id,
+        channel.user_id,
+        'token_refresh',
+        {
+          code: tokenData.error,
+          message: tokenData.error_description || tokenData.error,
         }
-      }
+      );
       
       throw new Error(`Token refresh failed: ${tokenData.error_description || tokenData.error}`);
     }
@@ -363,6 +373,15 @@ serve(async (req) => {
       .from('youtube_channels')
       .update({ last_upload_at: new Date().toISOString() })
       .eq('id', youtubeChannelId);
+
+    // Record success via health engine
+    await recordHealthEvent(
+      supabase,
+      'record_success',
+      youtubeChannelId,
+      channel.user_id,
+      'youtube_upload'
+    );
 
     console.log('Upload completed successfully:', videoUrl);
 
