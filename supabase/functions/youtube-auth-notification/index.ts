@@ -11,7 +11,7 @@ interface NotificationRequest {
   channelId: string;
   userId: string;
   channelName: string;
-  issueType: 'token_revoked' | 'api_not_enabled' | 'auth_failed';
+  issueType: 'token_revoked' | 'api_not_enabled' | 'auth_failed' | 'quota_exceeded';
 }
 
 interface BrandingConfig {
@@ -273,6 +273,56 @@ function getIssueDetails(issueType: string, channelName: string, siteUrl: string
               <td style="text-align: center;">
                 <a href="${siteUrl}/dashboard/youtube" style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);">
                   Fix Authorization Now →
+                </a>
+              </td>
+            </tr>
+          </table>
+        `,
+      };
+
+    case 'quota_exceeded':
+      return {
+        headerIcon: '📊',
+        headerTitle: 'YouTube API Quota Exceeded',
+        headerGradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 50%, #6d28d9 100%)',
+        subject: `Notice: YouTube Channel "${channelName}" Quota Exceeded`,
+        preheader: `Your YouTube API quota has been exceeded. Uploads will resume when quota resets.`,
+        content: `
+          <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+            The YouTube API quota for channel <strong>"${channelName}"</strong> has been exceeded.
+          </p>
+          
+          <div style="background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); border-left: 4px solid #8b5cf6; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
+            <p style="margin: 0; color: #5b21b6; font-size: 14px; font-weight: 600;">
+              📊 Video uploads will automatically resume when the quota resets at midnight Pacific Time.
+            </p>
+          </div>
+          
+          <p style="margin: 24px 0 16px 0; color: #475569; font-size: 15px; font-weight: 600;">
+            What does this mean?
+          </p>
+          
+          <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+            <div style="margin-bottom: 12px;">
+              <span style="color: #475569; font-size: 14px; line-height: 1.5;">• YouTube limits API usage per day (typically 10,000 units)</span>
+            </div>
+            <div style="margin-bottom: 12px;">
+              <span style="color: #475569; font-size: 14px; line-height: 1.5;">• Each video upload costs approximately 1,600 quota units</span>
+            </div>
+            <div>
+              <span style="color: #475569; font-size: 14px; line-height: 1.5;">• Quota resets daily at midnight Pacific Time (PT)</span>
+            </div>
+          </div>
+          
+          <p style="margin: 0 0 20px 0; color: #475569; font-size: 15px; line-height: 1.6;">
+            No action is required. Pending uploads will be processed automatically when quota becomes available.
+          </p>
+          
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="text-align: center;">
+                <a href="${siteUrl}/dashboard/youtube" style="display: inline-block; background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(139, 92, 246, 0.4);">
+                  View Channel Status →
                 </a>
               </td>
             </tr>

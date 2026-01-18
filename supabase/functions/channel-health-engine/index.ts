@@ -592,14 +592,21 @@ serve(async (req) => {
             .eq('id', channelId)
             .single();
           
-          // Send notification
+          // Send notification - determine issue type based on error
+          const getIssueType = (): 'token_revoked' | 'api_not_enabled' | 'auth_failed' | 'quota_exceeded' => {
+            if (classifiedError.code === 'accessNotConfigured') return 'api_not_enabled';
+            if (classifiedError.code === 'quotaExceeded') return 'quota_exceeded';
+            if (classifiedError.category === 'AUTH') return 'token_revoked';
+            return 'auth_failed';
+          };
+          
           try {
             await supabase.functions.invoke('youtube-auth-notification', {
               body: {
                 channelId,
                 userId,
                 channelName: channel?.channel_title || channel?.channel_handle || 'Unknown Channel',
-                issueType: classifiedError.code === 'accessNotConfigured' ? 'api_not_enabled' : 'token_revoked',
+                issueType: getIssueType(),
               },
             });
             
