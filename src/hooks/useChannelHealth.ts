@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -392,6 +393,55 @@ export function useHealthCheck() {
     checkHealth: checkHealthMutation.mutateAsync,
     isChecking: checkHealthMutation.isPending,
     error: checkHealthMutation.error,
+  };
+}
+
+/**
+ * Hook to perform bulk health checks on multiple channels
+ */
+export function useBulkHealthCheck() {
+  const queryClient = useQueryClient();
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+
+  const bulkCheckMutation = useMutation({
+    mutationFn: async (channelIds: string[]) => {
+      setProgress({ current: 0, total: channelIds.length });
+      const results: Array<{ channelId: string; success: boolean; data?: any; error?: any }> = [];
+      
+      for (let i = 0; i < channelIds.length; i++) {
+        try {
+          const { data, error } = await supabase.functions.invoke('channel-health-engine', {
+            body: {
+              action: 'check_health',
+              channelId: channelIds[i],
+            },
+          });
+          results.push({ channelId: channelIds[i], success: !error, data, error });
+        } catch (err) {
+          results.push({ channelId: channelIds[i], success: false, error: err });
+        }
+        setProgress({ current: i + 1, total: channelIds.length });
+        // Small delay to prevent rate limiting
+        if (i < channelIds.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['channel-health'] });
+      queryClient.invalidateQueries({ queryKey: ['all-channels-health'] });
+      queryClient.invalidateQueries({ queryKey: ['youtube-channels'] });
+    },
+    onSettled: () => {
+      setProgress({ current: 0, total: 0 });
+    },
+  });
+
+  return {
+    checkAllChannels: bulkCheckMutation.mutateAsync,
+    isChecking: bulkCheckMutation.isPending,
+    progress,
   };
 }
 
