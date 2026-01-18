@@ -124,6 +124,226 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          actor_type: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          error_message: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          new_values: Json | null
+          old_values: Json | null
+          request_id: string | null
+          success: boolean | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          actor_type?: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          new_values?: Json | null
+          old_values?: Json | null
+          request_id?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          actor_type?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          new_values?: Json | null
+          old_values?: Json | null
+          request_id?: string | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      channel_errors: {
+        Row: {
+          channel_id: string
+          created_at: string
+          error_category: string
+          error_code: string
+          error_description: string | null
+          error_message: string
+          id: string
+          is_resolved: boolean | null
+          is_retryable: boolean | null
+          operation: string | null
+          raw_error: Json | null
+          recommended_action: string | null
+          request_id: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          user_id: string
+        }
+        Insert: {
+          channel_id: string
+          created_at?: string
+          error_category: string
+          error_code: string
+          error_description?: string | null
+          error_message: string
+          id?: string
+          is_resolved?: boolean | null
+          is_retryable?: boolean | null
+          operation?: string | null
+          raw_error?: Json | null
+          recommended_action?: string | null
+          request_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_id: string
+        }
+        Update: {
+          channel_id?: string
+          created_at?: string
+          error_category?: string
+          error_code?: string
+          error_description?: string | null
+          error_message?: string
+          id?: string
+          is_resolved?: boolean | null
+          is_retryable?: boolean | null
+          operation?: string | null
+          raw_error?: Json | null
+          recommended_action?: string | null
+          request_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_errors_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_health: {
+        Row: {
+          auto_recovery_attempts: number | null
+          channel_id: string
+          channel_type: string
+          circuit_failure_count: number | null
+          circuit_opened_at: string | null
+          circuit_state: string | null
+          consecutive_failures: number | null
+          consecutive_successes: number | null
+          created_at: string
+          id: string
+          last_error_at: string | null
+          last_error_code: string | null
+          last_error_message: string | null
+          last_health_check_at: string | null
+          last_successful_operation_at: string | null
+          max_retries: number | null
+          next_health_check_at: string | null
+          next_retry_at: string | null
+          previous_status: string | null
+          retry_count: number | null
+          status: string
+          status_changed_at: string | null
+          success_rate: number | null
+          total_failures: number | null
+          total_successes: number | null
+          updated_at: string
+        }
+        Insert: {
+          auto_recovery_attempts?: number | null
+          channel_id: string
+          channel_type?: string
+          circuit_failure_count?: number | null
+          circuit_opened_at?: string | null
+          circuit_state?: string | null
+          consecutive_failures?: number | null
+          consecutive_successes?: number | null
+          created_at?: string
+          id?: string
+          last_error_at?: string | null
+          last_error_code?: string | null
+          last_error_message?: string | null
+          last_health_check_at?: string | null
+          last_successful_operation_at?: string | null
+          max_retries?: number | null
+          next_health_check_at?: string | null
+          next_retry_at?: string | null
+          previous_status?: string | null
+          retry_count?: number | null
+          status?: string
+          status_changed_at?: string | null
+          success_rate?: number | null
+          total_failures?: number | null
+          total_successes?: number | null
+          updated_at?: string
+        }
+        Update: {
+          auto_recovery_attempts?: number | null
+          channel_id?: string
+          channel_type?: string
+          circuit_failure_count?: number | null
+          circuit_opened_at?: string | null
+          circuit_state?: string | null
+          consecutive_failures?: number | null
+          consecutive_successes?: number | null
+          created_at?: string
+          id?: string
+          last_error_at?: string | null
+          last_error_code?: string | null
+          last_error_message?: string | null
+          last_health_check_at?: string | null
+          last_successful_operation_at?: string | null
+          max_retries?: number | null
+          next_health_check_at?: string | null
+          next_retry_at?: string | null
+          previous_status?: string | null
+          retry_count?: number | null
+          status?: string
+          status_changed_at?: string | null
+          success_rate?: number | null
+          total_failures?: number | null
+          total_successes?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_health_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       earnings: {
         Row: {
           amount: number
@@ -158,6 +378,71 @@ export type Database = {
             columns: ["video_id"]
             isOneToOne: false
             referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_log: {
+        Row: {
+          channel_id: string | null
+          cooldown_until: string | null
+          created_at: string
+          delivery_error: string | null
+          delivery_status: string | null
+          duplicate_count: number | null
+          error_category: string | null
+          error_code: string | null
+          id: string
+          is_rate_limited: boolean | null
+          notification_key: string
+          notification_type: string
+          sent_at: string | null
+          severity: string | null
+          subject: string | null
+          user_id: string
+        }
+        Insert: {
+          channel_id?: string | null
+          cooldown_until?: string | null
+          created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string | null
+          duplicate_count?: number | null
+          error_category?: string | null
+          error_code?: string | null
+          id?: string
+          is_rate_limited?: boolean | null
+          notification_key: string
+          notification_type: string
+          sent_at?: string | null
+          severity?: string | null
+          subject?: string | null
+          user_id: string
+        }
+        Update: {
+          channel_id?: string | null
+          cooldown_until?: string | null
+          created_at?: string
+          delivery_error?: string | null
+          delivery_status?: string | null
+          duplicate_count?: number | null
+          error_category?: string | null
+          error_code?: string | null
+          id?: string
+          is_rate_limited?: boolean | null
+          notification_key?: string
+          notification_type?: string
+          sent_at?: string | null
+          severity?: string | null
+          subject?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_log_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_channels"
             referencedColumns: ["id"]
           },
         ]
@@ -975,6 +1260,9 @@ export type Database = {
       youtube_channels: {
         Row: {
           access_token: string | null
+          auth_error_at: string | null
+          auth_error_code: string | null
+          auth_error_message: string | null
           auth_status: string | null
           channel_handle: string | null
           channel_id: string | null
@@ -984,8 +1272,10 @@ export type Database = {
           google_client_id: string | null
           google_client_secret: string | null
           google_redirect_uri: string | null
+          health_check_failures: number | null
           id: string
           is_connected: boolean | null
+          last_health_check_at: string | null
           last_upload_at: string | null
           refresh_token: string | null
           subscriber_count: number | null
@@ -997,6 +1287,9 @@ export type Database = {
         }
         Insert: {
           access_token?: string | null
+          auth_error_at?: string | null
+          auth_error_code?: string | null
+          auth_error_message?: string | null
           auth_status?: string | null
           channel_handle?: string | null
           channel_id?: string | null
@@ -1006,8 +1299,10 @@ export type Database = {
           google_client_id?: string | null
           google_client_secret?: string | null
           google_redirect_uri?: string | null
+          health_check_failures?: number | null
           id?: string
           is_connected?: boolean | null
+          last_health_check_at?: string | null
           last_upload_at?: string | null
           refresh_token?: string | null
           subscriber_count?: number | null
@@ -1019,6 +1314,9 @@ export type Database = {
         }
         Update: {
           access_token?: string | null
+          auth_error_at?: string | null
+          auth_error_code?: string | null
+          auth_error_message?: string | null
           auth_status?: string | null
           channel_handle?: string | null
           channel_id?: string | null
@@ -1028,8 +1326,10 @@ export type Database = {
           google_client_id?: string | null
           google_client_secret?: string | null
           google_redirect_uri?: string | null
+          health_check_failures?: number | null
           id?: string
           is_connected?: boolean | null
+          last_health_check_at?: string | null
           last_upload_at?: string | null
           refresh_token?: string | null
           subscriber_count?: number | null

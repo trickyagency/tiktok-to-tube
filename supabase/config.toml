@@ -65,3 +65,6 @@ verify_jwt = false
 
 [functions.youtube-bulk-validate]
 verify_jwt = false
+
+[functions.channel-health-engine]
+verify_jwt = false
