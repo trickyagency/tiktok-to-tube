@@ -14,6 +14,8 @@ export interface EmailPreferences {
   emailOnExpiry1Day: boolean;
   // Video sync notification (when owner scrapes for user)
   emailOnVideosSynced: boolean;
+  // YouTube channel authorization issues
+  emailOnYouTubeAuthIssue: boolean;
 }
 
 const defaultPreferences: EmailPreferences = {
@@ -29,6 +31,8 @@ const defaultPreferences: EmailPreferences = {
   emailOnExpiry1Day: true,
   // Video sync notification - enabled by default
   emailOnVideosSynced: true,
+  // YouTube channel authorization issues - enabled by default
+  emailOnYouTubeAuthIssue: true,
 };
 
 export const useEmailPreferences = () => {

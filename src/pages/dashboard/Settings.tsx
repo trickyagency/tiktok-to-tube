@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
-import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, Loader2, AlertTriangle, Trash2, Camera, X, Clock } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Key, Eye, EyeOff, Mail, Palette, CheckCircle2, XCircle, Video, Calendar, Loader2, AlertTriangle, Trash2, Camera, X, Clock, Youtube } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
@@ -964,6 +964,35 @@ const Settings = () => {
                     disabled={preferencesLoading}
                   />
                 </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* YouTube Channel Events */}
+            <div className="space-y-4">
+              <h4 className="text-sm font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                <Youtube className="h-4 w-4" />
+                YouTube Channel Events
+              </h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <div className="space-y-0.5">
+                    <Label htmlFor="youtube-auth" className="text-sm font-medium cursor-pointer">
+                      Authorization Issues
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Get notified when a YouTube channel's authorization expires, gets revoked, or has API issues
+                    </p>
+                  </div>
+                </div>
+                <Switch
+                  id="youtube-auth"
+                  checked={preferences.emailOnYouTubeAuthIssue}
+                  onCheckedChange={(checked) => updatePreference('emailOnYouTubeAuthIssue', checked)}
+                  disabled={preferencesLoading}
+                />
               </div>
             </div>
 
