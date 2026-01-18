@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle, TrendingUp, ShieldCheck } from 'lucide-react';
+import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle, TrendingUp, ShieldCheck, Activity, RefreshCw } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { YouTubeChannelsTable } from '@/components/youtube/YouTubeChannelsTable';
@@ -16,6 +16,7 @@ import {
   YouTubeFiltersSkeleton 
 } from '@/components/youtube/YouTubeChannelsSkeleton';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
+import { useBulkHealthCheck } from '@/hooks/useChannelHealth';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -32,6 +33,8 @@ const YouTubeChannels = () => {
   const [refreshingChannelId, setRefreshingChannelId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [showValidateDialog, setShowValidateDialog] = useState(false);
+  
+  const { checkAllChannels, isChecking: isBulkChecking, progress } = useBulkHealthCheck();
 
   useEffect(() => {
     document.title = "YouTube Channels | RepostFlow";
@@ -126,6 +129,27 @@ const YouTubeChannels = () => {
 
   const handleDelete = (channelId: string) => {
     deleteChannel(channelId);
+  };
+
+  const handleBulkHealthCheck = async () => {
+    const connectedChannelIds = channels
+      .filter(c => c.auth_status === 'connected')
+      .map(c => c.id);
+      
+    if (connectedChannelIds.length === 0) {
+      toast.info('No connected channels to check');
+      return;
+    }
+    
+    try {
+      const results = await checkAllChannels(connectedChannelIds);
+      const successCount = results.filter(r => r.success).length;
+      toast.success(`Health check completed: ${successCount}/${connectedChannelIds.length} channels healthy`);
+      refetch();
+    } catch (error) {
+      console.error('Bulk health check failed:', error);
+      toast.error('Bulk health check failed');
+    }
   };
 
   const connectedChannels = filteredChannels.filter(c => c.auth_status === 'connected');
@@ -268,6 +292,25 @@ const YouTubeChannels = () => {
               />
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleBulkHealthCheck}
+                disabled={isBulkChecking || channels.filter(c => c.auth_status === 'connected').length === 0}
+                className="gap-2"
+              >
+                {isBulkChecking ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    Checking ({progress.current}/{progress.total})
+                  </>
+                ) : (
+                  <>
+                    <Activity className="h-4 w-4" />
+                    Check All Health
+                  </>
+                )}
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
