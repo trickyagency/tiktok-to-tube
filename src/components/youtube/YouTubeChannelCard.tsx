@@ -19,7 +19,9 @@ import {
   RotateCcw,
   Sparkles,
   AlertTriangle,
-  Copy
+  Copy,
+  Settings,
+  KeyRound
 } from 'lucide-react';
 import { YouTubeChannelWithOwner, useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,6 +30,7 @@ import { useScrapedVideos } from '@/hooks/useScrapedVideos';
 import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
 import { useCurrentUserSubscription } from '@/hooks/useCurrentUserSubscription';
 import { QuotaIndicator } from '@/components/quota/QuotaIndicator';
+import { EditCredentialsDialog } from '@/components/youtube/EditCredentialsDialog';
 import { toast } from 'sonner';
 import { OAUTH_REDIRECT_URI } from '@/lib/api-config';
 import { supabase } from '@/integrations/supabase/client';
@@ -90,6 +93,16 @@ const getStatusColors = (status: string | null) => {
         dot: 'bg-amber-500',
         glow: 'shadow-amber-500/20'
       };
+    case 'api_not_enabled':
+      return {
+        gradient: 'from-orange-500 via-orange-400 to-orange-500',
+        ring: 'ring-orange-500/30',
+        bg: 'bg-orange-500/10',
+        text: 'text-orange-600',
+        border: 'border-orange-500/30',
+        dot: 'bg-orange-500',
+        glow: 'shadow-orange-500/20'
+      };
     case 'failed':
     case 'token_revoked':
       return {
@@ -122,6 +135,7 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
   const [secondsUntilCheck, setSecondsUntilCheck] = useState(30);
   const [isManualChecking, setIsManualChecking] = useState(false);
   const [authFailed, setAuthFailed] = useState(false);
+  const [showEditCredentials, setShowEditCredentials] = useState(false);
   const pollingRef = useRef<{ intervalId: NodeJS.Timeout | null; timeoutId: NodeJS.Timeout | null }>({
     intervalId: null,
     timeoutId: null,
@@ -354,6 +368,20 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
           <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
             <AlertCircle className="h-3 w-3" />
             No YouTube Channel
+          </Badge>
+        );
+      case 'api_not_enabled':
+        return (
+          <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
+            <AlertTriangle className="h-3 w-3" />
+            API Not Enabled
+          </Badge>
+        );
+      case 'token_revoked':
+        return (
+          <Badge className={cn(baseClass, statusColors.bg, statusColors.text, statusColors.border, "border")}>
+            <AlertCircle className="h-3 w-3" />
+            Token Revoked
           </Badge>
         );
       case 'authorizing':
@@ -621,36 +649,126 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
               </div>
             )}
 
+            {/* Token Revoked Warning with Update Credentials option */}
             {channel.auth_status === 'token_revoked' && (
-              <p className="text-xs text-amber-500 mt-2 p-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                Refresh token revoked - please reconnect your channel
-              </p>
+              <div className="mt-3 p-3 rounded-xl bg-amber-500/5 border border-amber-500/20">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-amber-600 font-medium">Authorization Revoked</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Your refresh token was revoked. You can re-authorize with the same credentials 
+                      or update your Google Cloud credentials if needed.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <Button 
+                    size="sm" 
+                    onClick={handleAuthorize}
+                    disabled={isAuthorizing}
+                    className="flex-1"
+                  >
+                    {isAuthorizing ? (
+                      <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Re-authorizing...</>
+                    ) : (
+                      <><RotateCcw className="h-4 w-4 mr-2" />Re-authorize</>
+                    )}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setShowEditCredentials(true)}
+                  >
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    Update Credentials
+                  </Button>
+                </div>
+              </div>
             )}
 
-            {/* Authorization failed banner with retry */}
-            {(channel.auth_status === 'failed' || authFailed) && channel.auth_status !== 'connected' && (
+            {/* API Not Enabled Warning */}
+            {channel.auth_status === 'api_not_enabled' && (
+              <div className="mt-3 p-3 rounded-xl bg-orange-500/5 border border-orange-500/20">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-orange-600 font-medium">YouTube Data API v3 Not Enabled</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      You need to enable the YouTube Data API v3 in your Google Cloud Console to connect this channel.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 space-y-2">
+                  <span className="flex items-center gap-2 text-xs">
+                    <span className="h-5 w-5 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-600 text-[10px] font-bold">1</span>
+                    <a 
+                      href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline font-medium"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Open YouTube Data API v3 in Google Cloud Console
+                    </a>
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="h-5 w-5 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-600 text-[10px] font-bold">2</span>
+                    Click the "Enable" button
+                  </span>
+                  <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="h-5 w-5 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-600 text-[10px] font-bold">3</span>
+                    Come back and click "Re-authorize"
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={handleAuthorize}
+                  disabled={isAuthorizing}
+                  className="mt-3 w-full bg-orange-500 hover:bg-orange-600 text-white"
+                >
+                  {isAuthorizing ? (
+                    <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Re-authorizing...</>
+                  ) : (
+                    <><RotateCcw className="h-4 w-4 mr-2" />Re-authorize After Enabling API</>
+                  )}
+                </Button>
+              </div>
+            )}
+
+            {/* Authorization failed banner with retry and update credentials */}
+            {(channel.auth_status === 'failed' || authFailed) && channel.auth_status !== 'connected' && channel.auth_status !== 'token_revoked' && channel.auth_status !== 'api_not_enabled' && (
               <div className="mt-3 p-3 rounded-xl bg-red-500/5 border border-red-500/20">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
                   <div className="flex-1">
                     <p className="text-sm text-red-600 font-medium">Authorization failed</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      This could happen if you denied access or there was a connection issue.
+                      This could happen if you denied access, there was a connection issue, or your credentials are invalid.
                     </p>
                   </div>
                 </div>
-                <Button
-                  size="sm"
-                  onClick={handleAuthorize}
-                  disabled={isAuthorizing}
-                  className="mt-3 w-full bg-red-500 hover:bg-red-600 text-white"
-                >
-                  {isAuthorizing ? (
-                    <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Retrying...</>
-                  ) : (
-                    <><RotateCcw className="h-4 w-4 mr-2" />Retry Authorization</>
-                  )}
-                </Button>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    size="sm"
+                    onClick={handleAuthorize}
+                    disabled={isAuthorizing}
+                    className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                  >
+                    {isAuthorizing ? (
+                      <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Retrying...</>
+                    ) : (
+                      <><RotateCcw className="h-4 w-4 mr-2" />Retry Authorization</>
+                    )}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setShowEditCredentials(true)}
+                  >
+                    <KeyRound className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -733,6 +851,14 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
             </AlertDialog>
           </div>
         </div>
+
+        {/* Edit Credentials Dialog */}
+        <EditCredentialsDialog
+          channel={channel}
+          open={showEditCredentials}
+          onOpenChange={setShowEditCredentials}
+          onSuccess={onAuthComplete}
+        />
       </CardContent>
     </Card>
   );
