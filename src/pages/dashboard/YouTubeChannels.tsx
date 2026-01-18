@@ -1,13 +1,15 @@
 import { useEffect, useState, useMemo } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle, TrendingUp, ShieldCheck } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { YouTubeChannelsTable } from '@/components/youtube/YouTubeChannelsTable';
 import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuide';
 import { YouTubeFiltersToolbar } from '@/components/youtube/YouTubeFiltersToolbar';
 import { YouTubeEmptyState } from '@/components/youtube/YouTubeEmptyState';
+import { BulkValidateDialog } from '@/components/youtube/BulkValidateDialog';
 import { 
   YouTubeStatsSkeleton, 
   YouTubeCardsSkeleton, 
@@ -29,6 +31,7 @@ const YouTubeChannels = () => {
   const [authorizingChannelId, setAuthorizingChannelId] = useState<string | null>(null);
   const [refreshingChannelId, setRefreshingChannelId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [showValidateDialog, setShowValidateDialog] = useState(false);
 
   useEffect(() => {
     document.title = "YouTube Channels | RepostFlow";
@@ -264,7 +267,18 @@ const YouTubeChannels = () => {
                 filteredCount={filteredChannels.length}
               />
             </div>
-            <AddYouTubeChannelDialog onSuccess={refetch} />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowValidateDialog(true)}
+                className="gap-2"
+              >
+                <ShieldCheck className="h-4 w-4" />
+                Validate All
+              </Button>
+              <AddYouTubeChannelDialog onSuccess={refetch} />
+            </div>
           </div>
         )}
 
@@ -403,6 +417,15 @@ const YouTubeChannels = () => {
             )}
           </div>
         )}
+
+        {/* Bulk Validate Dialog */}
+        <BulkValidateDialog
+          open={showValidateDialog}
+          onOpenChange={setShowValidateDialog}
+          channelCount={channels.length}
+          onComplete={refetch}
+          onReauthorize={handleReauthorize}
+        />
       </div>
     </DashboardLayout>
   );

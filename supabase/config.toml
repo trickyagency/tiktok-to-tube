@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.youtube-auth-notification]
 verify_jwt = false
+
+[functions.youtube-bulk-validate]
+verify_jwt = false
