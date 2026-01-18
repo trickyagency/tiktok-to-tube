@@ -69,6 +69,45 @@ const severityStyles = {
   },
 };
 
+// Quota status styling (violet theme)
+const quotaStyles = {
+  container: 'border-violet-500/30 bg-violet-500/5',
+  icon: 'text-violet-500',
+  title: 'text-violet-600',
+  badge: 'bg-violet-500/10 text-violet-600 border-violet-500/30',
+};
+
+// Calculate time until midnight PT
+function getTimeUntilQuotaReset(): string {
+  const now = new Date();
+  
+  // Get current time in PT
+  const ptFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: false,
+  });
+  
+  const ptParts = ptFormatter.formatToParts(now);
+  const currentHour = parseInt(ptParts.find(p => p.type === 'hour')?.value || '0');
+  const currentMinute = parseInt(ptParts.find(p => p.type === 'minute')?.value || '0');
+  
+  // Calculate hours and minutes until midnight PT
+  const hoursUntil = 23 - currentHour;
+  const minutesUntil = 60 - currentMinute;
+  
+  if (hoursUntil <= 0 && minutesUntil <= 0) {
+    return 'soon';
+  }
+  
+  if (hoursUntil > 0) {
+    return `${hoursUntil}h ${minutesUntil}m`;
+  }
+  
+  return `${minutesUntil} minutes`;
+}
+
 // Default issue summaries by status
 function getDefaultIssueSummary(status: string): string {
   switch (status) {
@@ -80,7 +119,7 @@ function getDefaultIssueSummary(status: string): string {
       return 'YouTube API configuration issue detected';
     case 'issues_quota':
     case 'quota_exceeded':
-      return 'YouTube API quota has been exceeded';
+      return `Daily quota exhausted — resets in ${getTimeUntilQuotaReset()}`;
     case 'issues_permission':
     case 'permission_denied':
       return 'Insufficient permissions to access YouTube';
@@ -166,7 +205,9 @@ export function ChannelIssueBanner({
     recommendedAction: getDefaultRecommendedAction(status),
   };
 
-  const styles = severityStyles[effectiveIssue.severity];
+  // Determine if this is a quota issue for special styling
+  const isQuotaIssue = status === 'quota_exceeded' || status === 'issues_quota';
+  const styles = isQuotaIssue ? quotaStyles : severityStyles[effectiveIssue.severity];
   const showAutoRetryMessage = effectiveIssue.recommendedAction === 'WAIT_AND_RETRY' || effectiveIssue.recommendedAction === 'AUTO_RETRY';
 
   return (
