@@ -235,24 +235,35 @@ export function ChannelIssueBanner({
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2 mt-3">
               {(effectiveIssue.recommendedAction === 'USER_REAUTH') && (
-                <Button
-                  size="sm"
-                  onClick={onReauthorize}
-                  disabled={isReauthorizing}
-                  className="h-8"
-                >
-                  {isReauthorizing ? (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
-                      Re-authorizing...
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                      Reconnect Channel
-                    </>
-                  )}
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    onClick={onReauthorize}
+                    disabled={isReauthorizing}
+                    className="h-8"
+                  >
+                    {isReauthorizing ? (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                        Re-authorizing...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                        Reconnect Channel
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={onEditCredentials}
+                    className="h-8"
+                  >
+                    <KeyRound className="h-3.5 w-3.5 mr-1.5" />
+                    Edit Credentials
+                  </Button>
+                </>
               )}
               
               {(effectiveIssue.recommendedAction === 'USER_CONFIG') && (
