@@ -70,6 +70,10 @@ function categorizeGoogleError(error: string, errorDescription?: string): { cate
     'invalid_scope': {
       category: 'config_error',
       userMessage: 'Invalid OAuth scope. Ensure YouTube API is enabled in Google Cloud Console.'
+    },
+    'accessNotConfigured': {
+      category: 'api_not_enabled',
+      userMessage: 'YouTube Data API v3 is not enabled. Please enable it in your Google Cloud Console.'
     }
   };
 
@@ -81,6 +85,17 @@ function categorizeGoogleError(error: string, errorDescription?: string): { cate
     return {
       category: 'config_error',
       userMessage: 'Redirect URI issue. Ensure your Google Cloud Console redirect URI matches exactly.'
+    };
+  }
+
+  // Check for API not enabled errors
+  if (errorDescription?.toLowerCase().includes('youtube data api') ||
+      errorDescription?.toLowerCase().includes('has not been used') ||
+      errorDescription?.toLowerCase().includes('it is disabled') ||
+      errorDescription?.toLowerCase().includes('accessnotconfigured')) {
+    return {
+      category: 'api_not_enabled',
+      userMessage: 'YouTube Data API v3 is not enabled. Please enable it in your Google Cloud Console.'
     };
   }
 
@@ -460,7 +475,7 @@ serve(async (req) => {
         channelInfo = { items: [] };
       }
 
-      log('info', 'Channel info response', { itemCount: channelInfo.items?.length || 0 });
+      log('info', 'Channel info response', { itemCount: channelInfo.items?.length || 0, hasError: !!channelInfo.error });
 
       let channelTitle = 'Unknown Channel';
       let channelThumbnail = null;
@@ -469,6 +484,58 @@ serve(async (req) => {
       let youtubeChannelId: string | null = null;
       let authStatus = 'connected';
       let channelHandle: string | null = null;
+
+      // Check for API not enabled error
+      if (channelInfo.error) {
+        const errorReason = channelInfo.error?.errors?.[0]?.reason;
+        const errorMessage = channelInfo.error?.message || '';
+        
+        log('warn', 'YouTube API error', { errorReason, errorMessage });
+        
+        if (errorReason === 'accessNotConfigured' ||
+            errorMessage.includes('YouTube Data API v3 has not been used') ||
+            errorMessage.includes('it is disabled') ||
+            errorMessage.toLowerCase().includes('accessnotconfigured')) {
+          
+          log('error', 'YouTube Data API v3 not enabled for this project');
+          
+          // Update channel with api_not_enabled status
+          await supabase
+            .from('youtube_channels')
+            .update({ 
+              auth_status: 'api_not_enabled',
+              is_connected: false,
+              access_token: tokenData.access_token,
+              refresh_token: tokenData.refresh_token || null,
+              token_expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
+            })
+            .eq('id', stateObj.channel_id);
+
+          return new Response(`
+            <html>
+              <body>
+                <script>
+                  window.opener?.postMessage({ 
+                    type: 'youtube-oauth-error', 
+                    error: 'YouTube Data API v3 is not enabled. Please enable it in your Google Cloud Console.',
+                    category: 'api_not_enabled',
+                    requestId: '${requestId}'
+                  }, '*');
+                  setTimeout(() => window.close(), 2000);
+                </script>
+                <div style="font-family: system-ui; text-align: center; padding: 50px;">
+                  <h2>⚠️ API Not Enabled</h2>
+                  <p>YouTube Data API v3 is not enabled for your Google Cloud project.</p>
+                  <p style="color: #666; font-size: 14px;">Please enable it in your <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank">Google Cloud Console</a> and try again.</p>
+                  <p style="color: #999; font-size: 11px;">Request ID: ${requestId}</p>
+                </div>
+              </body>
+            </html>
+          `, {
+            headers: { 'Content-Type': 'text/html' },
+          });
+        }
+      }
 
       if (channelInfo.items && channelInfo.items.length > 0) {
         const ytChannel = channelInfo.items[0];
