@@ -59,6 +59,23 @@ async function refreshAccessToken(supabase: any, channel: any): Promise<string> 
             is_connected: false,
           })
           .eq('id', channel.id);
+        
+        // Send notification email
+        try {
+          console.log('Sending token revoked notification email...');
+          await supabase.functions.invoke('youtube-auth-notification', {
+            body: {
+              channelId: channel.id,
+              userId: channel.user_id,
+              channelName: channel.channel_title || channel.channel_handle || 'Unknown Channel',
+              issueType: 'token_revoked',
+            },
+          });
+          console.log('Token revoked notification email sent successfully');
+        } catch (notifyError) {
+          console.error('Failed to send auth notification:', notifyError);
+          // Don't fail the main operation if notification fails
+        }
       }
       
       throw new Error(`Token refresh failed: ${tokenData.error_description || tokenData.error}`);

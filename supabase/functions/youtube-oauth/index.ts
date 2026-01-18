@@ -511,6 +511,33 @@ serve(async (req) => {
             })
             .eq('id', stateObj.channel_id);
 
+          // Send notification email
+          try {
+            log('info', 'Sending API not enabled notification email...');
+            
+            // Fetch channel to get user_id and name
+            const { data: channelData } = await supabase
+              .from('youtube_channels')
+              .select('user_id, channel_title, channel_handle')
+              .eq('id', stateObj.channel_id)
+              .single();
+              
+            if (channelData) {
+              await supabase.functions.invoke('youtube-auth-notification', {
+                body: {
+                  channelId: stateObj.channel_id,
+                  userId: channelData.user_id,
+                  channelName: channelData.channel_title || channelData.channel_handle || 'Unknown Channel',
+                  issueType: 'api_not_enabled',
+                },
+              });
+              log('info', 'API not enabled notification email sent');
+            }
+          } catch (notifyError) {
+            log('error', 'Failed to send auth notification', { error: String(notifyError) });
+            // Don't fail the main operation if notification fails
+          }
+
           return new Response(`
             <html>
               <body>
