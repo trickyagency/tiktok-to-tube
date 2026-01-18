@@ -29,11 +29,20 @@ import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useScrapedVideos } from '@/hooks/useScrapedVideos';
 import { useYouTubeQuota } from '@/hooks/useYouTubeQuota';
 import { useCurrentUserSubscription } from '@/hooks/useCurrentUserSubscription';
+import { useChannelHealth } from '@/hooks/useChannelHealth';
 import { QuotaIndicator } from '@/components/quota/QuotaIndicator';
 import { EditCredentialsDialog } from '@/components/youtube/EditCredentialsDialog';
+import { ChannelHealthBadge } from '@/components/youtube/ChannelHealthBadge';
+import { ChannelIssueBanner } from '@/components/youtube/ChannelIssueBanner';
 import { toast } from 'sonner';
 import { OAUTH_REDIRECT_URI } from '@/lib/api-config';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -149,6 +158,14 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
   const { data: quotaData } = useYouTubeQuota(channel.id);
   const channelQuota = quotaData?.[0];
   const { data: subscriptionData } = useCurrentUserSubscription();
+  
+  // Channel health hook for health monitoring
+  const { health: channelHealth, isLoading: isHealthLoading } = useChannelHealth(channel.id);
+  
+  // Determine if channel is healthy enough to perform actions
+  const isChannelHealthy = channel.auth_status === 'connected' && 
+    channelHealth?.circuit_state !== 'open' &&
+    !['issues_auth', 'issues_config', 'suspended'].includes(channelHealth?.status || '');
 
   const statusColors = getStatusColors(channel.auth_status);
 
@@ -486,6 +503,10 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
                 {channel.channel_title || 'Unnamed Channel'}
               </h3>
               {getStatusBadge()}
+              {/* Health badge for connected channels */}
+              {channel.auth_status === 'connected' && !isHealthLoading && (
+                <ChannelHealthBadge channelId={channel.id} compact showActions={false} />
+              )}
             </div>
 
             {/* Owner badge */}
@@ -770,6 +791,27 @@ export function YouTubeChannelCard({ channel, onAuthComplete, index }: YouTubeCh
                   </Button>
                 </div>
               </div>
+            )}
+
+            {/* Channel Health Issue Banner */}
+            {channel.auth_status === 'connected' && channelHealth && 
+             channelHealth.status !== 'healthy' && (
+              <ChannelIssueBanner
+                channelId={channel.id}
+                status={channelHealth.status}
+                issue={channelHealth.last_error_code ? {
+                  code: channelHealth.last_error_code,
+                  summary: channelHealth.last_error_message || 'Unknown issue',
+                  severity: channelHealth.status === 'suspended' ? 'critical' : 
+                           channelHealth.status.startsWith('issues_') ? 'high' : 'medium',
+                  lastCheckedAt: channelHealth.last_health_check_at || new Date().toISOString(),
+                  nextRetryAt: channelHealth.next_retry_at,
+                  recommendedAction: channelHealth.status === 'issues_auth' ? 'USER_REAUTH' :
+                                    channelHealth.status === 'issues_config' ? 'USER_CONFIG' : 'WAIT_AND_RETRY',
+                } : undefined}
+                onReauthorize={handleAuthorize}
+                onEditCredentials={() => setShowEditCredentials(true)}
+              />
             )}
 
             {/* Quota Indicator for connected channels */}

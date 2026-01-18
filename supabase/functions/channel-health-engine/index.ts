@@ -497,8 +497,14 @@ serve(async (req) => {
           request_id: requestId,
         });
       
-      // Send notification if needed (with SHA-256 deduplication)
-      if (classifiedError.severity === 'critical' || classifiedError.severity === 'high') {
+      // Send notification if needed (with SHA-256 deduplication and escalation)
+      // Critical/High: immediate, Medium: after 5 failures
+      const shouldNotify = 
+        classifiedError.severity === 'critical' ||
+        classifiedError.severity === 'high' ||
+        (classifiedError.severity === 'medium' && newConsecutiveFailures >= 5);
+        
+      if (shouldNotify) {
         // Create notification hash for deduplication
         const notificationHash = await createNotificationHash(channelId, classifiedError.code, classifiedError.severity);
         
@@ -524,6 +530,13 @@ serve(async (req) => {
             })
             .eq('id', recentNotification.id);
           
+          // Log metrics for dedup
+          console.log(JSON.stringify({
+            type: 'metrics',
+            metrics: { dedup_skipped: 1 },
+            labels: { platform: 'youtube', error_code: classifiedError.code, severity: classifiedError.severity },
+          }));
+          
           console.log(JSON.stringify({
             requestId,
             level: 'info',
@@ -533,6 +546,45 @@ serve(async (req) => {
             duplicateCount: (recentNotification.duplicate_count || 0) + 1,
           }));
         } else {
+          // Check per-user rate limit (max 5 notifications per hour)
+          const { count: recentUserNotifications } = await supabase
+            .from('notification_log')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('sent_at', new Date(Date.now() - 3600000).toISOString());
+          
+          if ((recentUserNotifications || 0) >= 5) {
+            // Log rate limited notification
+            await supabase
+              .from('notification_log')
+              .insert({
+                user_id: userId,
+                channel_id: channelId,
+                notification_type: 'auth_issue',
+                notification_key: notificationHash,
+                error_code: classifiedError.code,
+                error_category: classifiedError.category,
+                severity: classifiedError.severity,
+                delivery_status: 'rate_limited',
+                is_rate_limited: true,
+                correlation_id: body.requestId,
+              });
+            
+            console.log(JSON.stringify({
+              type: 'metrics',
+              metrics: { rate_limited: 1 },
+              labels: { platform: 'youtube', error_code: classifiedError.code },
+            }));
+            
+            console.log(JSON.stringify({
+              requestId,
+              level: 'info',
+              message: 'User notification rate limit reached, skipping',
+              channelId: channelId.slice(0, 8),
+              userId: userId.slice(0, 8),
+              recentNotifications: recentUserNotifications,
+            }));
+          } else {
           // Get channel info for notification
           const { data: channel } = await supabase
             .from('youtube_channels')
@@ -551,32 +603,41 @@ serve(async (req) => {
               },
             });
             
-            // Log notification with hash for deduplication
-            await supabase
-              .from('notification_log')
-              .insert({
-                user_id: userId,
-                channel_id: channelId,
-                notification_type: 'auth_issue',
-                notification_key: notificationHash,
-                error_code: classifiedError.code,
-                error_category: classifiedError.category,
-                severity: classifiedError.severity,
-                delivery_status: 'sent',
-                sent_at: new Date().toISOString(),
-                cooldown_until: new Date(Date.now() + cooldownMs).toISOString(),
-                duplicate_count: 0,
-              });
-              
-            console.log(JSON.stringify({
-              requestId,
-              level: 'info',
-              message: 'Notification sent',
-              channelId: channelId.slice(0, 8),
-              hash: notificationHash,
-            }));
-          } catch (notifyError) {
-            console.error('Failed to send notification:', notifyError);
+              // Log notification with hash for deduplication
+              await supabase
+                .from('notification_log')
+                .insert({
+                  user_id: userId,
+                  channel_id: channelId,
+                  notification_type: 'auth_issue',
+                  notification_key: notificationHash,
+                  error_code: classifiedError.code,
+                  error_category: classifiedError.category,
+                  severity: classifiedError.severity,
+                  delivery_status: 'sent',
+                  sent_at: new Date().toISOString(),
+                  cooldown_until: new Date(Date.now() + cooldownMs).toISOString(),
+                  duplicate_count: 0,
+                  correlation_id: body.requestId,
+                });
+                
+              // Log metrics for notification sent
+              console.log(JSON.stringify({
+                type: 'metrics',
+                metrics: { notifications_sent: 1 },
+                labels: { platform: 'youtube', error_code: classifiedError.code, severity: classifiedError.severity },
+              }));
+                
+              console.log(JSON.stringify({
+                requestId,
+                level: 'info',
+                message: 'Notification sent',
+                channelId: channelId.slice(0, 8),
+                hash: notificationHash,
+              }));
+            } catch (notifyError) {
+              console.error('Failed to send notification:', notifyError);
+            }
           }
         }
       }

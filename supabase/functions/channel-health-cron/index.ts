@@ -66,10 +66,16 @@ serve(async (req) => {
     // =========================================
     // 1. Dynamic Frequency-Based Channel Selection
     // =========================================
-    // Connected/Healthy: check if next_health_check_at <= now() OR every 15 minutes
+    // Healthy: check ONLY when next_health_check_at <= now() (or fallback for null)
     // Issues/Degraded: check every 5 minutes
     // Suspended: check daily only
     
+    const nowDate = new Date();
+    const fiveMinAgo = new Date(nowDate.getTime() - 5 * 60 * 1000).toISOString();
+    const fifteenMinAgo = new Date(nowDate.getTime() - 15 * 60 * 1000).toISOString();
+    const oneDayAgo = new Date(nowDate.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    
+    // Build the query - selecting channels that need checking
     const { data: channelsToCheck, error: fetchError } = await supabase
       .from("channel_health")
       .select(`
@@ -92,7 +98,14 @@ serve(async (req) => {
           auth_status
         )
       `)
-      .or(`and(status.eq.healthy,or(next_health_check_at.lte.now(),last_health_check_at.lt.${new Date(Date.now() - 15 * 60 * 1000).toISOString()})),and(status.in.(degraded,issues_auth,issues_quota,issues_config,issues_permission),last_health_check_at.lt.${new Date(Date.now() - 5 * 60 * 1000).toISOString()}),and(status.eq.suspended,last_health_check_at.lt.${new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()})`)
+      .or(
+        // Healthy: use next_health_check_at, fallback to 15min if null
+        `and(status.eq.healthy,or(next_health_check_at.lte.now(),and(next_health_check_at.is.null,last_health_check_at.lt.${fifteenMinAgo}))),` +
+        // Issues/Degraded: every 5 minutes
+        `and(status.in.(degraded,issues_auth,issues_quota,issues_config,issues_permission),or(last_health_check_at.lt.${fiveMinAgo},last_health_check_at.is.null)),` +
+        // Suspended: daily only
+        `and(status.eq.suspended,or(last_health_check_at.lt.${oneDayAgo},last_health_check_at.is.null))`
+      )
       .order("last_health_check_at", { ascending: true, nullsFirst: true })
       .limit(100);
 
@@ -223,6 +236,12 @@ serve(async (req) => {
             channelId: channel.id.slice(0, 8),
           }));
           
+          // Update last_health_check_at to prevent re-picking
+          await supabase
+            .from("channel_health")
+            .update({ last_health_check_at: new Date().toISOString() })
+            .eq("id", health.id);
+            
           results.push({
             channelId: channel.id,
             channelTitle: channel.channel_title || 'Unknown',
@@ -549,16 +568,37 @@ serve(async (req) => {
     }
 
     // =========================================
-    // 5. Summary
+    // 5. Summary with Metrics Logging
     // =========================================
     const summary = {
       checkedCount,
       recoveredCount,
       suspendedCount,
+      skippedCount: results.filter(r => r.action === 'skipped').length,
+      errorCount: results.filter(r => r.action === 'error').length,
       elapsedMs: Date.now() - startTime,
       resultsCount: results.length,
+      queueDepth: channelsToCheck?.length || 0,
       timestamp: new Date().toISOString()
     };
+
+    // Structured metrics log for monitoring
+    console.log(JSON.stringify({
+      type: 'metrics',
+      correlationId,
+      metrics: {
+        health_check_total: checkedCount,
+        recovered_total: recoveredCount,
+        suspended_total: suspendedCount,
+        skipped_total: summary.skippedCount,
+        error_total: summary.errorCount,
+        duration_ms: summary.elapsedMs,
+        queue_depth: summary.queueDepth,
+      },
+      labels: {
+        platform: 'youtube',
+      },
+    }));
 
     console.log(JSON.stringify({
       correlationId,

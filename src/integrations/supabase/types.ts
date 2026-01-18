@@ -181,6 +181,7 @@ export type Database = {
       channel_errors: {
         Row: {
           channel_id: string
+          correlation_id: string | null
           created_at: string
           error_category: string
           error_code: string
@@ -201,6 +202,7 @@ export type Database = {
         }
         Insert: {
           channel_id: string
+          correlation_id?: string | null
           created_at?: string
           error_category: string
           error_code: string
@@ -221,6 +223,7 @@ export type Database = {
         }
         Update: {
           channel_id?: string
+          correlation_id?: string | null
           created_at?: string
           error_category?: string
           error_code?: string
@@ -386,6 +389,7 @@ export type Database = {
         Row: {
           channel_id: string | null
           cooldown_until: string | null
+          correlation_id: string | null
           created_at: string
           delivery_error: string | null
           delivery_status: string | null
@@ -404,6 +408,7 @@ export type Database = {
         Insert: {
           channel_id?: string | null
           cooldown_until?: string | null
+          correlation_id?: string | null
           created_at?: string
           delivery_error?: string | null
           delivery_status?: string | null
@@ -422,6 +427,7 @@ export type Database = {
         Update: {
           channel_id?: string | null
           cooldown_until?: string | null
+          correlation_id?: string | null
           created_at?: string
           delivery_error?: string | null
           delivery_status?: string | null
