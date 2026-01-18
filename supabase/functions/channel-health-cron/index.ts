@@ -340,6 +340,8 @@ serve(async (req) => {
           
           // Determine the issue type based on status code
           const issueStatus = apiResponse.status === 403 ? 'issues_quota' : 'issues_config';
+          // Determine auth_status - use quota_exceeded for 403 (quota issues)
+          const authStatus = apiResponse.status === 403 ? 'quota_exceeded' : 'failed';
           
           await supabase
             .from("channel_health")
@@ -353,13 +355,15 @@ serve(async (req) => {
             })
             .eq("id", health.id);
 
-          // ALSO update youtube_channels auth_status to 'failed' for realtime UI sync
+          // ALSO update youtube_channels auth_status for realtime UI sync
           await supabase
             .from("youtube_channels")
             .update({
-              auth_status: "failed",
+              auth_status: authStatus,
               auth_error_code: `api_${apiResponse.status}`,
-              auth_error_message: `API check failed: ${apiResponse.status}`,
+              auth_error_message: apiResponse.status === 403 
+                ? 'YouTube API quota exceeded. Uploads will resume when quota resets at midnight PT.'
+                : `API check failed: ${apiResponse.status}`,
               auth_error_at: new Date().toISOString(),
               last_health_check_at: new Date().toISOString(),
             })

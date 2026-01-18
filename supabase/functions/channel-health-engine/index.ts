@@ -224,6 +224,7 @@ function getAuthStatusFromError(category: ErrorCategory, code: string): string {
     case 'CONFIG': return code === 'accessNotConfigured' ? 'api_not_enabled' : 'failed';
     case 'QUOTA': return 'quota_exceeded';
     case 'PERMISSION': return 'permission_denied';
+    case 'RATE_LIMIT': return 'quota_exceeded'; // Rate limit often indicates quota issues
     default: return 'failed';
   }
 }
