@@ -9,6 +9,7 @@ import { QuickFixConfirmDialog } from '@/components/dashboard/QuickFixConfirmDia
 import { UploadLogDetails } from '@/components/history/UploadLogDetails';
 import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminderBanner';
 import { UploadProgressWidget } from '@/components/dashboard/UploadProgressWidget';
+import { ChannelHealthWidget } from '@/components/dashboard/ChannelHealthWidget';
 import { useWelcomeModal } from '@/hooks/useWelcomeModal';
 import { useWelcomeEmail } from '@/hooks/useWelcomeEmail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -156,6 +157,9 @@ const Dashboard = () => {
 
       {/* Subscription Renewal Reminder Banner */}
       <RenewalReminderBanner />
+
+      {/* Channel Health Widget - shows channels with issues */}
+      <ChannelHealthWidget />
 
       {/* Reconnection Warning Banner */}
       {channelsNeedingReconnect.length > 0 && (

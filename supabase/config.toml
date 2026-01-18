@@ -68,3 +68,6 @@ verify_jwt = false
 
 [functions.channel-health-engine]
 verify_jwt = false
+
+[functions.channel-health-cron]
+verify_jwt = false
