@@ -531,6 +531,7 @@ const YouTubeChannels = () => {
           onComplete={refetch}
           onReauthorize={handleReauthorize}
         />
+        </div>
       </div>
     </DashboardLayout>
   );
