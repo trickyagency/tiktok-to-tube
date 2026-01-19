@@ -8,6 +8,7 @@ export interface PublishSchedule {
   user_id: string;
   tiktok_account_id: string;
   youtube_channel_id: string;
+  channel_pool_id: string | null;
   schedule_name: string;
   videos_per_day: number;
   publish_times: string[]; // Array of HH:MM times
@@ -20,6 +21,7 @@ export interface PublishSchedule {
 export interface CreateScheduleInput {
   tiktok_account_id: string;
   youtube_channel_id: string;
+  channel_pool_id?: string | null;
   schedule_name: string;
   videos_per_day: number;
   publish_times: string[];
@@ -99,6 +101,7 @@ export function usePublishSchedules() {
           user_id: user.id,
           tiktok_account_id: input.tiktok_account_id,
           youtube_channel_id: input.youtube_channel_id,
+          channel_pool_id: input.channel_pool_id || null,
           schedule_name: input.schedule_name,
           videos_per_day: input.videos_per_day,
           publish_times: input.publish_times,
