@@ -954,6 +954,25 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
   }
 }
 
+// Release stale claims using the new DB function
+async function releaseStaleClaimsDB(supabase: any): Promise<number> {
+  const { data: releasedCount, error } = await supabase.rpc('release_stale_claims', {
+    p_minutes: 10
+  });
+
+  if (error) {
+    console.error('Failed to release stale claims:', error.message);
+    return 0;
+  }
+
+  if (releasedCount > 0) {
+    console.log(`Released ${releasedCount} stale claims (stuck > 10 minutes)`);
+  }
+
+  return releasedCount || 0;
+}
+
+// Legacy function for items stuck even longer (hard timeout)
 async function resetStuckItems(supabase: any): Promise<number> {
   const timeoutThreshold = new Date(Date.now() - STUCK_TIMEOUT_MS).toISOString();
 
@@ -961,12 +980,15 @@ async function resetStuckItems(supabase: any): Promise<number> {
     .from('publish_queue')
     .update({
       status: 'failed',
-      error_message: 'Processing timeout - stuck for more than 5 minutes',
+      error_message: 'Processing timeout - stuck for more than 5 minutes with no recovery',
       progress_phase: null,
       started_at: null,
+      processor_id: null,
+      claimed_at: null,
     })
     .eq('status', 'processing')
     .lt('started_at', timeoutThreshold)
+    .gte('retry_count', 3) // Only fail items that exhausted retries
     .select('id');
 
   if (error) {
@@ -975,10 +997,25 @@ async function resetStuckItems(supabase: any): Promise<number> {
   }
 
   if (stuckItems && stuckItems.length > 0) {
-    console.log(`Reset ${stuckItems.length} stuck items: ${stuckItems.map((i: any) => i.id).join(', ')}`);
+    console.log(`Failed ${stuckItems.length} items after max retries: ${stuckItems.map((i: any) => i.id).join(', ')}`);
   }
 
   return stuckItems?.length || 0;
+}
+
+// Atomically claim a queue item to prevent race conditions
+async function claimQueueItem(supabase: any, itemId: string, processorId: string): Promise<boolean> {
+  const { data: claimed, error } = await supabase.rpc('claim_queue_item', {
+    p_item_id: itemId,
+    p_processor_id: processorId
+  });
+
+  if (error) {
+    console.error(`Failed to claim item ${itemId}:`, error.message);
+    return false;
+  }
+
+  return claimed === true;
 }
 
 serve(async (req) => {
@@ -986,31 +1023,41 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Generate unique processor ID for this invocation
+  const processorId = crypto.randomUUID();
+  const correlationId = processorId.slice(0, 8);
+
   try {
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    console.log('Process queue started at:', new Date().toISOString());
+    console.log(`[${correlationId}] Process queue started at:`, new Date().toISOString());
 
-    // First, reset any stuck items
-    const stuckCount = await resetStuckItems(supabase);
-    if (stuckCount > 0) {
-      console.log(`Reset ${stuckCount} stuck items`);
+    // First, release stale claims (items stuck in processing)
+    const releasedCount = await releaseStaleClaimsDB(supabase);
+    if (releasedCount > 0) {
+      console.log(`[${correlationId}] Released ${releasedCount} stale claims`);
     }
 
-    // Fetch queue items that are due
+    // Then reset truly stuck items (exhausted retries)
+    const stuckCount = await resetStuckItems(supabase);
+    if (stuckCount > 0) {
+      console.log(`[${correlationId}] Failed ${stuckCount} stuck items after max retries`);
+    }
+
+    // Fetch queue items that are due (still queued status)
     const { data: queueItems, error: queueError } = await supabase
       .from('publish_queue')
       .select('*')
       .eq('status', 'queued')
       .lte('scheduled_for', new Date().toISOString())
       .order('scheduled_for', { ascending: true })
-      .limit(20); // Increased limit for concurrent processing
+      .limit(20);
 
     if (queueError) {
       throw new Error(`Failed to fetch queue: ${queueError.message}`);
     }
 
-    console.log(`Found ${queueItems?.length || 0} items to process`);
+    console.log(`[${correlationId}] Found ${queueItems?.length || 0} items to process`);
 
     if (!queueItems || queueItems.length === 0) {
       return new Response(JSON.stringify({
@@ -1018,14 +1065,44 @@ serve(async (req) => {
         message: 'No items to process',
         processed: 0,
         stuckReset: stuckCount,
+        staleReleased: releasedCount,
+        correlationId,
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Group items by YouTube channel for concurrent processing
-    const itemsByChannel: Map<string, typeof queueItems> = new Map();
+    // Atomically claim items before grouping
+    const claimedItems: typeof queueItems = [];
     for (const item of queueItems) {
+      const claimed = await claimQueueItem(supabase, item.id, processorId);
+      if (claimed) {
+        claimedItems.push(item);
+        console.log(`[${correlationId}] Claimed item ${item.id}`);
+      } else {
+        console.log(`[${correlationId}] Item ${item.id} already claimed by another processor`);
+      }
+    }
+
+    console.log(`[${correlationId}] Claimed ${claimedItems.length}/${queueItems.length} items`);
+
+    if (claimedItems.length === 0) {
+      return new Response(JSON.stringify({
+        success: true,
+        message: 'All items already claimed by other processors',
+        processed: 0,
+        skipped: queueItems.length,
+        stuckReset: stuckCount,
+        staleReleased: releasedCount,
+        correlationId,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Group claimed items by YouTube channel for concurrent processing
+    const itemsByChannel: Map<string, typeof claimedItems> = new Map();
+    for (const item of claimedItems) {
       const channelId = item.youtube_channel_id;
       if (!itemsByChannel.has(channelId)) {
         itemsByChannel.set(channelId, []);
@@ -1033,7 +1110,7 @@ serve(async (req) => {
       itemsByChannel.get(channelId)!.push(item);
     }
 
-    console.log(`Processing ${queueItems.length} items across ${itemsByChannel.size} channels concurrently`);
+    console.log(`[${correlationId}] Processing ${claimedItems.length} items across ${itemsByChannel.size} channels`);
 
     // Track results
     let processed = 0;
@@ -1042,7 +1119,7 @@ serve(async (req) => {
     // Process channels concurrently - one item at a time per channel
     const channelPromises = Array.from(itemsByChannel.entries()).map(
       async ([channelId, items]) => {
-        console.log(`Channel ${channelId}: processing ${items.length} items`);
+        console.log(`[${correlationId}] Channel ${channelId}: processing ${items.length} items`);
         
         // Process items sequentially within a channel (YouTube rate limits)
         for (let i = 0; i < items.length; i++) {
@@ -1051,7 +1128,7 @@ serve(async (req) => {
             await processQueueItem(supabase, item);
             processed++;
           } catch (e) {
-            console.error(`Failed to process item ${item.id}:`, e);
+            console.error(`[${correlationId}] Failed to process item ${item.id}:`, e);
             failed++;
           }
 
@@ -1066,24 +1143,30 @@ serve(async (req) => {
     // All channels process in parallel
     await Promise.all(channelPromises);
 
-    console.log(`Process queue completed: ${processed} processed, ${failed} failed`);
+    console.log(`[${correlationId}] Process queue completed: ${processed} processed, ${failed} failed`);
 
     return new Response(JSON.stringify({
       success: true,
       processed,
       failed,
-      total: queueItems.length,
+      total: claimedItems.length,
+      skipped: queueItems.length - claimedItems.length,
       channelsProcessed: itemsByChannel.size,
       stuckReset: stuckCount,
+      staleReleased: releasedCount,
+      correlationId,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: unknown) {
-    console.error('Error in process-queue:', error);
+    console.error(`[${correlationId}] Error in process-queue:`, error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      correlationId,
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

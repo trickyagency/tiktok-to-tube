@@ -674,11 +674,14 @@ export type Database = {
       }
       publish_queue: {
         Row: {
+          claimed_at: string | null
           created_at: string
           error_message: string | null
           id: string
+          idempotency_key: string | null
           max_retries: number | null
           processed_at: string | null
+          processor_id: string | null
           progress_percentage: number | null
           progress_phase: string | null
           retry_count: number | null
@@ -694,11 +697,14 @@ export type Database = {
           youtube_video_url: string | null
         }
         Insert: {
+          claimed_at?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           max_retries?: number | null
           processed_at?: string | null
+          processor_id?: string | null
           progress_percentage?: number | null
           progress_phase?: string | null
           retry_count?: number | null
@@ -714,11 +720,14 @@ export type Database = {
           youtube_video_url?: string | null
         }
         Update: {
+          claimed_at?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
+          idempotency_key?: string | null
           max_retries?: number | null
           processed_at?: string | null
+          processor_id?: string | null
           progress_percentage?: number | null
           progress_phase?: string | null
           retry_count?: number | null
@@ -1496,6 +1505,10 @@ export type Database = {
         Args: { p_channel_id: string; p_quota_cost?: number }
         Returns: boolean
       }
+      claim_queue_item: {
+        Args: { p_item_id: string; p_processor_id: string }
+        Returns: boolean
+      }
       fix_ownership_mismatches: { Args: never; Returns: number }
       get_cron_history: {
         Args: { limit_rows?: number }
@@ -1559,6 +1572,7 @@ export type Database = {
       }
       is_apify_configured: { Args: never; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      release_stale_claims: { Args: { p_minutes?: number }; Returns: number }
       restore_incorrectly_published_videos: { Args: never; Returns: number }
     }
     Enums: {
