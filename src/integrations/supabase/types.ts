@@ -347,6 +347,81 @@ export type Database = {
           },
         ]
       }
+      channel_pool_members: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_fallback_only: boolean | null
+          pool_id: string
+          priority: number
+          youtube_channel_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_fallback_only?: boolean | null
+          pool_id: string
+          priority?: number
+          youtube_channel_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_fallback_only?: boolean | null
+          pool_id?: string
+          priority?: number
+          youtube_channel_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_pool_members_pool_id_fkey"
+            columns: ["pool_id"]
+            isOneToOne: false
+            referencedRelation: "channel_rotation_pools"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_pool_members_youtube_channel_id_fkey"
+            columns: ["youtube_channel_id"]
+            isOneToOne: false
+            referencedRelation: "youtube_channels"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      channel_rotation_pools: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          rotation_strategy: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          rotation_strategy?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          rotation_strategy?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       earnings: {
         Row: {
           amount: number
@@ -684,6 +759,7 @@ export type Database = {
       }
       publish_schedules: {
         Row: {
+          channel_pool_id: string | null
           created_at: string
           id: string
           is_active: boolean | null
@@ -697,6 +773,7 @@ export type Database = {
           youtube_channel_id: string
         }
         Insert: {
+          channel_pool_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean | null
@@ -710,6 +787,7 @@ export type Database = {
           youtube_channel_id: string
         }
         Update: {
+          channel_pool_id?: string | null
           created_at?: string
           id?: string
           is_active?: boolean | null
@@ -723,6 +801,13 @@ export type Database = {
           youtube_channel_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "publish_schedules_channel_pool_id_fkey"
+            columns: ["channel_pool_id"]
+            isOneToOne: false
+            referencedRelation: "channel_rotation_pools"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "publish_schedules_tiktok_account_id_fkey"
             columns: ["tiktok_account_id"]

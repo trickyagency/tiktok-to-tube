@@ -18,11 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, X, Clock, Crown, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Plus, X, Clock, Crown, AlertCircle, Layers } from 'lucide-react';
 import { useTikTokAccounts } from '@/hooks/useTikTokAccounts';
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { usePublishSchedules } from '@/hooks/usePublishSchedules';
 import { useCurrentUserSubscription } from '@/hooks/useUserSubscription';
+import { useChannelPools } from '@/hooks/useChannelPools';
 import { Link } from 'react-router-dom';
 
 const TIMEZONES = [
@@ -49,6 +52,8 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
   const [scheduleName, setScheduleName] = useState('');
   const [tiktokAccountId, setTiktokAccountId] = useState('');
   const [youtubeChannelId, setYoutubeChannelId] = useState('');
+  const [channelPoolId, setChannelPoolId] = useState('');
+  const [channelMode, setChannelMode] = useState<'single' | 'pool'>('single');
   const [publishTimes, setPublishTimes] = useState<string[]>(['10:00']);
   const [timezone, setTimezone] = useState('America/New_York');
 
@@ -56,6 +61,10 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
   const { channels: youtubeChannels } = useYouTubeChannels();
   const { createSchedule, isCreating, schedules: existingSchedules } = usePublishSchedules();
   const { data: subscription } = useCurrentUserSubscription();
+  const { pools } = useChannelPools();
+
+  // Active pools only
+  const activePools = pools.filter(p => p.is_active);
 
   // Get max videos per day from subscription plan (default to 2 for basic)
   const maxVideosPerDay = subscription?.plan?.max_videos_per_day || 2;
@@ -108,18 +117,26 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!tiktokAccountId || !youtubeChannelId || !scheduleName) {
+    const hasChannel = channelMode === 'single' ? youtubeChannelId : channelPoolId;
+    if (!tiktokAccountId || !hasChannel || !scheduleName) {
       return;
     }
 
+    // Get first channel from pool as default for the schedule
+    const selectedPool = activePools.find(p => p.id === channelPoolId);
+    const defaultChannelId = channelMode === 'pool' && selectedPool?.members?.[0]
+      ? selectedPool.members[0].youtube_channel_id
+      : youtubeChannelId;
+
     await createSchedule({
       tiktok_account_id: tiktokAccountId,
-      youtube_channel_id: youtubeChannelId,
+      youtube_channel_id: defaultChannelId,
       schedule_name: scheduleName,
       videos_per_day: publishTimes.length,
       publish_times: publishTimes,
       timezone,
-    });
+      channel_pool_id: channelMode === 'pool' ? channelPoolId : undefined,
+    } as any);
 
     setOpen(false);
     resetForm();
@@ -130,9 +147,14 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
     setScheduleName('');
     setTiktokAccountId('');
     setYoutubeChannelId('');
+    setChannelPoolId('');
+    setChannelMode('single');
     setPublishTimes(['10:00']);
     setTimezone('America/New_York');
   };
+
+  const isFormValid = scheduleName && tiktokAccountId && 
+    (channelMode === 'single' ? youtubeChannelId : channelPoolId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -206,44 +228,85 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
             )}
           </div>
 
-          {/* YouTube Channel Selection */}
-          <div className="space-y-2">
+          {/* YouTube Channel Selection with Pool Option */}
+          <div className="space-y-3">
             <Label>Target YouTube Channel</Label>
-            <Select value={youtubeChannelId} onValueChange={setYoutubeChannelId} required>
-              <SelectTrigger>
-                <SelectValue placeholder="Select YouTube channel" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableChannels.map((channel) => (
-                  <SelectItem key={channel.id} value={channel.id}>
-                    {channel.channel_title || 'Unnamed Channel'}
-                  </SelectItem>
-                ))}
-                {/* Show channels with existing schedules as disabled */}
-                {connectedChannels
-                  .filter(c => channelsWithSchedule.some(s => s.channelId === c.id))
-                  .map((channel) => {
-                    const schedule = channelsWithSchedule.find(s => s.channelId === channel.id);
-                    const status = schedule?.isActive ? 'Active' : 'Paused';
-                    return (
-                      <SelectItem key={channel.id} value={channel.id} disabled>
-                        {channel.channel_title || 'Unnamed Channel'} ({status} schedule exists)
+            <Tabs value={channelMode} onValueChange={(v) => setChannelMode(v as 'single' | 'pool')}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single">Single Channel</TabsTrigger>
+                <TabsTrigger value="pool" className="gap-1.5">
+                  <Layers className="h-3 w-3" />
+                  Channel Pool
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="single" className="mt-3">
+                <Select value={youtubeChannelId} onValueChange={setYoutubeChannelId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select YouTube channel" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableChannels.map((channel) => (
+                      <SelectItem key={channel.id} value={channel.id}>
+                        {channel.channel_title || 'Unnamed Channel'}
                       </SelectItem>
-                    );
-                  })}
-              </SelectContent>
-            </Select>
-            {connectedChannels.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                No connected YouTube channels. Please authorize a channel first.
-              </p>
-            )}
-            {connectedChannels.length > 0 && availableChannels.length === 0 && (
-              <p className="text-xs text-amber-600 flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                All channels have schedules. Activate or edit an existing schedule instead.
-              </p>
-            )}
+                    ))}
+                    {connectedChannels
+                      .filter(c => channelsWithSchedule.some(s => s.channelId === c.id))
+                      .map((channel) => {
+                        const schedule = channelsWithSchedule.find(s => s.channelId === channel.id);
+                        const status = schedule?.isActive ? 'Active' : 'Paused';
+                        return (
+                          <SelectItem key={channel.id} value={channel.id} disabled>
+                            {channel.channel_title || 'Unnamed Channel'} ({status} schedule exists)
+                          </SelectItem>
+                        );
+                      })}
+                  </SelectContent>
+                </Select>
+                {connectedChannels.length === 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    No connected YouTube channels. Please authorize a channel first.
+                  </p>
+                )}
+              </TabsContent>
+              
+              <TabsContent value="pool" className="mt-3">
+                {activePools.length === 0 ? (
+                  <div className="p-4 rounded-lg border border-dashed text-center">
+                    <Layers className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground mb-2">
+                      No channel pools created yet
+                    </p>
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to="/dashboard/youtube">Create Pool</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <Select value={channelPoolId} onValueChange={setChannelPoolId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select channel pool" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {activePools.map((pool) => (
+                        <SelectItem key={pool.id} value={pool.id}>
+                          <div className="flex items-center gap-2">
+                            <Layers className="h-3 w-3 text-primary" />
+                            {pool.name}
+                            <Badge variant="secondary" className="text-xs ml-1">
+                              {pool.members?.length || 0} channels
+                            </Badge>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground mt-2">
+                  Pools automatically rotate uploads across channels when quota is exhausted.
+                </p>
+              </TabsContent>
+            </Tabs>
           </div>
 
           {/* Publish Times */}
@@ -320,7 +383,7 @@ export function CreateScheduleDialog({ onSuccess, trigger }: CreateScheduleDialo
             </Button>
             <Button 
               type="submit" 
-              disabled={isCreating || !tiktokAccountId || !youtubeChannelId || !scheduleName}
+              disabled={isCreating || !isFormValid}
             >
               {isCreating ? 'Creating...' : 'Create Schedule'}
             </Button>

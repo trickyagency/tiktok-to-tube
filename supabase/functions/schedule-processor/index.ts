@@ -88,11 +88,138 @@ async function checkChannelQuota(supabase: any, channelId: string): Promise<{
   return { available: true, uploadsRemaining };
 }
 
+// Select the best channel from a pool based on rotation strategy
+async function selectChannelFromPool(
+  supabase: any,
+  schedule: any
+): Promise<{ channelId: string; reason: string } | null> {
+  const today = new Date().toISOString().split('T')[0];
+  
+  // Fetch pool with members
+  const { data: pool, error: poolError } = await supabase
+    .from('channel_rotation_pools')
+    .select(`
+      id,
+      rotation_strategy,
+      is_active,
+      members:channel_pool_members(
+        id,
+        youtube_channel_id,
+        priority,
+        is_fallback_only,
+        youtube_channel:youtube_channels(
+          id,
+          channel_title,
+          auth_status,
+          user_id
+        )
+      )
+    `)
+    .eq('id', schedule.channel_pool_id)
+    .single();
+
+  if (poolError || !pool) {
+    console.error('Failed to fetch pool:', poolError?.message);
+    return null;
+  }
+
+  if (!pool.is_active) {
+    console.log(`Pool ${pool.id} is paused - skipping`);
+    return null;
+  }
+
+  const members = pool.members || [];
+  if (members.length === 0) {
+    console.log(`Pool ${pool.id} has no members`);
+    return null;
+  }
+
+  // Get channel IDs
+  const channelIds = members.map((m: any) => m.youtube_channel_id);
+
+  // Fetch quota data for all channels in pool
+  const { data: quotaData } = await supabase
+    .from('youtube_quota_usage')
+    .select('*')
+    .in('youtube_channel_id', channelIds)
+    .eq('date', today);
+
+  // Build availability list
+  const availableChannels = members
+    .filter((member: any) => {
+      const channel = member.youtube_channel;
+      if (!channel) return false;
+      if (channel.auth_status !== 'connected') return false;
+      if (channel.user_id !== schedule.user_id) return false;
+
+      const quota = quotaData?.find((q: any) => q.youtube_channel_id === member.youtube_channel_id);
+      if (quota?.is_paused) return false;
+
+      const remaining = (quota?.quota_limit || DEFAULT_DAILY_QUOTA) - (quota?.quota_used || 0);
+      const uploadsRemaining = Math.floor(remaining / UPLOAD_QUOTA_COST);
+      return uploadsRemaining > 0;
+    })
+    .map((member: any) => ({
+      ...member,
+      quota: quotaData?.find((q: any) => q.youtube_channel_id === member.youtube_channel_id) || null,
+      remainingUploads: Math.floor(
+        ((quotaData?.find((q: any) => q.youtube_channel_id === member.youtube_channel_id)?.quota_limit || DEFAULT_DAILY_QUOTA) -
+        (quotaData?.find((q: any) => q.youtube_channel_id === member.youtube_channel_id)?.quota_used || 0)) / UPLOAD_QUOTA_COST
+      ),
+    }));
+
+  if (availableChannels.length === 0) {
+    console.log(`All channels in pool ${pool.id} exhausted or unavailable`);
+    return null;
+  }
+
+  // Select based on rotation strategy
+  let selectedChannel;
+  const strategy = pool.rotation_strategy || 'quota_based';
+
+  switch (strategy) {
+    case 'quota_based':
+      // Pick channel with most remaining quota
+      selectedChannel = availableChannels.sort((a: any, b: any) => 
+        b.remainingUploads - a.remainingUploads
+      )[0];
+      break;
+
+    case 'priority':
+      // Use priority order (already sorted by priority in query), skip fallback-only if primaries available
+      const primaries = availableChannels.filter((c: any) => !c.is_fallback_only);
+      selectedChannel = primaries.length > 0 
+        ? primaries.sort((a: any, b: any) => a.priority - b.priority)[0]
+        : availableChannels.sort((a: any, b: any) => a.priority - b.priority)[0];
+      break;
+
+    case 'round_robin':
+      // Pick channel with fewest uploads today
+      selectedChannel = availableChannels.sort((a: any, b: any) => {
+        const aUploads = a.quota?.uploads_count || 0;
+        const bUploads = b.quota?.uploads_count || 0;
+        return aUploads - bUploads;
+      })[0];
+      break;
+
+    default:
+      selectedChannel = availableChannels[0];
+  }
+
+  console.log(`Pool rotation (${strategy}): Selected channel ${selectedChannel.youtube_channel_id} (${selectedChannel.remainingUploads} uploads remaining)`);
+  
+  return {
+    channelId: selectedChannel.youtube_channel_id,
+    reason: `Pool rotation (${strategy}): ${selectedChannel.youtube_channel?.channel_title || 'Unknown'}`,
+  };
+}
+
 // Validate that schedule, video, and channel all belong to the same user
 async function validateScheduleOwnership(
   supabase: any,
   schedule: any,
-  video: any
+  video: any,
+  channelId: string
 ): Promise<{ valid: boolean; error?: string }> {
   const scheduleUserId = schedule.user_id;
   
@@ -106,7 +233,7 @@ async function validateScheduleOwnership(
   const { data: channel, error: channelError } = await supabase
     .from('youtube_channels')
     .select('user_id')
-    .eq('id', schedule.youtube_channel_id)
+    .eq('id', channelId)
     .single();
   
   if (channelError || !channel) {
@@ -194,6 +321,7 @@ serve(async (req) => {
     let queued = 0;
     let skipped = 0;
     let quotaSkipped = 0;
+    let rotated = 0;
     const debugLog: any[] = [];
 
     for (const schedule of schedules) {
@@ -203,6 +331,7 @@ serve(async (req) => {
         scheduleUserId: schedule.user_id,
         tiktokAccountId: schedule.tiktok_account_id,
         youtubeChannelId: schedule.youtube_channel_id,
+        channelPoolId: schedule.channel_pool_id,
         timezone: schedule.timezone || 'UTC',
         publishTimes: schedule.publish_times,
       };
@@ -228,21 +357,44 @@ serve(async (req) => {
 
       console.log(`Schedule "${schedule.schedule_name}" - TIME TO PUBLISH!`);
 
-      // *** CHECK QUOTA BEFORE PROCEEDING ***
-      const quotaCheck = await checkChannelQuota(supabase, schedule.youtube_channel_id);
-      if (!quotaCheck.available) {
-        console.log(`Schedule "${schedule.schedule_name}" - quota not available: ${quotaCheck.reason}`);
-        scheduleDebug.status = 'skipped';
-        scheduleDebug.reason = `Quota unavailable: ${quotaCheck.reason}`;
-        debugLog.push(scheduleDebug);
-        quotaSkipped++;
-        continue;
+      // *** SMART CHANNEL SELECTION ***
+      let targetChannelId: string;
+      let channelSelectionReason: string;
+
+      if (schedule.channel_pool_id) {
+        // Use pool rotation
+        const poolResult = await selectChannelFromPool(supabase, schedule);
+        if (!poolResult) {
+          console.log(`Schedule "${schedule.schedule_name}" - no available channels in pool`);
+          scheduleDebug.status = 'skipped';
+          scheduleDebug.reason = 'All channels in pool exhausted or unavailable';
+          debugLog.push(scheduleDebug);
+          quotaSkipped++;
+          continue;
+        }
+        targetChannelId = poolResult.channelId;
+        channelSelectionReason = poolResult.reason;
+        rotated++;
+      } else {
+        // Direct channel assignment - check quota
+        const quotaCheck = await checkChannelQuota(supabase, schedule.youtube_channel_id);
+        if (!quotaCheck.available) {
+          console.log(`Schedule "${schedule.schedule_name}" - quota not available: ${quotaCheck.reason}`);
+          scheduleDebug.status = 'skipped';
+          scheduleDebug.reason = `Quota unavailable: ${quotaCheck.reason}`;
+          debugLog.push(scheduleDebug);
+          quotaSkipped++;
+          continue;
+        }
+        targetChannelId = schedule.youtube_channel_id;
+        channelSelectionReason = `Direct assignment (${quotaCheck.uploadsRemaining} uploads remaining)`;
       }
       
-      console.log(`Schedule "${schedule.schedule_name}" - quota available (${quotaCheck.uploadsRemaining} uploads remaining)`);
-      scheduleDebug.quotaRemaining = quotaCheck.uploadsRemaining;
+      console.log(`Channel selected: ${targetChannelId} - ${channelSelectionReason}`);
+      scheduleDebug.selectedChannelId = targetChannelId;
+      scheduleDebug.channelSelectionReason = channelSelectionReason;
 
-      // Get unpublished videos from the linked TikTok account, try to find one that hasn't been uploaded
+      // Get unpublished videos from the linked TikTok account
       let selectedVideo = null;
       const { data: unpublishedVideos, error: videosError } = await supabase
         .from('scraped_videos')
@@ -250,7 +402,7 @@ serve(async (req) => {
         .eq('tiktok_account_id', schedule.tiktok_account_id)
         .eq('is_published', false)
         .order('scraped_at', { ascending: true })
-        .limit(10); // Get more to find a valid one
+        .limit(10);
 
       if (videosError) {
         console.error(`Error fetching videos for schedule "${schedule.schedule_name}":`, videosError);
@@ -261,15 +413,6 @@ serve(async (req) => {
       }
 
       console.log(`Fetched ${unpublishedVideos?.length || 0} unpublished videos for account ${schedule.tiktok_account_id}`);
-      
-      // Log first few videos for debugging
-      if (unpublishedVideos && unpublishedVideos.length > 0) {
-        console.log('Sample videos (first 3):');
-        unpublishedVideos.slice(0, 3).forEach((v, i) => {
-          console.log(`  [${i + 1}] Video ID: ${v.id}, user_id: ${v.user_id}, tiktok_video_id: ${v.tiktok_video_id}`);
-        });
-      }
-
       scheduleDebug.unpublishedVideoCount = unpublishedVideos?.length || 0;
 
       if (!unpublishedVideos || unpublishedVideos.length === 0) {
@@ -288,7 +431,7 @@ serve(async (req) => {
       for (const video of unpublishedVideos) {
         videosChecked++;
         
-        // Check if video is already in queue (queued, processing, OR published)
+        // Check if video is already in queue
         const { data: existingQueue, error: queueCheckError } = await supabase
           .from('publish_queue')
           .select('id, status')
@@ -305,7 +448,6 @@ serve(async (req) => {
           console.log(`Video ${video.id} already ${existingQueue.status}, skipping`);
           videosAlreadyQueued++;
           
-          // If it was published, sync the scraped_videos table
           if (existingQueue.status === 'published') {
             await supabase
               .from('scraped_videos')
@@ -315,21 +457,13 @@ serve(async (req) => {
           continue;
         }
 
-        // IMPORTANT: Check ownership BEFORE selecting the video
-        // Log detailed ownership check info
-        console.log(`Ownership check for video ${video.id}:`);
-        console.log(`  - Schedule user_id: ${schedule.user_id}`);
-        console.log(`  - Video user_id: ${video.user_id}`);
-        console.log(`  - Match: ${schedule.user_id === video.user_id}`);
-
-        // Pre-validate ownership before full check
+        // Check ownership
         if (video.user_id !== schedule.user_id) {
           console.warn(`OWNERSHIP MISMATCH: Video ${video.id} belongs to user ${video.user_id}, but schedule belongs to user ${schedule.user_id}`);
           ownershipFailed++;
           continue;
         }
 
-        // Found a valid video
         selectedVideo = video;
         break;
       }
@@ -340,7 +474,6 @@ serve(async (req) => {
 
       if (!selectedVideo) {
         console.log(`No available videos for schedule "${schedule.schedule_name}"`);
-        console.log(`  Checked: ${videosChecked}, Already queued: ${videosAlreadyQueued}, Ownership failed: ${ownershipFailed}`);
         scheduleDebug.status = 'skipped';
         scheduleDebug.reason = `No valid videos: ${videosChecked} checked, ${videosAlreadyQueued} already queued, ${ownershipFailed} ownership mismatch`;
         debugLog.push(scheduleDebug);
@@ -350,8 +483,8 @@ serve(async (req) => {
       const video = selectedVideo;
       console.log(`Selected video: ${video.id} (tiktok_video_id: ${video.tiktok_video_id})`);
 
-      // SECURITY: Validate that schedule, video, and channel all belong to the same user
-      const ownershipCheck = await validateScheduleOwnership(supabase, schedule, video);
+      // SECURITY: Validate ownership with the TARGET channel (which may differ from schedule.youtube_channel_id)
+      const ownershipCheck = await validateScheduleOwnership(supabase, schedule, video, targetChannelId);
       if (!ownershipCheck.valid) {
         console.error(`SECURITY: Ownership validation failed for schedule "${schedule.schedule_name}": ${ownershipCheck.error}`);
         scheduleDebug.status = 'error';
@@ -365,7 +498,6 @@ serve(async (req) => {
       try {
         downloadUrl = await fetchTikWMDownloadUrl(video.video_url);
         
-        // Update the video with the new download URL
         await supabase
           .from('scraped_videos')
           .update({ download_url: downloadUrl })
@@ -374,7 +506,6 @@ serve(async (req) => {
         console.log(`Updated download URL for video ${video.id}`);
       } catch (tikwmError) {
         console.error(`TikWM fetch failed for video ${video.id}:`, tikwmError);
-        // Continue with existing download URL if available
         if (!downloadUrl) {
           console.error(`No download URL available for video ${video.id}, skipping`);
           scheduleDebug.status = 'error';
@@ -384,13 +515,13 @@ serve(async (req) => {
         }
       }
 
-      // Add to publish queue
+      // Add to publish queue with the SELECTED channel (may be different from schedule's default)
       const { error: insertError } = await supabase
         .from('publish_queue')
         .insert({
           user_id: schedule.user_id,
           scraped_video_id: video.id,
-          youtube_channel_id: schedule.youtube_channel_id,
+          youtube_channel_id: targetChannelId,
           schedule_id: schedule.id,
           scheduled_for: new Date().toISOString(),
           status: 'queued',
@@ -404,20 +535,22 @@ serve(async (req) => {
         continue;
       }
 
-      console.log(`✓ Queued video ${video.id} for schedule "${schedule.schedule_name}"`);
+      console.log(`✓ Queued video ${video.id} for schedule "${schedule.schedule_name}" -> channel ${targetChannelId}`);
       scheduleDebug.status = 'queued';
       scheduleDebug.queuedVideoId = video.id;
+      scheduleDebug.targetChannelId = targetChannelId;
       debugLog.push(scheduleDebug);
       queued++;
     }
 
     console.log('\n=== Schedule Processor Complete ===');
-    console.log(`Summary: ${queued} queued, ${skipped} skipped (not time), ${quotaSkipped} skipped (quota), ${schedules.length - queued - skipped - quotaSkipped} other`);
+    console.log(`Summary: ${queued} queued (${rotated} rotated), ${skipped} skipped (not time), ${quotaSkipped} skipped (quota), ${schedules.length - queued - skipped - quotaSkipped} other`);
     console.log('Debug log:', JSON.stringify(debugLog, null, 2));
 
     return new Response(JSON.stringify({
       success: true,
       queued,
+      rotated,
       skipped,
       quotaSkipped,
       totalSchedules: schedules.length,
