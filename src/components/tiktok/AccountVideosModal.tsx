@@ -13,8 +13,19 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Eye, Heart, MessageCircle, Share2, ExternalLink, Youtube, Upload, Video, CheckSquare } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Eye, Heart, MessageCircle, Share2, ExternalLink, Youtube, Upload, Video, CheckSquare, Undo2 } from 'lucide-react';
 import { useScrapedVideos, ScrapedVideo } from '@/hooks/useScrapedVideos';
+import { useUnmarkAsPublished } from '@/hooks/useUnmarkAsPublished';
 import { TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { QueueVideoToYouTube } from '@/components/queue/QueueVideoToYouTube';
 import { MarkAsPublishedDialog } from './MarkAsPublishedDialog';
@@ -27,12 +38,19 @@ interface AccountVideosModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-function VideoCard({ video }: { video: ScrapedVideo }) {
+interface VideoCardProps {
+  video: ScrapedVideo;
+  onUnmarkClick?: (video: ScrapedVideo) => void;
+}
+
+function VideoCard({ video, onUnmarkClick }: VideoCardProps) {
   const formatNumber = (num: number) => {
     if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
     if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
     return num.toString();
   };
+
+  const canUnmark = video.is_published && video.published_via === 'manual';
 
   return (
     <div className="flex gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors group">
@@ -69,6 +87,10 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
                 YouTube
               </Badge>
             </a>
+          ) : video.published_via === 'manual' ? (
+            <Badge className="absolute top-1 right-1 text-xs bg-amber-600 text-white">
+              Marked Manual
+            </Badge>
           ) : (
             <Badge className="absolute top-1 right-1 text-xs" variant="secondary">
               Published
@@ -109,15 +131,30 @@ function VideoCard({ video }: { video: ScrapedVideo }) {
           </span>
         </div>
 
-        <div className="flex items-center justify-between mt-2">
-          {video.duration && (
-            <p className="text-xs text-muted-foreground">
-              {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-            </p>
-          )}
-          {!video.is_published && video.download_url && (
-            <QueueVideoToYouTube video={video} />
-          )}
+        <div className="flex items-center justify-between mt-2 gap-2">
+          <div className="flex items-center gap-2">
+            {video.duration && (
+              <p className="text-xs text-muted-foreground">
+                {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {canUnmark && onUnmarkClick && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onUnmarkClick(video)}
+                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Undo2 className="h-3 w-3 mr-1" />
+                Unmark
+              </Button>
+            )}
+            {!video.is_published && video.download_url && (
+              <QueueVideoToYouTube video={video} />
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -139,7 +176,9 @@ function VideoSkeleton() {
 
 export function AccountVideosModal({ account, open, onOpenChange }: AccountVideosModalProps) {
   const { data: videos, isLoading } = useScrapedVideos(account?.id || null);
+  const unmarkMutation = useUnmarkAsPublished();
   const [markAsPublishedOpen, setMarkAsPublishedOpen] = useState(false);
+  const [videoToUnmark, setVideoToUnmark] = useState<ScrapedVideo | null>(null);
 
   const PAGE_SIZE = 20;
   const [page, setPage] = useState(1);
@@ -185,119 +224,135 @@ export function AccountVideosModal({ account, open, onOpenChange }: AccountVideo
     return filteredVideos.slice(start, start + PAGE_SIZE);
   }, [page, filteredVideos]);
 
+  const handleUnmarkClick = (video: ScrapedVideo) => {
+    setVideoToUnmark(video);
+  };
+
+  const handleConfirmUnmark = async () => {
+    if (!videoToUnmark) return;
+    await unmarkMutation.mutateAsync({ videoId: videoToUnmark.id });
+    setVideoToUnmark(null);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh]">
-        <DialogHeader>
-          <div className="flex items-center justify-between gap-2">
-            <DialogTitle className="flex items-center gap-2 flex-wrap">
-              Videos from @{account?.username}
-              <Badge variant="secondary">
-                {counts.all} total
-              </Badge>
-            </DialogTitle>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => setMarkAsPublishedOpen(true)}
-              className="shrink-0"
-            >
-              <CheckSquare className="h-4 w-4 mr-2" />
-              Mark as Published
-            </Button>
-          </div>
-        </DialogHeader>
-
-        {/* Filter tabs */}
-        <Tabs value={filter} onValueChange={(v) => setFilter(v as VideoFilter)} className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all" className="text-xs gap-1.5">
-              <Video className="h-3.5 w-3.5" />
-              All ({counts.all})
-            </TabsTrigger>
-            <TabsTrigger value="not_uploaded" className="text-xs gap-1.5">
-              <Upload className="h-3.5 w-3.5" />
-              Not Uploaded ({counts.not_uploaded})
-            </TabsTrigger>
-            <TabsTrigger value="uploaded" className="text-xs gap-1.5">
-              <Youtube className="h-3.5 w-3.5" />
-              Uploaded ({counts.uploaded})
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
-
-        <ScrollArea className="h-[60vh] pr-4">
-          {isLoading ? (
-            <div className="space-y-2">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <VideoSkeleton key={i} />
-              ))}
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="flex items-center gap-2 flex-wrap">
+                Videos from @{account?.username}
+                <Badge variant="secondary">
+                  {counts.all} total
+                </Badge>
+              </DialogTitle>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setMarkAsPublishedOpen(true)}
+                className="shrink-0"
+              >
+                <CheckSquare className="h-4 w-4 mr-2" />
+                Mark as Published
+              </Button>
             </div>
-          ) : total > 0 ? (
-            <div className="space-y-1">
-              {pageVideos.map((video) => (
-                <VideoCard key={video.id} video={video} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 text-muted-foreground">
-              <p>No videos scraped yet</p>
+          </DialogHeader>
+
+          {/* Filter tabs */}
+          <Tabs value={filter} onValueChange={(v) => setFilter(v as VideoFilter)} className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="all" className="text-xs gap-1.5">
+                <Video className="h-3.5 w-3.5" />
+                All ({counts.all})
+              </TabsTrigger>
+              <TabsTrigger value="not_uploaded" className="text-xs gap-1.5">
+                <Upload className="h-3.5 w-3.5" />
+                Not Uploaded ({counts.not_uploaded})
+              </TabsTrigger>
+              <TabsTrigger value="uploaded" className="text-xs gap-1.5">
+                <Youtube className="h-3.5 w-3.5" />
+                Uploaded ({counts.uploaded})
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <ScrollArea className="h-[60vh] pr-4">
+            {isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <VideoSkeleton key={i} />
+                ))}
+              </div>
+            ) : total > 0 ? (
+              <div className="space-y-1">
+                {pageVideos.map((video) => (
+                  <VideoCard 
+                    key={video.id} 
+                    video={video} 
+                    onUnmarkClick={handleUnmarkClick}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">
+                <p>No videos scraped yet</p>
+              </div>
+            )}
+          </ScrollArea>
+
+          {!isLoading && total > PAGE_SIZE && (
+            <div className="pt-2">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPage((p) => Math.max(1, p - 1));
+                      }}
+                      className={page <= 1 ? 'pointer-events-none opacity-50' : undefined}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: Math.min(5, totalPages) }).map((_, idx) => {
+                    const p = idx + 1;
+                    return (
+                      <PaginationItem key={p}>
+                        <PaginationLink
+                          href="#"
+                          isActive={p === page}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setPage(p);
+                          }}
+                        >
+                          {p}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setPage((p) => Math.min(totalPages, p + 1));
+                      }}
+                      className={page >= totalPages ? 'pointer-events-none opacity-50' : undefined}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+
+              <p className="mt-2 text-xs text-muted-foreground text-center">
+                Page {page} of {totalPages}
+              </p>
             </div>
           )}
-        </ScrollArea>
-
-        {!isLoading && total > PAGE_SIZE && (
-          <div className="pt-2">
-            <Pagination>
-              <PaginationContent>
-                <PaginationItem>
-                  <PaginationPrevious
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.max(1, p - 1));
-                    }}
-                    className={page <= 1 ? 'pointer-events-none opacity-50' : undefined}
-                  />
-                </PaginationItem>
-
-                {Array.from({ length: Math.min(5, totalPages) }).map((_, idx) => {
-                  const p = idx + 1;
-                  return (
-                    <PaginationItem key={p}>
-                      <PaginationLink
-                        href="#"
-                        isActive={p === page}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          setPage(p);
-                        }}
-                      >
-                        {p}
-                      </PaginationLink>
-                    </PaginationItem>
-                  );
-                })}
-
-                <PaginationItem>
-                  <PaginationNext
-                    href="#"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage((p) => Math.min(totalPages, p + 1));
-                    }}
-                    className={page >= totalPages ? 'pointer-events-none opacity-50' : undefined}
-                  />
-                </PaginationItem>
-              </PaginationContent>
-            </Pagination>
-
-            <p className="mt-2 text-xs text-muted-foreground text-center">
-              Page {page} of {totalPages}
-            </p>
-          </div>
-        )}
-      </DialogContent>
+        </DialogContent>
+      </Dialog>
 
       {account && (
         <MarkAsPublishedDialog
@@ -306,6 +361,27 @@ export function AccountVideosModal({ account, open, onOpenChange }: AccountVideo
           onOpenChange={setMarkAsPublishedOpen}
         />
       )}
-    </Dialog>
+
+      {/* Unmark Confirmation Dialog */}
+      <AlertDialog open={!!videoToUnmark} onOpenChange={(open) => !open && setVideoToUnmark(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unmark as Published?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will make the video available for automation again. It may be uploaded to YouTube in future scheduled runs.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleConfirmUnmark}
+              disabled={unmarkMutation.isPending}
+            >
+              {unmarkMutation.isPending ? 'Unmarking...' : 'Unmark Video'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

@@ -21,6 +21,7 @@ export interface ScrapedVideo {
   is_downloaded: boolean;
   is_published: boolean;
   published_at: string | null;
+  published_via: 'automated' | 'manual' | null;
   scraped_at: string;
   created_at: string;
   updated_at: string;
