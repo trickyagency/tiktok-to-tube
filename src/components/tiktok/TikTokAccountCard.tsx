@@ -6,13 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Settings, Heart, CheckCircle2, Clock } from 'lucide-react';
+import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Settings, Heart, CheckCircle2, Clock, CheckSquare } from 'lucide-react';
 import { TikTokAccountWithOwner, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
 import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
 import { AccountYouTubeSettingsDialog } from './AccountYouTubeSettingsDialog';
+import { MarkAsPublishedDialog } from './MarkAsPublishedDialog';
 
 interface TikTokAccountCardProps {
   account: TikTokAccountWithOwner;
@@ -26,6 +27,7 @@ const RESCRAPE_COOLDOWN_DAYS = 15;
 export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, index }: TikTokAccountCardProps) {
   const { isOwner } = useAuth();
   const [youtubeSettingsOpen, setYoutubeSettingsOpen] = useState(false);
+  const [markAsPublishedOpen, setMarkAsPublishedOpen] = useState(false);
   const scrapeVideos = useScrapeVideos();
   const refreshAccount = useRefreshTikTokAccount();
   const deleteAccount = useDeleteTikTokAccount();
@@ -226,6 +228,10 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
                         Set
                       </Badge>
                     )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setMarkAsPublishedOpen(true)}>
+                    <CheckSquare className="h-4 w-4 mr-2" />
+                    Mark as Published
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleSyncProfile} disabled={isRefreshing || isScraping}>
                     {isRefreshing ? (
@@ -439,6 +445,12 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
         account={account}
         open={youtubeSettingsOpen}
         onOpenChange={setYoutubeSettingsOpen}
+      />
+
+      <MarkAsPublishedDialog
+        account={account}
+        open={markAsPublishedOpen}
+        onOpenChange={setMarkAsPublishedOpen}
       />
     </Card>
   );
