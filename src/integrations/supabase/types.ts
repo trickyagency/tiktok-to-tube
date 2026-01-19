@@ -766,6 +766,39 @@ export type Database = {
           },
         ]
       }
+      publish_queue_archive: {
+        Row: {
+          archived_at: string | null
+          error_message: string | null
+          id: string
+          original_created_at: string | null
+          retry_count: number | null
+          scraped_video_id: string | null
+          user_id: string | null
+          youtube_channel_id: string | null
+        }
+        Insert: {
+          archived_at?: string | null
+          error_message?: string | null
+          id: string
+          original_created_at?: string | null
+          retry_count?: number | null
+          scraped_video_id?: string | null
+          user_id?: string | null
+          youtube_channel_id?: string | null
+        }
+        Update: {
+          archived_at?: string | null
+          error_message?: string | null
+          id?: string
+          original_created_at?: string | null
+          retry_count?: number | null
+          scraped_video_id?: string | null
+          user_id?: string | null
+          youtube_channel_id?: string | null
+        }
+        Relationships: []
+      }
       publish_schedules: {
         Row: {
           channel_pool_id: string | null
