@@ -898,6 +898,7 @@ export type Database = {
           is_published: boolean | null
           like_count: number | null
           published_at: string | null
+          published_via: string | null
           scraped_at: string
           share_count: number | null
           storage_path: string | null
@@ -921,6 +922,7 @@ export type Database = {
           is_published?: boolean | null
           like_count?: number | null
           published_at?: string | null
+          published_via?: string | null
           scraped_at?: string
           share_count?: number | null
           storage_path?: string | null
@@ -944,6 +946,7 @@ export type Database = {
           is_published?: boolean | null
           like_count?: number | null
           published_at?: string | null
+          published_via?: string | null
           scraped_at?: string
           share_count?: number | null
           storage_path?: string | null

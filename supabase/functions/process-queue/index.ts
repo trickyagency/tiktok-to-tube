@@ -853,7 +853,11 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     await updateWithRetry(
       supabase,
       'scraped_videos',
-      { is_published: true, published_at: new Date().toISOString() },
+      { 
+        is_published: true, 
+        published_at: new Date().toISOString(),
+        published_via: 'automated'
+      },
       'id',
       currentVideo.id
     );

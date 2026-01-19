@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -12,10 +13,11 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination';
-import { Eye, Heart, MessageCircle, Share2, ExternalLink, Youtube, Upload, Video } from 'lucide-react';
+import { Eye, Heart, MessageCircle, Share2, ExternalLink, Youtube, Upload, Video, CheckSquare } from 'lucide-react';
 import { useScrapedVideos, ScrapedVideo } from '@/hooks/useScrapedVideos';
 import { TikTokAccount } from '@/hooks/useTikTokAccounts';
 import { QueueVideoToYouTube } from '@/components/queue/QueueVideoToYouTube';
+import { MarkAsPublishedDialog } from './MarkAsPublishedDialog';
 
 type VideoFilter = 'all' | 'not_uploaded' | 'uploaded';
 
@@ -137,6 +139,7 @@ function VideoSkeleton() {
 
 export function AccountVideosModal({ account, open, onOpenChange }: AccountVideosModalProps) {
   const { data: videos, isLoading } = useScrapedVideos(account?.id || null);
+  const [markAsPublishedOpen, setMarkAsPublishedOpen] = useState(false);
 
   const PAGE_SIZE = 20;
   const [page, setPage] = useState(1);
@@ -186,12 +189,23 @@ export function AccountVideosModal({ account, open, onOpenChange }: AccountVideo
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh]">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 flex-wrap">
-            Videos from @{account?.username}
-            <Badge variant="secondary">
-              {counts.all} total
-            </Badge>
-          </DialogTitle>
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2 flex-wrap">
+              Videos from @{account?.username}
+              <Badge variant="secondary">
+                {counts.all} total
+              </Badge>
+            </DialogTitle>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setMarkAsPublishedOpen(true)}
+              className="shrink-0"
+            >
+              <CheckSquare className="h-4 w-4 mr-2" />
+              Mark as Published
+            </Button>
+          </div>
         </DialogHeader>
 
         {/* Filter tabs */}
@@ -284,6 +298,14 @@ export function AccountVideosModal({ account, open, onOpenChange }: AccountVideo
           </div>
         )}
       </DialogContent>
+
+      {account && (
+        <MarkAsPublishedDialog
+          account={account as any}
+          open={markAsPublishedOpen}
+          onOpenChange={setMarkAsPublishedOpen}
+        />
+      )}
     </Dialog>
   );
 }
