@@ -2,7 +2,7 @@ import { useEffect, useState, useMemo } from 'react';
 import DashboardLayout from '@/components/dashboard/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle, TrendingUp, ShieldCheck, Activity, RefreshCw } from 'lucide-react';
+import { Youtube, CheckCircle2, Clock, AlertCircle, XCircle, TrendingUp, ShieldCheck, Activity, RefreshCw, Layers, Plus } from 'lucide-react';
 import { AddYouTubeChannelDialog } from '@/components/youtube/AddYouTubeChannelDialog';
 import { YouTubeChannelCard } from '@/components/youtube/YouTubeChannelCard';
 import { YouTubeChannelsTable } from '@/components/youtube/YouTubeChannelsTable';
@@ -10,6 +10,8 @@ import { GoogleCloudSetupGuide } from '@/components/youtube/GoogleCloudSetupGuid
 import { YouTubeFiltersToolbar } from '@/components/youtube/YouTubeFiltersToolbar';
 import { YouTubeEmptyState } from '@/components/youtube/YouTubeEmptyState';
 import { BulkValidateDialog } from '@/components/youtube/BulkValidateDialog';
+import { ChannelPoolDialog } from '@/components/youtube/ChannelPoolDialog';
+import { ChannelPoolCard } from '@/components/youtube/ChannelPoolCard';
 import { 
   YouTubeStatsSkeleton, 
   YouTubeCardsSkeleton, 
@@ -18,6 +20,8 @@ import {
 import { useYouTubeChannels } from '@/hooks/useYouTubeChannels';
 import { useBulkHealthCheck } from '@/hooks/useChannelHealth';
 import { useYouTubeChannelsRealtime } from '@/hooks/useYouTubeChannelsRealtime';
+import { useChannelPools } from '@/hooks/useChannelPools';
+import { usePoolQuotaAggregation } from '@/hooks/usePoolQuotaAggregation';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -34,8 +38,12 @@ const YouTubeChannels = () => {
   const [refreshingChannelId, setRefreshingChannelId] = useState<string | null>(null);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [showValidateDialog, setShowValidateDialog] = useState(false);
+  const [editingPool, setEditingPool] = useState<any>(null);
+  const [showPoolDialog, setShowPoolDialog] = useState(false);
   
   const { checkAllChannels, isChecking: isBulkChecking, progress } = useBulkHealthCheck();
+  const { pools, deletePool } = useChannelPools();
+  const { poolQuotas } = usePoolQuotaAggregation(pools);
 
   // Enable realtime updates for instant status changes
   useYouTubeChannelsRealtime();
@@ -216,7 +224,57 @@ const YouTubeChannels = () => {
       title="YouTube Channels"
       description="Connect and manage your YouTube channels with per-channel OAuth credentials"
     >
-      <div className="space-y-6">
+      <div className="space-y-8">
+        {/* Channel Rotation Pools Section */}
+        {pools.length > 0 && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Layers className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Channel Pools</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Automatic rotation across multiple channels
+                  </p>
+                </div>
+              </div>
+              <ChannelPoolDialog
+                open={showPoolDialog}
+                onOpenChange={setShowPoolDialog}
+                pool={editingPool}
+                trigger={
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Create Pool
+                  </Button>
+                }
+                onSuccess={() => {
+                  setEditingPool(null);
+                  setShowPoolDialog(false);
+                }}
+              />
+            </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {pools.map((pool) => (
+                <ChannelPoolCard
+                  key={pool.id}
+                  pool={pool}
+                  quotaInfo={poolQuotas.find(q => q.poolId === pool.id)}
+                  onEdit={() => {
+                    setEditingPool(pool);
+                    setShowPoolDialog(true);
+                  }}
+                  onDelete={() => deletePool(pool.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Original content */}
+        <div className="space-y-6">
         {/* Setup Guide */}
         <GoogleCloudSetupGuide />
 
