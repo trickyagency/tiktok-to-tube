@@ -593,10 +593,23 @@ serve(async (req) => {
             .eq('id', channelId)
             .single();
           
+          // Fetch linked TikTok username from active publish schedules
+          const { data: scheduleData } = await supabase
+            .from('publish_schedules')
+            .select('tiktok_accounts!inner(username)')
+            .eq('youtube_channel_id', channelId)
+            .eq('is_active', true)
+            .limit(1)
+            .maybeSingle();
+          
+          // Extract TikTok username if found
+          const tiktokUsername = (scheduleData?.tiktok_accounts as any)?.username || null;
+          
           // Send notification - determine issue type based on error
-          const getIssueType = (): 'token_revoked' | 'api_not_enabled' | 'auth_failed' | 'quota_exceeded' => {
+          const getIssueType = (): 'token_revoked' | 'api_not_enabled' | 'auth_failed' | 'quota_exceeded' | 'credentials_invalid' => {
             if (classifiedError.code === 'accessNotConfigured') return 'api_not_enabled';
             if (classifiedError.code === 'quotaExceeded') return 'quota_exceeded';
+            if (classifiedError.code === 'invalid_client') return 'credentials_invalid';
             if (classifiedError.category === 'AUTH') return 'token_revoked';
             return 'auth_failed';
           };
@@ -607,6 +620,7 @@ serve(async (req) => {
                 channelId,
                 userId,
                 channelName: channel?.channel_title || channel?.channel_handle || 'Unknown Channel',
+                tiktokUsername,
                 issueType: getIssueType(),
               },
             });
