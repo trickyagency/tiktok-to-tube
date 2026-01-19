@@ -11,7 +11,8 @@ interface NotificationRequest {
   channelId: string;
   userId: string;
   channelName: string;
-  issueType: 'token_revoked' | 'api_not_enabled' | 'auth_failed' | 'quota_exceeded';
+  tiktokUsername?: string;
+  issueType: 'token_revoked' | 'api_not_enabled' | 'auth_failed' | 'quota_exceeded' | 'credentials_invalid';
 }
 
 interface BrandingConfig {
@@ -121,7 +122,20 @@ function generateEmailWrapper(
   `;
 }
 
-function getIssueDetails(issueType: string, channelName: string, siteUrl: string) {
+// Helper to generate affected accounts section
+function getAffectedAccountsHtml(channelName: string, tiktokUsername?: string): string {
+  return `
+    <div style="background: #f1f5f9; border-radius: 8px; padding: 12px 16px; margin: 20px 0;">
+      <p style="margin: 0 0 8px 0; color: #334155; font-size: 14px; font-weight: 600;">Affected Accounts:</p>
+      <p style="margin: 0 0 4px 0; color: #475569; font-size: 14px;">📺 YouTube: <strong>${channelName}</strong></p>
+      <p style="margin: 0; color: #475569; font-size: 14px;">🎵 TikTok Source: <strong>${tiktokUsername ? '@' + tiktokUsername : 'Not linked'}</strong></p>
+    </div>
+  `;
+}
+
+function getIssueDetails(issueType: string, channelName: string, siteUrl: string, tiktokUsername?: string) {
+  const affectedAccountsHtml = getAffectedAccountsHtml(channelName, tiktokUsername);
+  
   switch (issueType) {
     case 'token_revoked':
       return {
@@ -135,6 +149,8 @@ function getIssueDetails(issueType: string, channelName: string, siteUrl: string
             Your YouTube channel <strong>"${channelName}"</strong> has had its authorization revoked. 
             This can happen when you change your Google password, revoke app permissions, or the refresh token expires.
           </p>
+          
+          ${affectedAccountsHtml}
           
           <div style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
             <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 600;">
@@ -186,6 +202,8 @@ function getIssueDetails(issueType: string, channelName: string, siteUrl: string
             is not enabled in your Google Cloud project.
           </p>
           
+          ${affectedAccountsHtml}
+          
           <div style="background: linear-gradient(135deg, #fed7aa 0%, #fdba74 100%); border-left: 4px solid #ea580c; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
             <p style="margin: 0; color: #9a3412; font-size: 14px; font-weight: 600;">
               🔧 The YouTube Data API v3 must be enabled to upload videos.
@@ -229,6 +247,69 @@ function getIssueDetails(issueType: string, channelName: string, siteUrl: string
           </table>
         `,
       };
+      
+    case 'credentials_invalid':
+      return {
+        headerIcon: '🔑',
+        headerTitle: 'Google Cloud Credentials Invalid',
+        headerGradient: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 50%, #991b1b 100%)',
+        subject: `Action Required: YouTube Channel "${channelName}" Credentials Invalid`,
+        preheader: `Your Google Cloud OAuth credentials are invalid or deleted. Update them to continue uploading.`,
+        content: `
+          <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
+            We couldn't authenticate your YouTube channel <strong>"${channelName}"</strong> because the Google Cloud 
+            OAuth credentials (Client ID or Client Secret) are invalid or have been deleted.
+          </p>
+          
+          ${affectedAccountsHtml}
+          
+          <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-left: 4px solid #dc2626; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
+            <p style="margin: 0; color: #991b1b; font-size: 14px; font-weight: 600;">
+              🔑 Your OAuth Client ID or Client Secret is incorrect or no longer exists.
+            </p>
+          </div>
+          
+          <p style="margin: 24px 0 16px 0; color: #475569; font-size: 15px; font-weight: 600;">
+            How to fix this:
+          </p>
+          
+          <div style="background-color: #f8fafc; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
+              <span style="background: #dc2626; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; margin-right: 12px; flex-shrink: 0;">1</span>
+              <span style="color: #475569; font-size: 14px; line-height: 1.5;">Go to <a href="https://console.cloud.google.com/apis/credentials" style="color: #3b82f6;">Google Cloud Console → APIs & Services → Credentials</a></span>
+            </div>
+            <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
+              <span style="background: #dc2626; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; margin-right: 12px; flex-shrink: 0;">2</span>
+              <span style="color: #475569; font-size: 14px; line-height: 1.5;">Verify your OAuth 2.0 Client ID exists and note the Client ID and Client Secret</span>
+            </div>
+            <div style="display: flex; align-items: flex-start; margin-bottom: 12px;">
+              <span style="background: #dc2626; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; margin-right: 12px; flex-shrink: 0;">3</span>
+              <span style="color: #475569; font-size: 14px; line-height: 1.5;">Go to YouTube Channels in your dashboard and click "Edit Credentials"</span>
+            </div>
+            <div style="display: flex; align-items: flex-start;">
+              <span style="background: #dc2626; color: white; width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; margin-right: 12px; flex-shrink: 0;">4</span>
+              <span style="color: #475569; font-size: 14px; line-height: 1.5;">Update the credentials and click "Re-authorize"</span>
+            </div>
+          </div>
+          
+          <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+            <tr>
+              <td style="text-align: center; padding-bottom: 12px;">
+                <a href="https://console.cloud.google.com/apis/credentials" style="display: inline-block; background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 14px rgba(220, 38, 38, 0.4);">
+                  Open Google Cloud Console →
+                </a>
+              </td>
+            </tr>
+            <tr>
+              <td style="text-align: center;">
+                <a href="${siteUrl}/dashboard/youtube" style="display: inline-block; background: white; border: 2px solid #e2e8f0; color: #475569; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-weight: 600; font-size: 14px;">
+                  Go to YouTube Channels
+                </a>
+              </td>
+            </tr>
+          </table>
+        `,
+      };
 
     case 'auth_failed':
     default:
@@ -242,6 +323,8 @@ function getIssueDetails(issueType: string, channelName: string, siteUrl: string
           <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
             We encountered an issue while trying to authorize your YouTube channel <strong>"${channelName}"</strong>.
           </p>
+          
+          ${affectedAccountsHtml}
           
           <div style="background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%); border-left: 4px solid #ef4444; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
             <p style="margin: 0; color: #991b1b; font-size: 14px; font-weight: 600;">
@@ -291,6 +374,8 @@ function getIssueDetails(issueType: string, channelName: string, siteUrl: string
           <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.6;">
             The YouTube API quota for channel <strong>"${channelName}"</strong> has been exceeded.
           </p>
+          
+          ${affectedAccountsHtml}
           
           <div style="background: linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%); border-left: 4px solid #8b5cf6; padding: 16px 20px; border-radius: 8px; margin: 24px 0;">
             <p style="margin: 0; color: #5b21b6; font-size: 14px; font-weight: 600;">
@@ -357,9 +442,9 @@ const handler = async (req: Request): Promise<Response> => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { channelId, userId, channelName, issueType }: NotificationRequest = await req.json();
+    const { channelId, userId, channelName, tiktokUsername, issueType }: NotificationRequest = await req.json();
 
-    console.log(`Processing ${issueType} notification for channel: ${channelName}, user: ${userId}`);
+    console.log(`Processing ${issueType} notification for channel: ${channelName}, tiktok: ${tiktokUsername || 'none'}, user: ${userId}`);
 
     // Fetch user's email from profiles
     const { data: profile, error: profileError } = await supabase
@@ -382,8 +467,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Get site URL for links
     const siteUrl = Deno.env.get("SITE_URL") || 'https://tik-to-tube-sync.lovable.app';
 
-    // Get issue-specific email content
-    const issueDetails = getIssueDetails(issueType, channelName, siteUrl);
+    // Get issue-specific email content (now with tiktokUsername)
+    const issueDetails = getIssueDetails(issueType, channelName, siteUrl, tiktokUsername);
 
     // Generate the full email HTML
     const emailHtml = generateEmailWrapper(
