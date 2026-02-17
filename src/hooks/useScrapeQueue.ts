@@ -292,3 +292,41 @@ export function useCancelPendingItems() {
     },
   });
 }
+
+// Hook to force clear stuck processing items (older than 30 minutes)
+export function useClearStuckItems() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      if (!user) throw new Error('Not authenticated');
+
+      const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+
+      const { error } = await supabase
+        .from('scrape_queue')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('status', 'processing')
+        .lt('started_at', thirtyMinutesAgo);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scrape-queue'] });
+      queryClient.invalidateQueries({ queryKey: ['tiktok-accounts'] });
+      toast({
+        title: 'Stuck items cleared',
+        description: 'Stale processing items have been removed.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Failed to clear stuck items',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+}

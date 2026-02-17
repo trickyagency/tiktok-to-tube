@@ -15,7 +15,8 @@ import {
   useScrapeQueueStats, 
   useRetryFailedItems, 
   useClearCompletedItems,
-  useCancelPendingItems 
+  useCancelPendingItems,
+  useClearStuckItems 
 } from '@/hooks/useScrapeQueue';
 
 export function ScrapeQueueProgress() {
@@ -24,11 +25,19 @@ export function ScrapeQueueProgress() {
   const retryFailed = useRetryFailedItems();
   const clearCompleted = useClearCompletedItems();
   const cancelPending = useCancelPendingItems();
+  const clearStuck = useClearStuckItems();
 
   // Don't show if no queue items
   if (isLoading || !queue || queue.length === 0) {
     return null;
   }
+
+  // Check for stuck processing items (older than 30 minutes)
+  const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
+  const stuckProcessingCount = queue.filter(
+    q => q.status === 'processing' && q.started_at && new Date(q.started_at) < thirtyMinutesAgo
+  ).length;
+  const hasStuckItems = stuckProcessingCount > 0 && stats.pending === 0;
 
   const activeItems = stats.pending + stats.processing;
   const totalProcessed = stats.completed + stats.failed;
@@ -114,7 +123,22 @@ export function ScrapeQueueProgress() {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          {hasStuckItems && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => clearStuck.mutate()}
+              disabled={clearStuck.isPending}
+            >
+              {clearStuck.isPending ? (
+                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-1" />
+              )}
+              Force Clear Stuck ({stuckProcessingCount})
+            </Button>
+          )}
           {stats.failed > 0 && (
             <Button
               variant="outline"
