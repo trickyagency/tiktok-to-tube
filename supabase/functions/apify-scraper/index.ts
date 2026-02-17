@@ -28,7 +28,7 @@ async function getApifyApiKey(supabase: any): Promise<string | null> {
 async function startActorRunWithWebhook(
   apiKey: string,
   username: string
-): Promise<{ runId: string } | null> {
+): Promise<{ runId: string } | { error: string }> {
   try {
     const response = await fetch('https://api.apify.com/v2/acts/tKV6oSrYXiKNXXNy6/runs', {
       method: 'POST',
@@ -44,7 +44,20 @@ async function startActorRunWithWebhook(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Failed to start Apify actor:', response.status, errorText);
-      return null;
+      
+      // Parse Apify error for a better user message
+      try {
+        const errorData = JSON.parse(errorText);
+        const apifyType = errorData?.error?.type;
+        if (apifyType === 'actor-memory-limit-exceeded') {
+          return { error: 'Apify memory limit exceeded. Too many scraping jobs are running. Please wait for current jobs to finish and try again.' };
+        }
+        if (response.status === 402) {
+          return { error: `Apify account limit reached: ${errorData?.error?.message || 'Please check your Apify subscription.'}` };
+        }
+      } catch (_) { /* ignore parse error */ }
+      
+      return { error: `Apify API error (${response.status}). Please check your API key and Actor subscription.` };
     }
 
     const data = await response.json();
@@ -52,13 +65,12 @@ async function startActorRunWithWebhook(
 
     if (!runId) {
       console.error('Apify actor started but no runId returned:', JSON.stringify(data));
-      return null;
+      return { error: 'Apify actor started but no run ID was returned.' };
     }
 
     console.log('Apify actor started:', runId);
 
     // Register an ad-hoc webhook scoped to THIS run.
-    // Apify does not support /actor-runs/{runId}/webhooks; webhooks are created via /v2/webhooks.
     const webhookPayload = {
       isAdHoc: true,
       requestUrl: WEBHOOK_URL,
@@ -71,7 +83,6 @@ async function startActorRunWithWebhook(
       condition: {
         actorRunId: runId,
       },
-      // Provide a consistent payload shape our Supabase webhook expects.
       shouldInterpolateStrings: true,
       payloadTemplate:
         '{"eventType":"{{eventType}}","eventData":{{eventData}},"resource":{{resource}}}',
@@ -97,7 +108,7 @@ async function startActorRunWithWebhook(
     return { runId };
   } catch (error) {
     console.error('Error starting Apify actor:', error);
-    return null;
+    return { error: 'Unexpected error starting Apify actor.' };
   }
 }
 
@@ -236,10 +247,10 @@ Deno.serve(async (req) => {
 
     // Start Apify actor with webhook
     const runResult = await startActorRunWithWebhook(apiKey, cleanUsername);
-    if (!runResult) {
+    if ('error' in runResult) {
       await updateAccountStatus(supabase, account.id, 'failed');
       return new Response(
-        JSON.stringify({ error: 'Failed to start TikTok scraper. Please check your Apify API key and Actor subscription.' }),
+        JSON.stringify({ error: runResult.error }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
