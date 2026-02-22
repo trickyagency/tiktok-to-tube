@@ -46,7 +46,7 @@ export function ScrapeQueueProgress() {
     : 0;
 
   // Calculate estimated time remaining
-  const estimatedMinutes = Math.ceil(activeItems * 0.25); // ~15 seconds per item
+  const estimatedMinutes = Math.ceil((activeItems / 5) * 0.25); // ~15s per batch of 5 in parallel
 
   return (
     <Card className="border-primary/20 bg-primary/5">
