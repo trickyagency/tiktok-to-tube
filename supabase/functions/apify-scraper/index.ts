@@ -235,7 +235,28 @@ Deno.serve(async (req) => {
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
       console.error('TikAPI error:', apiResponse.status, errorText);
-      await updateAccountStatus(supabase, account.id, 'failed');
+      
+      // Detect deleted/not found accounts from API error
+      const errorLower = errorText.toLowerCase();
+      const isDeletedOrNotFound = apiResponse.status === 404 || 
+        errorLower.includes('not found') || 
+        errorLower.includes('deleted') || 
+        errorLower.includes('user not found') ||
+        errorLower.includes('account not found') ||
+        errorLower.includes('doesn\'t exist') ||
+        errorLower.includes('does not exist');
+      
+      if (isDeletedOrNotFound) {
+        console.log(`Account ${cleanUsername} detected as deleted/not found`);
+        await supabase.from('tiktok_accounts').update({
+          account_status: 'deleted',
+          scrape_status: 'failed',
+          updated_at: new Date().toISOString(),
+        }).eq('id', account.id);
+      } else {
+        await updateAccountStatus(supabase, account.id, 'failed');
+      }
+      
       return new Response(
         JSON.stringify({ error: `Scraper API error (${apiResponse.status}): ${errorText}` }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -329,9 +350,10 @@ Deno.serve(async (req) => {
     // Extract profile data from response
     const profileData = extractProfileData(responseData);
 
-    // Mark as completed
+    // Mark as completed - reset account_status to active on successful scrape
     await supabase.from('tiktok_accounts').update({
       scrape_status: 'completed',
+      account_status: 'active',
       last_scraped_at: new Date().toISOString(),
       video_count: mappedVideos.length,
       scrape_progress_current: newVideos.length,

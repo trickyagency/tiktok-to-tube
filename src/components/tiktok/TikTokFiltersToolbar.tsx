@@ -1,4 +1,4 @@
-import { Search, LayoutGrid, List, Filter, ArrowUpDown } from "lucide-react";
+import { Search, LayoutGrid, List, Filter, ArrowUpDown, UserX } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +29,8 @@ interface TikTokFiltersToolbarProps {
   dateFrom?: Date;
   dateTo?: Date;
   onDateChange: (range: { from?: Date; to?: Date }) => void;
+  accountStatusFilter?: string;
+  onAccountStatusFilterChange?: (value: string) => void;
 }
 
 export const TikTokFiltersToolbar = ({
@@ -49,13 +51,16 @@ export const TikTokFiltersToolbar = ({
   dateFrom,
   dateTo,
   onDateChange,
+  accountStatusFilter,
+  onAccountStatusFilterChange,
 }: TikTokFiltersToolbarProps) => {
-  const hasActiveFilters = searchQuery || statusFilter !== "all" || ownerFilter || dateFrom || dateTo;
+  const hasActiveFilters = searchQuery || statusFilter !== "all" || ownerFilter || dateFrom || dateTo || (accountStatusFilter && accountStatusFilter !== "all");
 
   const clearFilters = () => {
     onSearchChange("");
     onStatusFilterChange("all");
     if (onOwnerFilterChange) onOwnerFilterChange("");
+    if (onAccountStatusFilterChange) onAccountStatusFilterChange("all");
     onDateChange({ from: undefined, to: undefined });
   };
 
@@ -91,6 +96,22 @@ export const TikTokFiltersToolbar = ({
               <SelectItem value="private">Private</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Account Status Filter */}
+          {onAccountStatusFilterChange && (
+            <Select value={accountStatusFilter || "all"} onValueChange={onAccountStatusFilterChange}>
+              <SelectTrigger className="w-[150px] bg-background/50 border-border/50">
+                <UserX className="h-4 w-4 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="Account Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Accounts</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="private">Private</SelectItem>
+                <SelectItem value="deleted">Deleted</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
 
           {/* Date Filter */}
           <DateRangePicker

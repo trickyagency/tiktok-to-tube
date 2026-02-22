@@ -121,6 +121,15 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
         tooltip: 'Videos are being imported'
       };
     }
+    if (isAccountUnavailable) {
+      return {
+        label: account.account_status === 'private' ? 'Account Private' : 'Account Deleted',
+        icon: <UserX className="h-4 w-4 mr-2" />,
+        variant: 'outline' as const,
+        disabled: true,
+        tooltip: account.account_status === 'private' ? 'This account is private. Scraping is disabled.' : 'This TikTok account has been deleted. Scraping is disabled.'
+      };
+    }
     if (isFailed) {
       return {
         label: 'Retry Scrape',
@@ -161,9 +170,29 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
   const buttonConfig = getButtonConfig();
 
   return (
-    <Card className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 border-border/50 ${isScraping ? 'ring-2 ring-primary/30 shadow-lg shadow-primary/10' : ''} ${isAccountUnavailable ? 'opacity-80' : ''}`}>
+    <Card className={`group relative overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 border-border/50 ${isScraping ? 'ring-2 ring-primary/30 shadow-lg shadow-primary/10' : ''} ${isAccountUnavailable ? 'opacity-80' : ''} ${(account.account_status === 'deleted' || account.account_status === 'not_found') ? 'border-destructive/50' : ''}`}>
       {/* Health indicator stripe */}
       <div className={`absolute top-0 left-0 right-0 h-1 ${healthStatus.color} transition-colors`} />
+      
+      {/* Deleted account overlay banner */}
+      {(account.account_status === 'deleted' || account.account_status === 'not_found') && (
+        <div className="absolute top-1 left-0 right-0 z-10 flex justify-center pointer-events-none">
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="pointer-events-auto bg-destructive text-destructive-foreground text-xs font-semibold px-3 py-1 rounded-b-md flex items-center gap-1.5 shadow-md">
+                  <UserX className="h-3.5 w-3.5" />
+                  TikTok Account Deleted
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>This TikTok account no longer exists or has been removed.</p>
+                <p className="text-xs text-muted-foreground mt-1">Scraping is disabled. Use "Sync Profile" to re-check.</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+      )}
       
       {/* Index number badge */}
       {typeof index === 'number' && (
@@ -197,10 +226,10 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
             {/* Username and badges */}
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="font-semibold text-base truncate leading-tight">
+                <h3 className={`font-semibold text-base truncate leading-tight ${isAccountUnavailable ? 'line-through text-muted-foreground' : ''}`}>
                   {account.display_name || account.username}
                 </h3>
-                <p className="text-sm text-muted-foreground">@{account.username}</p>
+                <p className={`text-sm text-muted-foreground ${isAccountUnavailable ? 'line-through' : ''}`}>@{account.username}</p>
               </div>
               
               {/* Actions menu */}

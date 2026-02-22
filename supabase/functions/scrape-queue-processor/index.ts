@@ -107,6 +107,26 @@ async function processQueueItem(
 
     if (!apiResponse.ok) {
       const errorText = await apiResponse.text();
+      
+      // Detect deleted/not found accounts
+      const errorLower = errorText.toLowerCase();
+      const isDeletedOrNotFound = apiResponse.status === 404 || 
+        errorLower.includes('not found') || 
+        errorLower.includes('deleted') || 
+        errorLower.includes('user not found') ||
+        errorLower.includes('account not found') ||
+        errorLower.includes('doesn\'t exist') ||
+        errorLower.includes('does not exist');
+      
+      if (isDeletedOrNotFound) {
+        console.log(`Account ${account.username} detected as deleted/not found`);
+        await supabase.from('tiktok_accounts').update({
+          account_status: 'deleted',
+          scrape_status: 'failed',
+          updated_at: new Date().toISOString(),
+        }).eq('id', tiktok_account_id);
+      }
+      
       throw new Error(`Scraper API error (${apiResponse.status}): ${errorText}`);
     }
 
@@ -160,9 +180,10 @@ async function processQueueItem(
       }).eq('id', tiktok_account_id);
     }
 
-    // Mark completed
+    // Mark completed - reset account_status to active on successful scrape
     await supabase.from('tiktok_accounts').update({
       scrape_status: 'completed',
+      account_status: 'active',
       last_scraped_at: new Date().toISOString(),
       video_count: mappedVideos.length,
       scrape_progress_current: newVideos.length,

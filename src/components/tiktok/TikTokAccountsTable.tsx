@@ -351,9 +351,9 @@ export function TikTokAccountsTable({
           </TableHeader>
           <TableBody>
           {paginatedAccounts.map((account, index) => (
-              <TableRow 
+            <TableRow 
                 key={account.id} 
-                className={`group transition-colors border-border/30 ${selectedIds.has(account.id) ? 'bg-primary/5' : ''}`}
+                className={`group transition-colors border-border/30 ${selectedIds.has(account.id) ? 'bg-primary/5' : ''} ${(account.account_status === 'deleted' || account.account_status === 'not_found') ? 'bg-destructive/5 hover:bg-destructive/10' : ''}`}
               >
                 <TableCell>
                   <Checkbox 
@@ -379,7 +379,7 @@ export function TikTokAccountsTable({
                 <TableCell className="font-medium">
                   <button 
                     onClick={() => window.open(`https://www.tiktok.com/@${account.username}`, '_blank')}
-                    className="hover:text-primary transition-colors flex items-center gap-1 group/link"
+                    className={`hover:text-primary transition-colors flex items-center gap-1 group/link ${(account.account_status === 'deleted' || account.account_status === 'not_found') ? 'line-through text-muted-foreground' : ''}`}
                   >
                     @{account.username}
                     <ExternalLink className="h-3 w-3 opacity-0 group-hover/link:opacity-100 transition-opacity" />
@@ -432,7 +432,16 @@ export function TikTokAccountsTable({
                         <Eye className="h-4 w-4 mr-2" />
                         View Videos
                       </DropdownMenuItem>
-                      {(() => {
+                    {(() => {
+                        const isDeleted = account.account_status === 'deleted' || account.account_status === 'not_found';
+                        if (isDeleted) {
+                          return (
+                            <DropdownMenuItem disabled className="text-muted-foreground">
+                              <UserX className="h-4 w-4 mr-2" />
+                              Account Deleted
+                            </DropdownMenuItem>
+                          );
+                        }
                         const scrapeState = getScrapeButtonState(account, isScraping === account.id);
                         return scrapeState.showButton ? (
                           <DropdownMenuItem 
