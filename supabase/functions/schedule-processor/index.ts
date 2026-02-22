@@ -31,13 +31,34 @@ function getCurrentTimeInTimezone(timezone: string): { hours: number; minutes: n
   return { hours, minutes, timeString };
 }
 
-// Check if current time matches any publish time
-function isTimeToPublish(publishTimes: string[], timezone: string): boolean {
+// Convert "HH:MM" to total minutes since midnight
+function timeToMinutes(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
+}
+
+// Check if current time is within ±2 minutes of any publish time
+function isTimeToPublish(publishTimes: string[], timezone: string): { match: boolean; matchedTime?: string } {
   const { timeString } = getCurrentTimeInTimezone(timezone);
-  console.log(`Current time in ${timezone}: ${timeString}`);
+  const currentMinutes = timeToMinutes(timeString);
+  console.log(`Current time in ${timezone}: ${timeString} (${currentMinutes} min)`);
   console.log(`Publish times: ${JSON.stringify(publishTimes)}`);
   
-  return publishTimes.some(time => time === timeString);
+  const TIME_WINDOW = 2; // ±2 minutes tolerance
+  
+  for (const time of publishTimes) {
+    const publishMinutes = timeToMinutes(time);
+    let diff = Math.abs(currentMinutes - publishMinutes);
+    // Handle midnight wraparound (e.g., 23:59 vs 00:01)
+    if (diff > 720) diff = 1440 - diff;
+    
+    if (diff <= TIME_WINDOW) {
+      console.log(`Time match: ${timeString} is within ±${TIME_WINDOW}min of ${time} (diff=${diff})`);
+      return { match: true, matchedTime: time };
+    }
+  }
+  
+  return { match: false };
 }
 
 // Check quota availability for a channel BEFORE queuing
@@ -345,8 +366,9 @@ serve(async (req) => {
       
       const timezone = schedule.timezone || 'UTC';
 
-      // Check if current time matches any publish time
-      if (!isTimeToPublish(publishTimes, timezone)) {
+      // Check if current time is within ±2 minutes of any publish time
+      const timeCheck = isTimeToPublish(publishTimes, timezone);
+      if (!timeCheck.match) {
         console.log(`Schedule "${schedule.schedule_name}" - not time to publish`);
         scheduleDebug.status = 'skipped';
         scheduleDebug.reason = 'Not time to publish';
@@ -355,7 +377,30 @@ serve(async (req) => {
         continue;
       }
 
-      console.log(`Schedule "${schedule.schedule_name}" - TIME TO PUBLISH!`);
+      console.log(`Schedule "${schedule.schedule_name}" - TIME TO PUBLISH (matched time: ${timeCheck.matchedTime})!`);
+
+      // Deduplication: check if this schedule already has a queued/processing/published entry in the last 5 minutes
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const { data: recentQueueEntry, error: dedupError } = await supabase
+        .from('publish_queue')
+        .select('id, status, created_at')
+        .eq('schedule_id', schedule.id)
+        .gte('created_at', fiveMinutesAgo)
+        .in('status', ['queued', 'processing', 'published'])
+        .maybeSingle();
+
+      if (dedupError) {
+        console.error(`Dedup check error for schedule "${schedule.schedule_name}":`, dedupError);
+      }
+
+      if (recentQueueEntry) {
+        console.log(`Schedule "${schedule.schedule_name}" - already queued at ${recentQueueEntry.created_at} (dedup), skipping`);
+        scheduleDebug.status = 'skipped';
+        scheduleDebug.reason = `Dedup: already queued at ${recentQueueEntry.created_at}`;
+        debugLog.push(scheduleDebug);
+        skipped++;
+        continue;
+      }
 
       // *** SMART CHANNEL SELECTION ***
       let targetChannelId: string;
