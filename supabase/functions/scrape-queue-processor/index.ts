@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
       .lte('scheduled_at', new Date().toISOString())
       .order('priority', { ascending: false })
       .order('scheduled_at', { ascending: true })
-      .limit(1); // Process one at a time due to long API response times
+      .limit(5); // Process up to 5 in parallel
 
     if (fetchError) throw fetchError;
 
@@ -250,18 +250,27 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Process the single item
-    const result = await processQueueItem(supabase, apiKey, queueItems[0]);
+    console.log(`Processing ${queueItems.length} queue items in parallel`);
+
+    // Process all items in parallel
+    const results = await Promise.allSettled(
+      queueItems.map((item) => processQueueItem(supabase, apiKey, item))
+    );
+
+    const succeeded = results.filter(
+      (r) => r.status === 'fulfilled' && r.value.success
+    ).length;
+    const failed = results.length - succeeded;
 
     const duration = Date.now() - startTime;
-    console.log(`Processing complete. Success: ${result.success}, Duration: ${duration}ms`);
+    console.log(`Processing complete. ${succeeded} succeeded, ${failed} failed, Duration: ${duration}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        processed: 1,
-        succeeded: result.success ? 1 : 0,
-        failed: result.success ? 0 : 1,
+        processed: queueItems.length,
+        succeeded,
+        failed,
         durationMs: duration,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
