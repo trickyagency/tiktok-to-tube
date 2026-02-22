@@ -12,7 +12,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useEmailPreferences } from '@/hooks/useEmailPreferences';
-import { useTestApifyKey, ApifyStatus } from '@/hooks/useApifyStatus';
+import { useTestApifyKey } from '@/hooks/useApifyStatus';
 import { toast } from 'sonner';
 import EmailPreview from '@/components/settings/EmailPreview';
 import SecuritySettings from '@/components/settings/SecuritySettings';
@@ -35,12 +35,9 @@ const Settings = () => {
   const { preferences, updatePreference, isLoading: preferencesLoading } = useEmailPreferences();
   
   
-  const [apifyApiKey, setApifyApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
   const [isTestingKey, setIsTestingKey] = useState(false);
-  const [keyTestResult, setKeyTestResult] = useState<{ status: ApifyStatus; message: string } | null>(null);
+  const [keyTestResult, setKeyTestResult] = useState<{ status: string; message: string } | null>(null);
   const { testKey } = useTestApifyKey();
-  const [hasSavedKey, setHasSavedKey] = useState(false);
   
   // Profile state
   const [fullName, setFullName] = useState('');
@@ -95,14 +92,6 @@ const Settings = () => {
 
   useEffect(() => {
     if (isOwner && !isLoading) {
-      const savedKey = getSetting('apify_api_key');
-      if (savedKey) {
-        setApifyApiKey(savedKey);
-        setHasSavedKey(true);
-      } else {
-        setHasSavedKey(false);
-      }
-      
       // Load email branding settings
       setPlatformName(getSetting('EMAIL_PLATFORM_NAME') || 'RepostFlow');
       setSenderName(getSetting('EMAIL_SENDER_NAME') || 'RepostFlow');
@@ -113,36 +102,19 @@ const Settings = () => {
     }
   }, [isOwner, isLoading, getSetting]);
 
-  const handleSaveApiKey = () => {
-    if (apifyApiKey.trim()) {
-      updateSetting('apify_api_key', apifyApiKey.trim());
-      setKeyTestResult(null);
-      setHasSavedKey(true);
-    }
-  };
-
-  const handleDeleteApiKey = () => {
-    deleteSetting('apify_api_key');
-    setApifyApiKey('');
-    setKeyTestResult(null);
-    setHasSavedKey(false);
-  };
-
   const handleTestApiKey = async () => {
     setIsTestingKey(true);
     setKeyTestResult(null);
     try {
-      // Test the key currently in the input field
-      const result = await testKey(apifyApiKey.trim() || undefined);
+      const result = await testKey();
       setKeyTestResult({ status: result.status, message: result.message });
-      
       if (result.valid) {
         toast.success(result.message);
       } else {
         toast.error(result.message, { description: result.details });
       }
     } catch (error) {
-      const message = 'Failed to test API key';
+      const message = 'Failed to check scraper status';
       setKeyTestResult({ status: 'error', message });
       toast.error(message);
     } finally {
@@ -546,101 +518,51 @@ const Settings = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Key className="h-5 w-5 text-primary" />
-                  API Keys
+                  Scraper Status
                   <span className="text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full ml-2">
                     Owner Only
                   </span>
                 </CardTitle>
                 <CardDescription>
-                  Manage platform API keys for external integrations
+                  TikTok video scraper connection status
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-3">
-                  <Label htmlFor="scraper-key">Scraper API Key</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input 
-                        id="scraper-key" 
-                        type={showApiKey ? 'text' : 'password'}
-                        value={apifyApiKey}
-                        onChange={(e) => {
-                          setApifyApiKey(e.target.value);
-                          setKeyTestResult(null); // Clear result when key changes
-                        }}
-                        placeholder="Enter your scraper API key"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      >
-                        {showApiKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      onClick={handleTestApiKey} 
-                      disabled={isTestingKey || !apifyApiKey.trim()}
-                    >
-                      {isTestingKey ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Testing...
-                        </>
-                      ) : (
-                        'Test'
-                      )}
-                    </Button>
-                    <Button onClick={handleSaveApiKey} disabled={isUpdating || !apifyApiKey.trim()}>
-                      {isUpdating ? 'Saving...' : 'Save'}
-                    </Button>
-                    {hasSavedKey && (
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="destructive" size="icon" disabled={isDeleting}>
-                            {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete API Key?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will remove the scraper API key. Video scraping features will be disabled until a new key is configured.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDeleteApiKey} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleTestApiKey} 
+                    disabled={isTestingKey}
+                  >
+                    {isTestingKey ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Checking...
+                      </>
+                    ) : (
+                      'Check Scraper Status'
                     )}
-                  </div>
-                  
-                  {/* Test Result Display */}
-                  {keyTestResult && (
-                    <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${
-                      keyTestResult.status === 'valid' 
-                        ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
-                        : 'bg-destructive/10 text-destructive'
-                    }`}>
-                      {keyTestResult.status === 'valid' ? (
-                        <CheckCircle2 className="h-4 w-4" />
-                      ) : (
-                        <AlertTriangle className="h-4 w-4" />
-                      )}
-                      {keyTestResult.message}
-                    </div>
-                  )}
-                  
-                  <p className="text-xs text-muted-foreground">
-                    Contact the platform administrator for the scraper API key.
-                  </p>
+                  </Button>
                 </div>
+                
+                {keyTestResult && (
+                  <div className={`flex items-center gap-2 text-sm p-2 rounded-md ${
+                    keyTestResult.status === 'valid' 
+                      ? 'bg-green-500/10 text-green-600 dark:text-green-400' 
+                      : 'bg-destructive/10 text-destructive'
+                  }`}>
+                    {keyTestResult.status === 'valid' ? (
+                      <CheckCircle2 className="h-4 w-4" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4" />
+                    )}
+                    {keyTestResult.message}
+                  </div>
+                )}
+                
+                <p className="text-xs text-muted-foreground">
+                  The scraper API key is managed as a server secret. Contact the platform administrator to update it.
+                </p>
               </CardContent>
             </Card>
 

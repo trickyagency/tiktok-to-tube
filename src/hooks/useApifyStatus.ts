@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export type ApifyStatus = 'valid' | 'invalid' | 'expired' | 'not_configured' | 'error' | 'loading';
+export type ApifyStatus = 'valid' | 'invalid' | 'not_configured' | 'error' | 'loading';
 
 interface ApifyValidationResult {
   valid: boolean;
@@ -10,20 +10,19 @@ interface ApifyValidationResult {
   details?: string;
 }
 
+// This hook checks whether the scraper is configured via the validate edge function
 export function useApifyStatus() {
   return useQuery({
     queryKey: ['apify-status'],
     queryFn: async (): Promise<boolean> => {
-      const { data, error } = await supabase.rpc('is_apify_configured');
-      
+      const { data, error } = await supabase.functions.invoke('apify-validate');
       if (error) {
-        console.error('Error checking Apify status:', error);
+        console.error('Error checking scraper status:', error);
         return false;
       }
-      
-      return data as boolean;
+      return data?.valid === true;
     },
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 1000 * 60 * 5,
   });
 }
 
@@ -32,40 +31,33 @@ export function useApifyValidation() {
     queryKey: ['apify-validation'],
     queryFn: async (): Promise<ApifyValidationResult> => {
       const { data, error } = await supabase.functions.invoke('apify-validate');
-      
       if (error) {
-        console.error('Error validating Apify key:', error);
         return {
           valid: false,
           status: 'error',
-          message: 'Failed to validate API key',
+          message: 'Failed to check scraper status',
           details: error.message,
         };
       }
-      
       return data as ApifyValidationResult;
     },
-    staleTime: 1000 * 60 * 5, // Cache for 5 minutes
+    staleTime: 1000 * 60 * 5,
     retry: 1,
   });
 }
 
+// Kept for backward compat but no longer used for testing arbitrary keys
 export function useTestApifyKey() {
-  const testKey = async (apiKey?: string): Promise<ApifyValidationResult> => {
-    const { data, error } = await supabase.functions.invoke('apify-validate', {
-      body: apiKey ? { apiKey } : {},
-    });
-    
+  const testKey = async (): Promise<ApifyValidationResult> => {
+    const { data, error } = await supabase.functions.invoke('apify-validate');
     if (error) {
-      console.error('Error testing Apify key:', error);
       return {
         valid: false,
         status: 'error',
-        message: 'Failed to test API key',
+        message: 'Failed to check scraper status',
         details: error.message,
       };
     }
-    
     return data as ApifyValidationResult;
   };
 
