@@ -1,39 +1,43 @@
 
 
-## Optimize: Parallel Scraping in Queue Processor
-
-Since your TikAPI can handle unlimited concurrent requests, we'll update the `scrape-queue-processor` to process multiple accounts in parallel instead of one at a time.
+## Show "TikTok User Deleted" Status More Prominently
 
 ### What Changes
 
-**`supabase/functions/scrape-queue-processor/index.ts`**
-- Increase the queue fetch limit from 1 to 5 (or 10) pending items per run
-- Use `Promise.allSettled()` to process all fetched items concurrently -- each account's API call runs in parallel
-- All scrapes fire simultaneously, so a batch of 5 accounts finishes in roughly the time of the slowest one (instead of 5x sequential)
-- Return aggregated results (total processed, succeeded, failed)
+**1. Detect deleted accounts in the TikAPI scraper**
+- In `supabase/functions/apify-scraper/index.ts`: When the API returns an error or empty result indicating the account doesn't exist, update `account_status` to `'deleted'` or `'not_found'` on the `tiktok_accounts` table
+- Similarly update `supabase/functions/scrape-queue-processor/index.ts`
 
-**`supabase/functions/apify-scraper/index.ts`**
-- No changes needed -- single-account scraping (triggered from UI "Scrape Now" button) already works fine
+**2. Make the "Deleted" status more prominent on TikTok Account Cards**
+- In `src/components/tiktok/TikTokAccountCard.tsx`:
+  - Add a red overlay banner across the card saying "TikTok Account Deleted" with UserX icon
+  - Disable the Scrape button for deleted accounts (no point scraping a deleted user)
+  - Keep the grayscale avatar (already there) but add a strikethrough on the username
+  - Show a tooltip explaining what "deleted" means
+
+**3. Make the "Deleted" status visible in Table view**
+- In `src/components/tiktok/TikTokAccountsTable.tsx`:
+  - The "Deleted" badge already shows, but add a red row background tint for deleted accounts so they stand out
+  - Disable scrape actions for deleted accounts in the dropdown menu
+
+**4. Add a filter option to show/hide deleted accounts**
+- In `src/components/tiktok/TikTokFiltersToolbar.tsx`: Add an "Account Status" filter dropdown with options: All, Active, Private, Deleted -- so users can quickly find deleted accounts or hide them
 
 ### Technical Details
 
-Current flow:
-```text
-Fetch 1 pending item --> Process it --> Return result
-```
-
-New flow:
-```text
-Fetch up to 5 pending items --> Process ALL in parallel (Promise.allSettled) --> Return aggregated results
-```
-
-The edge function timeout (~290s) still applies to the entire function execution. Since all API calls run in parallel, the total time is limited by the slowest single account -- not the sum of all accounts. This is much more efficient.
-
-Each individual account still has its own AbortController with a 280-second timeout, and failed items still retry with exponential backoff as before.
-
-### Files Modified
+**Files to modify:**
 
 | File | Change |
 |------|--------|
-| `supabase/functions/scrape-queue-processor/index.ts` | Fetch up to 5 items, process with `Promise.allSettled()` |
+| `supabase/functions/apify-scraper/index.ts` | Detect deleted/not_found from API error responses, update `account_status` |
+| `supabase/functions/scrape-queue-processor/index.ts` | Same deleted account detection |
+| `src/components/tiktok/TikTokAccountCard.tsx` | Add prominent red banner overlay for deleted accounts, disable scrape button |
+| `src/components/tiktok/TikTokAccountsTable.tsx` | Red row tint for deleted accounts, disable scrape in dropdown |
+| `src/components/tiktok/TikTokFiltersToolbar.tsx` | Add account status filter |
+| `src/pages/dashboard/TikTokAccounts.tsx` | Wire up the account status filter |
+
+**Detection logic in scraper:**
+- If the TikAPI returns a 404 or an empty videos array with an error message containing "not found" or "deleted", set `account_status = 'deleted'`
+- If the API returns 0 videos for an account that previously had videos, set `account_status = 'not_found'` as a soft indicator
+- On next successful sync (via "Sync Profile" which uses TikWM), status resets to `'active'` (this already works)
 
