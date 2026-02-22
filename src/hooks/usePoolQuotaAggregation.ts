@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useYouTubeQuota } from "@/hooks/useYouTubeQuota";
 import { ChannelPool } from "@/hooks/useChannelPools";
 
-const UPLOAD_QUOTA_COST = 1600;
+const UPLOAD_QUOTA_COST = 100;
 const DEFAULT_DAILY_QUOTA = 10000;
 
 export interface PoolQuotaInfo {

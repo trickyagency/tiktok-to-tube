@@ -10,7 +10,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // YouTube API quota constants
-const UPLOAD_QUOTA_COST = 1600;
+const UPLOAD_QUOTA_COST = 100;
 const DEFAULT_DAILY_QUOTA = 10000;
 
 // Get current time in a specific timezone
@@ -427,6 +427,7 @@ serve(async (req) => {
       let videosChecked = 0;
       let videosAlreadyQueued = 0;
       let ownershipFailed = 0;
+      let noDownloadUrl = 0;
       
       for (const video of unpublishedVideos) {
         videosChecked++;
@@ -464,6 +465,13 @@ serve(async (req) => {
           continue;
         }
 
+        // Skip videos without any URL to work with
+        if (!video.download_url && !video.video_url) {
+          console.log(`Video ${video.id} has no download_url or video_url, skipping`);
+          noDownloadUrl++;
+          continue;
+        }
+
         selectedVideo = video;
         break;
       }
@@ -471,11 +479,12 @@ serve(async (req) => {
       scheduleDebug.videosChecked = videosChecked;
       scheduleDebug.videosAlreadyQueued = videosAlreadyQueued;
       scheduleDebug.ownershipFailed = ownershipFailed;
+      scheduleDebug.noDownloadUrl = noDownloadUrl;
 
       if (!selectedVideo) {
         console.log(`No available videos for schedule "${schedule.schedule_name}"`);
         scheduleDebug.status = 'skipped';
-        scheduleDebug.reason = `No valid videos: ${videosChecked} checked, ${videosAlreadyQueued} already queued, ${ownershipFailed} ownership mismatch`;
+        scheduleDebug.reason = `No valid videos: ${videosChecked} checked, ${videosAlreadyQueued} already queued, ${ownershipFailed} ownership mismatch, ${noDownloadUrl} no download URL`;
         debugLog.push(scheduleDebug);
         continue;
       }

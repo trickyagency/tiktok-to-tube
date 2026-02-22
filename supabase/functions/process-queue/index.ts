@@ -14,7 +14,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const STUCK_TIMEOUT_MS = 5 * 60 * 1000;
 
 // YouTube API quota constants
-const UPLOAD_QUOTA_COST = 1600;
+const UPLOAD_QUOTA_COST = 100;
 const DEFAULT_DAILY_QUOTA = 10000;
 
 // Download retry configuration
@@ -663,7 +663,20 @@ async function processQueueItem(supabase: any, queueItem: any): Promise<void> {
     }
 
     if (!video.download_url) {
-      throw new Error('Video has no download URL');
+      // Try to fetch a fresh download URL via TikWM before giving up
+      console.log(`Video ${video.id} has no download URL, attempting TikWM fetch...`);
+      try {
+        const freshUrl = await getDirectVideoUrl(video.video_url);
+        video.download_url = freshUrl;
+        await supabase
+          .from('scraped_videos')
+          .update({ download_url: freshUrl })
+          .eq('id', video.id);
+        console.log(`Fetched fresh download URL for video ${video.id}`);
+      } catch (tikwmErr) {
+        console.error(`TikWM fetch failed for video ${video.id}:`, tikwmErr);
+        throw new Error('Video has no download URL and TikWM refresh failed');
+      }
     }
 
     // Fetch TikTok account for YouTube description settings
