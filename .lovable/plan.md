@@ -1,51 +1,64 @@
 
 
-## Fix: Update YouTube Quota Cost from 1600 to 100 Units
+## Fix Missed Uploads + Add Missed Uploads Monitoring Widget
 
-Google has updated the `youtube.videos.insert` API to cost **100 units** instead of 1600. This means each Google Cloud Client ID can now upload **100 videos/day** instead of just 6. The platform currently hardcodes `1600` everywhere, which is why channels are being falsely paused for "quota exceeded" after only 6 uploads.
+### Problem
+The `schedule-processor` uses exact minute matching (`time === timeString`), which means if the cron job fires at 10:01 instead of 10:00 due to timing drift or cold starts, the upload is silently skipped.
 
-### Also Fix: "Video has no download URL" Failures
+### Part 1: Fix Time Window Matching in Schedule Processor
 
-The 3 recent failed uploads are all caused by scraped videos missing a download URL. We'll add a check to skip these and pick the next video instead of failing the entire upload.
+**File: `supabase/functions/schedule-processor/index.ts`**
+
+Replace the `isTimeToPublish` function with a time-window approach:
+- Convert the current time and each publish time to total minutes since midnight
+- Match if the current time is within +/-2 minutes of any publish time
+- Add deduplication: before queuing, check if a video was already queued for this schedule + publish time slot today (query `publish_queue` for matching `schedule_id` with `created_at` within the last 5 minutes of the target time)
+
+```text
+Logic change:
+OLD: timeString === "10:00" (exact match)
+NEW: abs(currentMinutes - publishMinutes) <= 2 (window match)
+     + check publish_queue for existing entry for this schedule in last 5 min
+```
+
+The deduplication check prevents double-queuing if the cron fires twice within the window:
+- Query `publish_queue` for `schedule_id = X` AND `created_at > (now - 5 minutes)` AND `status IN ('queued', 'processing', 'published')`
+- If found, skip (already handled this time slot)
+
+### Part 2: Add "Missed Uploads" Monitoring Widget
+
+**New file: `src/components/dashboard/MissedUploadsWidget.tsx`**
+
+A dashboard widget that shows schedules that may have missed their publish time in the last 24 hours. Logic:
+- Fetch all active `publish_schedules` with their `publish_times` and `timezone`
+- For each schedule, calculate expected publish times in the last 24 hours
+- Cross-reference with `publish_queue` entries (by `schedule_id` and `created_at` near each expected time)
+- If no queue entry exists for an expected time, flag it as "missed"
+- Display as a card with warning styling, listing schedule name, expected time, and channel
+
+**New file: `src/hooks/useMissedUploads.ts`**
+
+Custom hook to compute missed uploads by comparing expected vs actual queue entries in the last 24 hours.
+
+**Modified file: `src/pages/dashboard/Dashboard.tsx`**
+
+Add the `MissedUploadsWidget` below the `ChannelHealthWidget` on the dashboard.
 
 ---
 
-### Changes
-
-**1. Update quota cost constant in all 5 locations**
+### Technical Details
 
 | File | Change |
 |------|--------|
-| `supabase/functions/process-queue/index.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
-| `supabase/functions/schedule-processor/index.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
-| `src/hooks/useYouTubeQuota.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
-| `src/hooks/usePoolQuotaAggregation.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
-| DB function `check_quota_available` | Update default parameter from `1600` to `100` |
+| `supabase/functions/schedule-processor/index.ts` | Replace exact matching with +/-2 min window + dedup check |
+| `src/hooks/useMissedUploads.ts` | New hook: compute missed uploads from schedules vs queue |
+| `src/components/dashboard/MissedUploadsWidget.tsx` | New widget: display missed uploads in last 24h |
+| `src/pages/dashboard/Dashboard.tsx` | Add MissedUploadsWidget to dashboard |
 
-**2. Update UI display text**
+### User Experience
 
-The MiniQuotaBar and quota indicators will automatically show correct numbers once the constant changes (e.g., "94 uploads remaining" instead of "5 uploads remaining").
-
-**3. Fix "Video has no download URL" failures**
-
-In `supabase/functions/process-queue/index.ts` and `supabase/functions/schedule-processor/index.ts`:
-- Before queuing a video, verify it has a valid `download_url`
-- If not, skip it and pick the next unpublished video
-- Mark the video with a flag so it's not repeatedly selected
-
-### Impact
-
-- Channels will no longer falsely pause after 6 uploads
-- Each channel can now process up to **100 uploads/day**
-- Videos without download URLs will be skipped instead of causing failures
-
-### Files Modified
-
-| File | Change |
-|------|--------|
-| `supabase/functions/process-queue/index.ts` | Quota cost 1600 to 100, skip videos without download URL |
-| `supabase/functions/schedule-processor/index.ts` | Quota cost 1600 to 100 |
-| `src/hooks/useYouTubeQuota.ts` | Quota cost 1600 to 100 |
-| `src/hooks/usePoolQuotaAggregation.ts` | Quota cost 1600 to 100 |
-| New SQL migration | Update `check_quota_available` default from 1600 to 100 |
+- **No more missed uploads**: The 2-minute window ensures cron timing drift (typically under 1 minute) never causes a miss
+- **No double uploads**: Deduplication check prevents the window from causing duplicate queuing
+- **Visibility**: The dashboard widget shows any missed slots so you can monitor reliability at a glance
+- **Auto-hides**: The widget only appears when there are missed uploads (same pattern as ChannelHealthWidget)
 
