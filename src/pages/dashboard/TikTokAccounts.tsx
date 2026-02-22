@@ -255,25 +255,19 @@ const TikTokAccounts = () => {
               </Alert>
             )}
             
-            {/* Configured but Invalid/Expired */}
+            {/* Configured but Invalid */}
             {isApifyConfigured && apifyValidation && !apifyValidation.valid && (
               <Alert variant="destructive">
                 <XCircle className="h-4 w-4" />
                 <AlertDescription className="flex items-center justify-between gap-4">
                   <span>
-                    <strong>
-                      {apifyValidation.status === 'expired' 
-                        ? 'Scraper subscription expired.' 
-                        : apifyValidation.status === 'invalid'
-                        ? 'Invalid scraper API key.'
-                        : 'Scraper API key error.'}
-                    </strong>{' '}
+                    <strong>Scraper API error.</strong>{' '}
                     {apifyValidation.message}. Video scraping is disabled.
                   </span>
                   <Button variant="outline" size="sm" asChild className="shrink-0">
                     <Link to="/dashboard/settings">
                       <Settings className="h-4 w-4 mr-2" />
-                      Update API Key
+                      Check Settings
                     </Link>
                   </Button>
                 </AlertDescription>
