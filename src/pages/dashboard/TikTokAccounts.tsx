@@ -36,6 +36,7 @@ const TikTokAccounts = () => {
   // Filter and view state
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [accountStatusFilter, setAccountStatusFilter] = useState('all');
   const [ownerFilter, setOwnerFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState('username');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
@@ -83,12 +84,18 @@ const TikTokAccounts = () => {
         account.display_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
         ownerEmail.includes(searchQuery.toLowerCase());
       
-      // Status filter
+      // Scrape status filter
       const matchesStatus = statusFilter === 'all' || 
         account.scrape_status === statusFilter ||
         (statusFilter === 'active' && account.account_status === 'active') ||
         (statusFilter === 'private' && account.account_status === 'private') ||
         (statusFilter === 'deleted' && account.account_status === 'deleted');
+      
+      // Account status filter (active/private/deleted)
+      const matchesAccountStatus = accountStatusFilter === 'all' || 
+        (accountStatusFilter === 'active' && account.account_status === 'active') ||
+        (accountStatusFilter === 'private' && account.account_status === 'private') ||
+        (accountStatusFilter === 'deleted' && (account.account_status === 'deleted' || account.account_status === 'not_found'));
       
       // Owner filter (only for owners viewing all accounts)
       const matchesOwner = ownerFilter === 'all' || 
@@ -106,9 +113,9 @@ const TikTokAccounts = () => {
         }
       }
       
-      return matchesSearch && matchesStatus && matchesOwner && matchesDate;
+      return matchesSearch && matchesStatus && matchesAccountStatus && matchesOwner && matchesDate;
     });
-  }, [accounts, searchQuery, statusFilter, ownerFilter, dateFrom, dateTo]);
+  }, [accounts, searchQuery, statusFilter, accountStatusFilter, ownerFilter, dateFrom, dateTo]);
 
   // Sort accounts
   const sortedAccounts = useMemo(() => {
@@ -165,12 +172,13 @@ const TikTokAccounts = () => {
   const clearFilters = () => {
     setSearchQuery('');
     setStatusFilter('all');
+    setAccountStatusFilter('all');
     setOwnerFilter('all');
     setDateFrom(undefined);
     setDateTo(undefined);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || ownerFilter !== 'all' || !!dateFrom || !!dateTo;
+  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all' || accountStatusFilter !== 'all' || ownerFilter !== 'all' || !!dateFrom || !!dateTo;
 
   const totalFollowers = accounts?.reduce((sum, a) => sum + (a.follower_count || 0), 0) || 0;
 
@@ -329,6 +337,8 @@ const TikTokAccounts = () => {
             dateFrom={dateFrom}
             dateTo={dateTo}
             onDateChange={handleDateChange}
+            accountStatusFilter={accountStatusFilter}
+            onAccountStatusFilterChange={setAccountStatusFilter}
           />
         ) : null}
 
