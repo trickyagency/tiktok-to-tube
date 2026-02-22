@@ -1,43 +1,51 @@
 
 
-## Show "TikTok User Deleted" Status More Prominently
+## Fix: Update YouTube Quota Cost from 1600 to 100 Units
 
-### What Changes
+Google has updated the `youtube.videos.insert` API to cost **100 units** instead of 1600. This means each Google Cloud Client ID can now upload **100 videos/day** instead of just 6. The platform currently hardcodes `1600` everywhere, which is why channels are being falsely paused for "quota exceeded" after only 6 uploads.
 
-**1. Detect deleted accounts in the TikAPI scraper**
-- In `supabase/functions/apify-scraper/index.ts`: When the API returns an error or empty result indicating the account doesn't exist, update `account_status` to `'deleted'` or `'not_found'` on the `tiktok_accounts` table
-- Similarly update `supabase/functions/scrape-queue-processor/index.ts`
+### Also Fix: "Video has no download URL" Failures
 
-**2. Make the "Deleted" status more prominent on TikTok Account Cards**
-- In `src/components/tiktok/TikTokAccountCard.tsx`:
-  - Add a red overlay banner across the card saying "TikTok Account Deleted" with UserX icon
-  - Disable the Scrape button for deleted accounts (no point scraping a deleted user)
-  - Keep the grayscale avatar (already there) but add a strikethrough on the username
-  - Show a tooltip explaining what "deleted" means
+The 3 recent failed uploads are all caused by scraped videos missing a download URL. We'll add a check to skip these and pick the next video instead of failing the entire upload.
 
-**3. Make the "Deleted" status visible in Table view**
-- In `src/components/tiktok/TikTokAccountsTable.tsx`:
-  - The "Deleted" badge already shows, but add a red row background tint for deleted accounts so they stand out
-  - Disable scrape actions for deleted accounts in the dropdown menu
+---
 
-**4. Add a filter option to show/hide deleted accounts**
-- In `src/components/tiktok/TikTokFiltersToolbar.tsx`: Add an "Account Status" filter dropdown with options: All, Active, Private, Deleted -- so users can quickly find deleted accounts or hide them
+### Changes
 
-### Technical Details
-
-**Files to modify:**
+**1. Update quota cost constant in all 5 locations**
 
 | File | Change |
 |------|--------|
-| `supabase/functions/apify-scraper/index.ts` | Detect deleted/not_found from API error responses, update `account_status` |
-| `supabase/functions/scrape-queue-processor/index.ts` | Same deleted account detection |
-| `src/components/tiktok/TikTokAccountCard.tsx` | Add prominent red banner overlay for deleted accounts, disable scrape button |
-| `src/components/tiktok/TikTokAccountsTable.tsx` | Red row tint for deleted accounts, disable scrape in dropdown |
-| `src/components/tiktok/TikTokFiltersToolbar.tsx` | Add account status filter |
-| `src/pages/dashboard/TikTokAccounts.tsx` | Wire up the account status filter |
+| `supabase/functions/process-queue/index.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
+| `supabase/functions/schedule-processor/index.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
+| `src/hooks/useYouTubeQuota.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
+| `src/hooks/usePoolQuotaAggregation.ts` | `UPLOAD_QUOTA_COST = 1600` to `100` |
+| DB function `check_quota_available` | Update default parameter from `1600` to `100` |
 
-**Detection logic in scraper:**
-- If the TikAPI returns a 404 or an empty videos array with an error message containing "not found" or "deleted", set `account_status = 'deleted'`
-- If the API returns 0 videos for an account that previously had videos, set `account_status = 'not_found'` as a soft indicator
-- On next successful sync (via "Sync Profile" which uses TikWM), status resets to `'active'` (this already works)
+**2. Update UI display text**
+
+The MiniQuotaBar and quota indicators will automatically show correct numbers once the constant changes (e.g., "94 uploads remaining" instead of "5 uploads remaining").
+
+**3. Fix "Video has no download URL" failures**
+
+In `supabase/functions/process-queue/index.ts` and `supabase/functions/schedule-processor/index.ts`:
+- Before queuing a video, verify it has a valid `download_url`
+- If not, skip it and pick the next unpublished video
+- Mark the video with a flag so it's not repeatedly selected
+
+### Impact
+
+- Channels will no longer falsely pause after 6 uploads
+- Each channel can now process up to **100 uploads/day**
+- Videos without download URLs will be skipped instead of causing failures
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `supabase/functions/process-queue/index.ts` | Quota cost 1600 to 100, skip videos without download URL |
+| `supabase/functions/schedule-processor/index.ts` | Quota cost 1600 to 100 |
+| `src/hooks/useYouTubeQuota.ts` | Quota cost 1600 to 100 |
+| `src/hooks/usePoolQuotaAggregation.ts` | Quota cost 1600 to 100 |
+| New SQL migration | Update `check_quota_available` default from 1600 to 100 |
 
