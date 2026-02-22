@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-const UPLOAD_QUOTA_COST = 1600;
+const UPLOAD_QUOTA_COST = 100;
 const DEFAULT_DAILY_QUOTA = 10000;
 
 export interface QuotaUsage {
