@@ -11,6 +11,7 @@ import { RenewalReminderBanner } from '@/components/subscriptions/RenewalReminde
 import { UploadProgressWidget } from '@/components/dashboard/UploadProgressWidget';
 import { ChannelHealthWidget } from '@/components/dashboard/ChannelHealthWidget';
 import { MissedUploadsWidget } from '@/components/dashboard/MissedUploadsWidget';
+import { LowVideoInventoryAlert } from '@/components/dashboard/LowVideoInventoryAlert';
 import { useWelcomeModal } from '@/hooks/useWelcomeModal';
 import { useWelcomeEmail } from '@/hooks/useWelcomeEmail';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -161,6 +162,9 @@ const Dashboard = () => {
 
       {/* Channel Health Widget - shows channels with issues */}
       <ChannelHealthWidget />
+
+      {/* Low Video Inventory Alert */}
+      <LowVideoInventoryAlert />
 
       {/* Missed Uploads Widget - shows schedules that missed their publish time */}
       <MissedUploadsWidget />
