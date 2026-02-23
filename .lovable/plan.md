@@ -1,66 +1,44 @@
 
 
-## Fix: TikAPI Video Mapping - All Videos Being Dropped
+## Auto Re-scrape When Videos Run Out
 
-### Root Cause
-The TikAPI (`tikapi.digitalautomators.com`) returns video data with field names that don't match the `mapVideoData` function's expected fields. Most critically, `duration_seconds` is not recognized, so all videos get `duration = 0` and are filtered out as "slideshows."
+### What This Does
+Jab kisi TikTok account ki saari videos publish ho jayein (unpublished videos = 0), toh schedule-processor automatically us account ko scrape queue mein daal dega taake naye videos import ho jayein. Is tarah aapko manually scrape karne ki zaroorat nahi hogi.
 
-### Evidence from Logs
-```
-Sample item keys: video_id, username, video_url, title, duration_seconds, 
-                  upload_date, view_count, like_count, comment_count, 
-                  repost_count, save_count, thumbnail, artists, track
-Raw videos: 80
-Mapped videos (after duration filter): 0   <-- ALL DROPPED
-```
+### How It Works
 
-### Field Mapping Gaps
+1. When the schedule-processor finds **0 unpublished videos** for an account, instead of just skipping, it will:
+   - Check if the account was already scraped recently (within the last 6 hours) to avoid spamming
+   - Check if there's already a pending/processing scrape queue item for this account
+   - If neither, insert a new `scrape_queue` entry for this account
+   - Log it and continue (the `scrape-queue-processor` cron will pick it up)
 
-| TikAPI Field | Currently Checked Fields | Status |
-|---|---|---|
-| `duration_seconds` | `videoDuration`, `duration`, `video_duration` | MISSING - causes all videos to be dropped |
-| `thumbnail` | `coverUrl`, `thumbnail_url`, `cover` | MISSING |
-| `repost_count` | `shareCount`, `share_count`, `shares` | MISSING |
-| `save_count` | (not captured) | MISSING |
-| `upload_date` | `postDate`, `created_at`, `createTime` | MISSING |
-| `title` | `videoDescription`, `description`, `title` | OK (matched via `title`) |
-| `video_id` | `id`, `video_id`, `tiktok_video_id` | OK |
-| `video_url` | `videoUrl`, `video_url`, `url` | OK |
-| `view_count` | `playCount`, `view_count`, `views` | OK |
-| `like_count` | `diggCount`, `like_count`, `likes` | OK |
-| `comment_count` | `commentCount`, `comment_count`, `comments` | OK |
+2. The schedule will still skip that time slot (no video to upload), but the next time the scrape completes and new videos appear, the schedule will automatically resume uploading.
 
-### Changes
+### Files Changed
 
-**1. `supabase/functions/apify-scraper/index.ts`** - Update `mapVideoData` function:
-- Add `duration_seconds` to the duration extraction chain
-- Add `thumbnail` to the thumbnail URL chain
-- Add `repost_count` to the share count chain
-- Add `upload_date` to the scraped_at chain
-- Add `download_url` fallback for TikAPI format
+| File | Change |
+|------|--------|
+| `supabase/functions/schedule-processor/index.ts` | Add auto-rescrape logic when unpublished videos = 0 |
 
-**2. `supabase/functions/scrape-queue-processor/index.ts`** - Same `mapVideoData` fix (identical function):
-- Apply the same field mapping updates to keep both functions in sync
+### Technical Details
 
-### Specific Code Change (both files)
+**In `schedule-processor/index.ts`**, at lines 463-468 where it currently says "No unpublished videos available" and skips:
 
-```typescript
-// Duration - ADD duration_seconds
-const duration = item.videoDuration || item.duration || item.video_duration || item.duration_seconds || 0;
-
-// Thumbnail - ADD thumbnail
-thumbnail_url: item.coverUrl || item.thumbnail_url || item.cover || item.thumbnail || null,
-
-// Share count - ADD repost_count
-share_count: item.shareCount || item.share_count || item.shares || item.repost_count || 0,
-
-// Scraped at / upload date - ADD upload_date
-scraped_at: item.postDate || item.created_at || item.createTime || item.upload_date || new Date().toISOString(),
+```text
+NEW LOGIC:
+1. Check tiktok_accounts.last_scraped_at -- if less than 6 hours ago, skip (cooldown)
+2. Check tiktok_accounts.account_status -- if 'deleted', skip (no point scraping)
+3. Check scrape_queue for pending/processing item for this account -- if exists, skip
+4. Insert into scrape_queue: { tiktok_account_id, user_id, status: 'pending', priority: 0 }
+5. Log: "Auto-queued rescrape for account X (videos depleted)"
 ```
 
-### Impact
-- All 80+ videos per account that are currently being silently dropped will now be properly imported
-- Both manual scraping (apify-scraper) and queue-based scraping (scrape-queue-processor) will be fixed
-- No database changes needed
-- Both edge functions will be redeployed
+This keeps the logic entirely server-side in the schedule-processor -- no frontend changes needed. The existing `scrape-queue-processor` cron job will automatically process the new queue item.
+
+### Safety Guards
+- **6-hour cooldown**: Won't re-scrape the same account more than once every 6 hours
+- **Deleted account check**: Won't try to scrape accounts marked as deleted/not_found
+- **Duplicate prevention**: Won't queue if there's already a pending/processing scrape for that account
+- **No blocking**: The schedule still skips gracefully; scraping happens asynchronously via the queue
 
