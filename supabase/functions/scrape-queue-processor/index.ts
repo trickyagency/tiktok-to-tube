@@ -14,6 +14,17 @@ function extractVideoId(videoUrl: string): string | null {
   return match ? match[1] : null;
 }
 
+// Parse dates that may be in DD/MM/YYYY format
+function parseFlexibleDate(dateStr: string | undefined | null): string | null {
+  if (!dateStr) return null;
+  const ddmmyyyy = String(dateStr).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (ddmmyyyy) {
+    const [, day, month, year] = ddmmyyyy;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00.000Z`;
+  }
+  return String(dateStr);
+}
+
 function mapVideoData(item: any, accountId: string, accountOwnerId: string): any | null {
   let videoId = item.id || item.video_id || item.tiktok_video_id;
   const videoUrl = item.videoUrl || item.video_url || item.url || '';
@@ -40,7 +51,7 @@ function mapVideoData(item: any, accountId: string, accountOwnerId: string): any
     like_count: item.diggCount || item.like_count || item.likes || 0,
     comment_count: item.commentCount || item.comment_count || item.comments || 0,
     share_count: item.shareCount || item.share_count || item.shares || item.repost_count || 0,
-    scraped_at: item.postDate || item.created_at || item.createTime || item.upload_date || new Date().toISOString(),
+    scraped_at: parseFlexibleDate(item.postDate) || parseFlexibleDate(item.created_at) || parseFlexibleDate(item.createTime) || parseFlexibleDate(item.upload_date) || new Date().toISOString(),
     is_published: false,
   };
 }
