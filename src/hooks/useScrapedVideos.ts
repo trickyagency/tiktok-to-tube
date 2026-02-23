@@ -128,3 +128,24 @@ export function usePublishedVideosCount(accountId: string | null) {
     enabled: !!user && !!accountId,
   });
 }
+
+export function useUnpublishedVideosCount(accountId: string | null) {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['unpublished-videos-count', accountId],
+    queryFn: async () => {
+      if (!accountId) return 0;
+
+      const { count, error } = await supabase
+        .from('scraped_videos')
+        .select('*', { count: 'exact', head: true })
+        .eq('tiktok_account_id', accountId)
+        .eq('is_published', false);
+
+      if (error) throw error;
+      return count || 0;
+    },
+    enabled: !!user && !!accountId,
+  });
+}
