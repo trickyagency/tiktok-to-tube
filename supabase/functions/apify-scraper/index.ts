@@ -48,7 +48,7 @@ function mapVideoData(item: any, accountId: string, accountOwnerId: string): any
   if (!videoId) return null;
 
   // Filter out zero-duration items (images/slideshows)
-  const duration = item.videoDuration || item.duration || item.video_duration || 0;
+  const duration = item.videoDuration || item.duration || item.video_duration || item.duration_seconds || 0;
   if (duration === 0) return null;
 
   // Get the best download URL
@@ -66,14 +66,14 @@ function mapVideoData(item: any, accountId: string, accountOwnerId: string): any
     title: (item.videoDescription || item.description || item.title || '').substring(0, 255) || null,
     description: item.videoDescription || item.description || null,
     video_url: videoUrl,
-    thumbnail_url: item.coverUrl || item.thumbnail_url || item.cover || null,
+    thumbnail_url: item.coverUrl || item.thumbnail_url || item.cover || item.thumbnail || null,
     download_url: downloadUrl,
     duration: duration,
     view_count: item.playCount || item.view_count || item.views || 0,
     like_count: item.diggCount || item.like_count || item.likes || 0,
     comment_count: item.commentCount || item.comment_count || item.comments || 0,
-    share_count: item.shareCount || item.share_count || item.shares || 0,
-    scraped_at: item.postDate || item.created_at || item.createTime || new Date().toISOString(),
+    share_count: item.shareCount || item.share_count || item.shares || item.repost_count || 0,
+    scraped_at: item.postDate || item.created_at || item.createTime || item.upload_date || new Date().toISOString(),
     is_published: false,
   };
 }
