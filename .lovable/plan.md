@@ -1,38 +1,42 @@
 
 
-## Update Missed Uploads Widget: Distinguish "No Videos" vs "Timing Miss"
+## Auto-Enable ReScrape for Low/Empty Video Accounts
 
 ### What Changes
-The Missed Uploads widget currently treats all missed schedules the same. This update will show two distinct categories with different icons, colors, and messages:
-
-- **No Videos Available** (blue/info icon) -- The schedule fired but all videos for that TikTok account are already published. Auto re-scrape may have been triggered.
-- **Timing Miss** (amber/warning icon) -- The schedule processor didn't fire at all for this time slot. This is the more concerning case.
+Currently, the "ReScrape" button on TikTok account cards has a strict 15-day cooldown. This update will **bypass the cooldown** for accounts that have low (fewer than 5) or zero unpublished videos remaining, so you can immediately rescrape them without waiting.
 
 ### How It Works
 
-The hook will fetch unpublished video counts per TikTok account and attach a `reason` field to each missed upload entry:
-- Query `scraped_videos` grouped by `tiktok_account_id` where `is_published = false` to get counts
-- If unpublished count for that account is 0: reason = `'no_videos'`
-- Otherwise: reason = `'timing_miss'`
+1. Add a new hook `useUnpublishedVideosCount` to get the count of unpublished videos per account
+2. In the `TikTokAccountCard`, use that count to override the 15-day cooldown logic:
+   - If unpublished videos < 5 and the account was scraped, the button shows **"ReScrape (Low Videos)"** and is enabled regardless of cooldown
+   - If unpublished videos = 0, it shows **"ReScrape (No Videos)"** with a more urgent styling
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `src/hooks/useMissedUploads.ts` | Add `reason` field to `MissedUpload` interface; query unpublished video counts; assign reason per entry |
-| `src/components/dashboard/MissedUploadsWidget.tsx` | Show different icon, color, and label based on `reason`; group/sort by reason |
+| `src/hooks/useScrapedVideos.ts` | Add `useUnpublishedVideosCount` hook (similar to `usePublishedVideosCount` but with `is_published = false`) |
+| `src/components/tiktok/TikTokAccountCard.tsx` | Import the new hook; modify `getButtonConfig()` to bypass cooldown when unpublished count < 5 |
 
 ### Technical Details
 
-**`useMissedUploads.ts`**:
-- Add `reason: 'no_videos' | 'timing_miss'` to the `MissedUpload` interface
-- After building the `missed` array, collect unique `tiktokAccountId` values
-- Query `scraped_videos` with `.eq('is_published', false)` for those account IDs, using a count query per account
-- For each missed entry, set `reason = 'no_videos'` if that account has 0 unpublished videos, otherwise `'timing_miss'`
+**`useScrapedVideos.ts`** -- Add new hook:
+```typescript
+export function useUnpublishedVideosCount(accountId: string | null) {
+  // Same pattern as usePublishedVideosCount but .eq('is_published', false)
+}
+```
 
-**`MissedUploadsWidget.tsx`**:
-- **No Videos**: Use `VideoOff` icon (from lucide-react), blue styling (`border-blue-500/20`, `bg-blue-500/10`), label: "No videos available -- auto re-scrape queued"
-- **Timing Miss**: Keep current amber styling with `Clock` icon, label: "Schedule didn't fire"
-- Show grouped counts in the header: e.g., "Missed Uploads (2 timing, 3 no videos)"
-- Sort timing misses first (more urgent) then no-videos entries
+**`TikTokAccountCard.tsx`** -- Modify `getButtonConfig()`:
+- Import and call `useUnpublishedVideosCount(account.id)`
+- Add a new `hasLowVideos` flag: `unpublishedCount < 5 && isScraped`
+- In `getButtonConfig()`, before the `isScraped && !canRescrape` (disabled) branch at line 142, add a new check:
+  - If `isScraped && !canRescrape && hasLowVideos`: return enabled button with label "ReScrape (Low Videos)" or "ReScrape (No Videos)", variant `default`, amber/warning styling
+- This way accounts with enough videos keep the normal cooldown, but depleted accounts get an override
+
+### Result
+- Accounts with 5+ unpublished videos: Normal 15-day cooldown (no change)
+- Accounts with 1-4 unpublished videos: Button enabled with "ReScrape (Low Videos)" label
+- Accounts with 0 unpublished videos: Button enabled with "ReScrape (No Videos)" label and urgent styling
 
