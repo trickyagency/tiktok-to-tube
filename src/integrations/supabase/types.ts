@@ -1605,6 +1605,10 @@ export type Database = {
       }
       is_apify_configured: { Args: never; Returns: boolean }
       is_owner: { Args: { _user_id: string }; Returns: boolean }
+      mark_video_as_published: {
+        Args: { p_video_id: string }
+        Returns: boolean
+      }
       release_stale_claims: { Args: { p_minutes?: number }; Returns: number }
       restore_incorrectly_published_videos: { Args: never; Returns: number }
     }

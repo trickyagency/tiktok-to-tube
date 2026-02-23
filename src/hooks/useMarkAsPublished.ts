@@ -152,23 +152,26 @@ export function useMarkAsPublished() {
           continue;
         }
 
-        // Mark as published
-        const { error: updateError } = await supabase
-          .from('scraped_videos')
-          .update({
-            is_published: true,
-            published_at: new Date().toISOString(),
-            published_via: 'manual',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', video.id);
+        // Mark as published via RPC (bypasses RLS for owners)
+        const { data: updated, error: rpcError } = await supabase
+          .rpc('mark_video_as_published', { p_video_id: video.id });
 
-        if (updateError) {
+        if (rpcError) {
           results.rejected++;
           results.details.push({
             url,
             status: 'invalid',
-            message: `Failed to update: ${updateError.message}`,
+            message: `Failed to update: ${rpcError.message}`,
+          });
+          continue;
+        }
+
+        if (!updated) {
+          results.skipped++;
+          results.details.push({
+            url,
+            status: 'skipped',
+            message: 'Already published or insufficient permissions',
           });
           continue;
         }
