@@ -35,6 +35,19 @@ async function updateAccountStatus(
   }
 }
 
+// Parse dates that may be in DD/MM/YYYY format
+function parseFlexibleDate(dateStr: string | undefined | null): string | null {
+  if (!dateStr) return null;
+  // Match DD/MM/YYYY or DD-MM-YYYY
+  const ddmmyyyy = String(dateStr).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (ddmmyyyy) {
+    const [, day, month, year] = ddmmyyyy;
+    return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}T00:00:00.000Z`;
+  }
+  // Already ISO or unix timestamp — return as-is
+  return String(dateStr);
+}
+
 // Try to map video data from the API response (auto-detect format)
 function mapVideoData(item: any, accountId: string, accountOwnerId: string): any | null {
   // Try to extract video ID from various possible fields
@@ -73,7 +86,7 @@ function mapVideoData(item: any, accountId: string, accountOwnerId: string): any
     like_count: item.diggCount || item.like_count || item.likes || 0,
     comment_count: item.commentCount || item.comment_count || item.comments || 0,
     share_count: item.shareCount || item.share_count || item.shares || item.repost_count || 0,
-    scraped_at: item.postDate || item.created_at || item.createTime || item.upload_date || new Date().toISOString(),
+    scraped_at: parseFlexibleDate(item.postDate) || parseFlexibleDate(item.created_at) || parseFlexibleDate(item.createTime) || parseFlexibleDate(item.upload_date) || new Date().toISOString(),
     is_published: false,
   };
 }
