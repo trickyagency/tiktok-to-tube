@@ -461,9 +461,66 @@ serve(async (req) => {
       scheduleDebug.unpublishedVideoCount = unpublishedVideos?.length || 0;
 
       if (!unpublishedVideos || unpublishedVideos.length === 0) {
-        console.log(`No unpublished videos for schedule "${schedule.schedule_name}"`);
+        console.log(`No unpublished videos for schedule "${schedule.schedule_name}" - checking auto-rescrape`);
+
+        // === AUTO RE-SCRAPE LOGIC ===
+        let rescrapeQueued = false;
+        try {
+          // 1. Check account status and last_scraped_at
+          const { data: account } = await supabase
+            .from('tiktok_accounts')
+            .select('account_status, last_scraped_at, username')
+            .eq('id', schedule.tiktok_account_id)
+            .single();
+
+          if (account && account.account_status !== 'deleted' && account.account_status !== 'not_found') {
+            const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+            const recentlyScrapped = account.last_scraped_at && account.last_scraped_at > sixHoursAgo;
+
+            if (recentlyScrapped) {
+              console.log(`Account @${account.username} was scraped recently (${account.last_scraped_at}), skipping auto-rescrape`);
+            } else {
+              // 2. Check for existing pending/processing scrape queue item
+              const { data: existingScrape } = await supabase
+                .from('scrape_queue')
+                .select('id, status')
+                .eq('tiktok_account_id', schedule.tiktok_account_id)
+                .in('status', ['pending', 'processing'])
+                .maybeSingle();
+
+              if (existingScrape) {
+                console.log(`Account @${account.username} already has a ${existingScrape.status} scrape queued`);
+              } else {
+                // 3. Queue the rescrape
+                const { error: scrapeInsertError } = await supabase
+                  .from('scrape_queue')
+                  .insert({
+                    tiktok_account_id: schedule.tiktok_account_id,
+                    user_id: schedule.user_id,
+                    status: 'pending',
+                    priority: 0,
+                  });
+
+                if (scrapeInsertError) {
+                  console.error(`Failed to queue auto-rescrape for @${account.username}:`, scrapeInsertError.message);
+                } else {
+                  console.log(`✓ Auto-queued rescrape for @${account.username} (videos depleted)`);
+                  rescrapeQueued = true;
+                }
+              }
+            }
+          } else {
+            console.log(`Account ${schedule.tiktok_account_id} status is ${account?.account_status || 'unknown'}, skipping auto-rescrape`);
+          }
+        } catch (rescrapeError) {
+          console.error('Auto-rescrape check failed:', rescrapeError);
+        }
+
         scheduleDebug.status = 'skipped';
-        scheduleDebug.reason = 'No unpublished videos available';
+        scheduleDebug.reason = rescrapeQueued
+          ? 'No unpublished videos - auto-rescrape queued'
+          : 'No unpublished videos available';
+        scheduleDebug.autoRescrapeQueued = rescrapeQueued;
         debugLog.push(scheduleDebug);
         continue;
       }
