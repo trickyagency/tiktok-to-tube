@@ -1,64 +1,66 @@
 
 
-## Fix Missed Uploads + Add Missed Uploads Monitoring Widget
+## Fix: TikAPI Video Mapping - All Videos Being Dropped
 
-### Problem
-The `schedule-processor` uses exact minute matching (`time === timeString`), which means if the cron job fires at 10:01 instead of 10:00 due to timing drift or cold starts, the upload is silently skipped.
+### Root Cause
+The TikAPI (`tikapi.digitalautomators.com`) returns video data with field names that don't match the `mapVideoData` function's expected fields. Most critically, `duration_seconds` is not recognized, so all videos get `duration = 0` and are filtered out as "slideshows."
 
-### Part 1: Fix Time Window Matching in Schedule Processor
-
-**File: `supabase/functions/schedule-processor/index.ts`**
-
-Replace the `isTimeToPublish` function with a time-window approach:
-- Convert the current time and each publish time to total minutes since midnight
-- Match if the current time is within +/-2 minutes of any publish time
-- Add deduplication: before queuing, check if a video was already queued for this schedule + publish time slot today (query `publish_queue` for matching `schedule_id` with `created_at` within the last 5 minutes of the target time)
-
-```text
-Logic change:
-OLD: timeString === "10:00" (exact match)
-NEW: abs(currentMinutes - publishMinutes) <= 2 (window match)
-     + check publish_queue for existing entry for this schedule in last 5 min
+### Evidence from Logs
+```
+Sample item keys: video_id, username, video_url, title, duration_seconds, 
+                  upload_date, view_count, like_count, comment_count, 
+                  repost_count, save_count, thumbnail, artists, track
+Raw videos: 80
+Mapped videos (after duration filter): 0   <-- ALL DROPPED
 ```
 
-The deduplication check prevents double-queuing if the cron fires twice within the window:
-- Query `publish_queue` for `schedule_id = X` AND `created_at > (now - 5 minutes)` AND `status IN ('queued', 'processing', 'published')`
-- If found, skip (already handled this time slot)
+### Field Mapping Gaps
 
-### Part 2: Add "Missed Uploads" Monitoring Widget
+| TikAPI Field | Currently Checked Fields | Status |
+|---|---|---|
+| `duration_seconds` | `videoDuration`, `duration`, `video_duration` | MISSING - causes all videos to be dropped |
+| `thumbnail` | `coverUrl`, `thumbnail_url`, `cover` | MISSING |
+| `repost_count` | `shareCount`, `share_count`, `shares` | MISSING |
+| `save_count` | (not captured) | MISSING |
+| `upload_date` | `postDate`, `created_at`, `createTime` | MISSING |
+| `title` | `videoDescription`, `description`, `title` | OK (matched via `title`) |
+| `video_id` | `id`, `video_id`, `tiktok_video_id` | OK |
+| `video_url` | `videoUrl`, `video_url`, `url` | OK |
+| `view_count` | `playCount`, `view_count`, `views` | OK |
+| `like_count` | `diggCount`, `like_count`, `likes` | OK |
+| `comment_count` | `commentCount`, `comment_count`, `comments` | OK |
 
-**New file: `src/components/dashboard/MissedUploadsWidget.tsx`**
+### Changes
 
-A dashboard widget that shows schedules that may have missed their publish time in the last 24 hours. Logic:
-- Fetch all active `publish_schedules` with their `publish_times` and `timezone`
-- For each schedule, calculate expected publish times in the last 24 hours
-- Cross-reference with `publish_queue` entries (by `schedule_id` and `created_at` near each expected time)
-- If no queue entry exists for an expected time, flag it as "missed"
-- Display as a card with warning styling, listing schedule name, expected time, and channel
+**1. `supabase/functions/apify-scraper/index.ts`** - Update `mapVideoData` function:
+- Add `duration_seconds` to the duration extraction chain
+- Add `thumbnail` to the thumbnail URL chain
+- Add `repost_count` to the share count chain
+- Add `upload_date` to the scraped_at chain
+- Add `download_url` fallback for TikAPI format
 
-**New file: `src/hooks/useMissedUploads.ts`**
+**2. `supabase/functions/scrape-queue-processor/index.ts`** - Same `mapVideoData` fix (identical function):
+- Apply the same field mapping updates to keep both functions in sync
 
-Custom hook to compute missed uploads by comparing expected vs actual queue entries in the last 24 hours.
+### Specific Code Change (both files)
 
-**Modified file: `src/pages/dashboard/Dashboard.tsx`**
+```typescript
+// Duration - ADD duration_seconds
+const duration = item.videoDuration || item.duration || item.video_duration || item.duration_seconds || 0;
 
-Add the `MissedUploadsWidget` below the `ChannelHealthWidget` on the dashboard.
+// Thumbnail - ADD thumbnail
+thumbnail_url: item.coverUrl || item.thumbnail_url || item.cover || item.thumbnail || null,
 
----
+// Share count - ADD repost_count
+share_count: item.shareCount || item.share_count || item.shares || item.repost_count || 0,
 
-### Technical Details
+// Scraped at / upload date - ADD upload_date
+scraped_at: item.postDate || item.created_at || item.createTime || item.upload_date || new Date().toISOString(),
+```
 
-| File | Change |
-|------|--------|
-| `supabase/functions/schedule-processor/index.ts` | Replace exact matching with +/-2 min window + dedup check |
-| `src/hooks/useMissedUploads.ts` | New hook: compute missed uploads from schedules vs queue |
-| `src/components/dashboard/MissedUploadsWidget.tsx` | New widget: display missed uploads in last 24h |
-| `src/pages/dashboard/Dashboard.tsx` | Add MissedUploadsWidget to dashboard |
-
-### User Experience
-
-- **No more missed uploads**: The 2-minute window ensures cron timing drift (typically under 1 minute) never causes a miss
-- **No double uploads**: Deduplication check prevents the window from causing duplicate queuing
-- **Visibility**: The dashboard widget shows any missed slots so you can monitor reliability at a glance
-- **Auto-hides**: The widget only appears when there are missed uploads (same pattern as ChannelHealthWidget)
+### Impact
+- All 80+ videos per account that are currently being silently dropped will now be properly imported
+- Both manual scraping (apify-scraper) and queue-based scraping (scrape-queue-processor) will be fixed
+- No database changes needed
+- Both edge functions will be redeployed
 
