@@ -12,6 +12,7 @@ export interface MissedUpload {
   youtubeChannelTitle?: string;
   tiktokAccountId: string;
   tiktokUsername?: string;
+  reason: 'no_videos' | 'timing_miss';
 }
 
 function timeToMinutes(timeStr: string): number {
@@ -144,14 +145,39 @@ export function useMissedUploads() {
                 youtubeChannelTitle: (schedule.youtube_channel as any)?.channel_title || undefined,
                 tiktokAccountId: schedule.tiktok_account_id,
                 tiktokUsername: (schedule.tiktok_account as any)?.username || undefined,
+                reason: 'timing_miss', // default, will be refined below
               });
             }
           }
         }
       }
 
-      // Sort by most recent expected time first
-      missed.sort((a, b) => b.expectedAt.getTime() - a.expectedAt.getTime());
+      // Fetch unpublished video counts per tiktok account to determine reason
+      const uniqueAccountIds = [...new Set(missed.map(m => m.tiktokAccountId))];
+      if (uniqueAccountIds.length > 0) {
+        const { data: unpublishedCounts } = await supabase
+          .from('scraped_videos')
+          .select('tiktok_account_id')
+          .in('tiktok_account_id', uniqueAccountIds)
+          .eq('is_published', false);
+
+        const countMap = new Map<string, number>();
+        uniqueAccountIds.forEach(id => countMap.set(id, 0));
+        unpublishedCounts?.forEach(row => {
+          countMap.set(row.tiktok_account_id, (countMap.get(row.tiktok_account_id) || 0) + 1);
+        });
+
+        for (const entry of missed) {
+          const unpubCount = countMap.get(entry.tiktokAccountId) || 0;
+          entry.reason = unpubCount === 0 ? 'no_videos' : 'timing_miss';
+        }
+      }
+
+      // Sort: timing_miss first (more urgent), then no_videos; within each group by most recent
+      missed.sort((a, b) => {
+        if (a.reason !== b.reason) return a.reason === 'timing_miss' ? -1 : 1;
+        return b.expectedAt.getTime() - a.expectedAt.getTime();
+      });
 
       return missed;
     },
