@@ -1,42 +1,77 @@
 
 
-## Auto-Enable ReScrape for Low/Empty Video Accounts
+## Fix: Mark as Published Feature
 
-### What Changes
-Currently, the "ReScrape" button on TikTok account cards has a strict 15-day cooldown. This update will **bypass the cooldown** for accounts that have low (fewer than 5) or zero unpublished videos remaining, so you can immediately rescrape them without waiting.
+### Root Cause
 
-### How It Works
+There are two issues preventing the feature from working:
 
-1. Add a new hook `useUnpublishedVideosCount` to get the count of unpublished videos per account
-2. In the `TikTokAccountCard`, use that count to override the 15-day cooldown logic:
-   - If unpublished videos < 5 and the account was scraped, the button shows **"ReScrape (Low Videos)"** and is enabled regardless of cooldown
-   - If unpublished videos = 0, it shows **"ReScrape (No Videos)"** with a more urgent styling
+1. **RLS permission mismatch (main bug)**: The owner can *view* all users' scraped videos (via the owner SELECT policy), but the UPDATE policy only allows `auth.uid() = user_id`. When the owner tries to mark videos from accounts owned by other users (e.g., `@mister_et_ptilu`, `@hauntedrules100`), the update query silently affects 0 rows -- no error is returned, but nothing changes. The code then reports "success" because it doesn't verify the update actually took effect.
 
-### Files Changed
+2. **No verification of update result**: After calling `.update()`, the code assumes success if there's no error. But Supabase RLS silently filters rows, so the update can return no error while changing nothing.
 
-| File | Change |
-|------|--------|
-| `src/hooks/useScrapedVideos.ts` | Add `useUnpublishedVideosCount` hook (similar to `usePublishedVideosCount` but with `is_published = false`) |
-| `src/components/tiktok/TikTokAccountCard.tsx` | Import the new hook; modify `getButtonConfig()` to bypass cooldown when unpublished count < 5 |
+### Affected Accounts
 
-### Technical Details
+| Account | Owner (user_id) | Issue |
+|---------|----------------|-------|
+| `@misteropenbrawn` | `bc365258...` (you) | Has 0 unpublished videos -- nothing to mark |
+| `@mister_et_ptilu` | `cec14264...` (other user) | RLS blocks your update |
+| `@hauntedrules100` | `cec14264...` (other user) | RLS blocks your update |
 
-**`useScrapedVideos.ts`** -- Add new hook:
-```typescript
-export function useUnpublishedVideosCount(accountId: string | null) {
-  // Same pattern as usePublishedVideosCount but .eq('is_published', false)
-}
+### Fix Plan
+
+**File: `src/hooks/useMarkAsPublished.ts`**
+
+1. **Add update verification**: After the `.update()` call, re-query the video to confirm `is_published` was actually set to `true`. If it wasn't, report a meaningful error ("Permission denied -- video belongs to another user").
+
+2. **Use service-level workaround for owners**: Since the owner needs to manage all accounts, modify the mutation to call a Supabase Edge Function (or use an RPC function) that can bypass RLS when the caller is an owner. 
+
+   **Preferred approach**: Create a simple Supabase database function (`mark_video_as_published`) that checks if the caller is the owner (using `is_owner(auth.uid())`), and if so, performs the update regardless of `user_id`. This avoids creating a new edge function.
+
+### Implementation Details
+
+**Step 1: Create a database RPC function** (SQL migration)
+
+```sql
+CREATE OR REPLACE FUNCTION mark_video_as_published(
+  p_video_id uuid
+) RETURNS boolean AS $$
+DECLARE
+  v_updated boolean := false;
+BEGIN
+  -- Owner can update any video; regular users can only update their own
+  IF is_owner(auth.uid()) OR EXISTS (
+    SELECT 1 FROM scraped_videos WHERE id = p_video_id AND user_id = auth.uid()
+  ) THEN
+    UPDATE scraped_videos
+    SET is_published = true,
+        published_at = now(),
+        published_via = 'manual',
+        updated_at = now()
+    WHERE id = p_video_id AND is_published = false;
+    
+    v_updated := FOUND;
+  END IF;
+  
+  RETURN v_updated;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 ```
 
-**`TikTokAccountCard.tsx`** -- Modify `getButtonConfig()`:
-- Import and call `useUnpublishedVideosCount(account.id)`
-- Add a new `hasLowVideos` flag: `unpublishedCount < 5 && isScraped`
-- In `getButtonConfig()`, before the `isScraped && !canRescrape` (disabled) branch at line 142, add a new check:
-  - If `isScraped && !canRescrape && hasLowVideos`: return enabled button with label "ReScrape (Low Videos)" or "ReScrape (No Videos)", variant `default`, amber/warning styling
-- This way accounts with enough videos keep the normal cooldown, but depleted accounts get an override
+**Step 2: Update `useMarkAsPublished.ts`**
+
+- Replace the direct `.update()` call with a call to `supabase.rpc('mark_video_as_published', { p_video_id: video.id })`
+- Check the returned boolean: if `false`, report "Failed to update -- insufficient permissions or video already published"
+- This makes the feature work for both owners and regular users
+
+**Step 3: Add verification feedback**
+
+- If the RPC returns `false`, add a detail entry with status `'invalid'` and message explaining the failure
+- This way users get clear feedback instead of silent failures
 
 ### Result
-- Accounts with 5+ unpublished videos: Normal 15-day cooldown (no change)
-- Accounts with 1-4 unpublished videos: Button enabled with "ReScrape (Low Videos)" label
-- Accounts with 0 unpublished videos: Button enabled with "ReScrape (No Videos)" label and urgent styling
+
+- Owners can mark any user's videos as published
+- Regular users can only mark their own videos (unchanged behavior)
+- Clear error messages when something goes wrong instead of silent failures
 
