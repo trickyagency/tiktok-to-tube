@@ -1,44 +1,38 @@
 
 
-## Auto Re-scrape When Videos Run Out
+## Update Missed Uploads Widget: Distinguish "No Videos" vs "Timing Miss"
 
-### What This Does
-Jab kisi TikTok account ki saari videos publish ho jayein (unpublished videos = 0), toh schedule-processor automatically us account ko scrape queue mein daal dega taake naye videos import ho jayein. Is tarah aapko manually scrape karne ki zaroorat nahi hogi.
+### What Changes
+The Missed Uploads widget currently treats all missed schedules the same. This update will show two distinct categories with different icons, colors, and messages:
+
+- **No Videos Available** (blue/info icon) -- The schedule fired but all videos for that TikTok account are already published. Auto re-scrape may have been triggered.
+- **Timing Miss** (amber/warning icon) -- The schedule processor didn't fire at all for this time slot. This is the more concerning case.
 
 ### How It Works
 
-1. When the schedule-processor finds **0 unpublished videos** for an account, instead of just skipping, it will:
-   - Check if the account was already scraped recently (within the last 6 hours) to avoid spamming
-   - Check if there's already a pending/processing scrape queue item for this account
-   - If neither, insert a new `scrape_queue` entry for this account
-   - Log it and continue (the `scrape-queue-processor` cron will pick it up)
-
-2. The schedule will still skip that time slot (no video to upload), but the next time the scrape completes and new videos appear, the schedule will automatically resume uploading.
+The hook will fetch unpublished video counts per TikTok account and attach a `reason` field to each missed upload entry:
+- Query `scraped_videos` grouped by `tiktok_account_id` where `is_published = false` to get counts
+- If unpublished count for that account is 0: reason = `'no_videos'`
+- Otherwise: reason = `'timing_miss'`
 
 ### Files Changed
 
 | File | Change |
 |------|--------|
-| `supabase/functions/schedule-processor/index.ts` | Add auto-rescrape logic when unpublished videos = 0 |
+| `src/hooks/useMissedUploads.ts` | Add `reason` field to `MissedUpload` interface; query unpublished video counts; assign reason per entry |
+| `src/components/dashboard/MissedUploadsWidget.tsx` | Show different icon, color, and label based on `reason`; group/sort by reason |
 
 ### Technical Details
 
-**In `schedule-processor/index.ts`**, at lines 463-468 where it currently says "No unpublished videos available" and skips:
+**`useMissedUploads.ts`**:
+- Add `reason: 'no_videos' | 'timing_miss'` to the `MissedUpload` interface
+- After building the `missed` array, collect unique `tiktokAccountId` values
+- Query `scraped_videos` with `.eq('is_published', false)` for those account IDs, using a count query per account
+- For each missed entry, set `reason = 'no_videos'` if that account has 0 unpublished videos, otherwise `'timing_miss'`
 
-```text
-NEW LOGIC:
-1. Check tiktok_accounts.last_scraped_at -- if less than 6 hours ago, skip (cooldown)
-2. Check tiktok_accounts.account_status -- if 'deleted', skip (no point scraping)
-3. Check scrape_queue for pending/processing item for this account -- if exists, skip
-4. Insert into scrape_queue: { tiktok_account_id, user_id, status: 'pending', priority: 0 }
-5. Log: "Auto-queued rescrape for account X (videos depleted)"
-```
-
-This keeps the logic entirely server-side in the schedule-processor -- no frontend changes needed. The existing `scrape-queue-processor` cron job will automatically process the new queue item.
-
-### Safety Guards
-- **6-hour cooldown**: Won't re-scrape the same account more than once every 6 hours
-- **Deleted account check**: Won't try to scrape accounts marked as deleted/not_found
-- **Duplicate prevention**: Won't queue if there's already a pending/processing scrape for that account
-- **No blocking**: The schedule still skips gracefully; scraping happens asynchronously via the queue
+**`MissedUploadsWidget.tsx`**:
+- **No Videos**: Use `VideoOff` icon (from lucide-react), blue styling (`border-blue-500/20`, `bg-blue-500/10`), label: "No videos available -- auto re-scrape queued"
+- **Timing Miss**: Keep current amber styling with `Clock` icon, label: "Schedule didn't fire"
+- Show grouped counts in the header: e.g., "Missed Uploads (2 timing, 3 no videos)"
+- Sort timing misses first (more urgent) then no-videos entries
 
