@@ -8,7 +8,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Video, Users, RefreshCw, Trash2, MoreVertical, Eye, Loader2, ExternalLink, Download, RotateCcw, AlertCircle, Youtube, Lock, UserX, Settings, Heart, CheckCircle2, Clock, CheckSquare } from 'lucide-react';
 import { TikTokAccountWithOwner, useScrapeVideos, useRefreshTikTokAccount, useDeleteTikTokAccount, useResetTikTokAccount } from '@/hooks/useTikTokAccounts';
-import { usePublishedVideosCount } from '@/hooks/useScrapedVideos';
+import { usePublishedVideosCount, useUnpublishedVideosCount } from '@/hooks/useScrapedVideos';
 import { useUserAccountLimits } from '@/hooks/useUserAccountLimits';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatDistanceToNow, differenceInDays } from 'date-fns';
@@ -33,6 +33,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
   const deleteAccount = useDeleteTikTokAccount();
   const resetAccount = useResetTikTokAccount();
   const { data: publishedCount = 0 } = usePublishedVideosCount(account.id);
+  const { data: unpublishedCount = 0 } = useUnpublishedVideosCount(account.id);
   const { data: limits } = useUserAccountLimits();
   
   const hasYouTubeSettings = !!(account.youtube_description || account.youtube_tags);
@@ -137,6 +138,21 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
         variant: 'outline' as const,
         disabled: !isApifyConfigured || !canScrape,
         tooltip: 'Previous scrape failed. Click to retry.'
+      };
+    }
+    if (isScraped && !canRescrape && unpublishedCount < 5) {
+      const noVideos = unpublishedCount === 0;
+      return {
+        label: noVideos ? 'ReScrape (No Videos)' : 'ReScrape (Low Videos)',
+        icon: <RefreshCw className="h-4 w-4 mr-2" />,
+        variant: 'default' as const,
+        disabled: !isApifyConfigured || !canScrape,
+        tooltip: noVideos
+          ? 'No unpublished videos left — rescrape now to replenish'
+          : `Only ${unpublishedCount} unpublished video${unpublishedCount !== 1 ? 's' : ''} left — rescrape to replenish`,
+        className: noVideos
+          ? 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+          : 'bg-amber-500 hover:bg-amber-600 text-white',
       };
     }
     if (isScraped && !canRescrape) {
@@ -450,7 +466,7 @@ export function TikTokAccountCard({ account, onViewVideos, isApifyConfigured, in
                   size="sm"
                   onClick={handleScrapeVideos}
                   disabled={buttonConfig.disabled}
-                  className={`w-full h-9 ${isScraped && !canRescrape ? 'opacity-60' : ''}`}
+                  className={`w-full h-9 ${isScraped && !canRescrape && unpublishedCount >= 5 ? 'opacity-60' : ''} ${'className' in buttonConfig ? (buttonConfig as any).className : ''}`}
                 >
                   {buttonConfig.icon}
                   {buttonConfig.label}
